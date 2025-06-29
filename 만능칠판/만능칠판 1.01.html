@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>만능칠판</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="whiteboardCanvas" width="4800" height="3200"></canvas>
+  </div>
+
+<div id="toolbarScaleWrap">
+  <div id="toolbarWrapper">
+    <div id="toolbarToggle">
+      <button id="toolbarHideBtn" title="툴바 숨기기/보이기"><span class="arrow-down">▼</span></button>
+    </div>
+    <div id="toolbar">
+      <div class="toolbar-group">
+        <button class="mode-btn toggle-btn active-select" id="selectMoveToggleBtn" data-mode="select">
+          <span class="icon">🖱️</span>
+          <span id="selectMoveLabel">선택</span>
+        </button>
+      </div>
+      <div class="toolbar-group layer-checkbox-group">
+        <div class="layer-checkbox-row">
+          <label>
+            <input type="checkbox" data-layer="editLayer" checked> 편집용 레이어
+          </label>
+        </div>
+        <div class="layer-checkbox-row">
+          <label>
+            <input type="checkbox" data-layer="scheduleLayer" checked> 스케줄 레이어
+          </label>
+        </div>
+      </div>
+      <div class="toolbar-group">
+        <button class="mode-btn" id="bgColorBtn"><span class="icon">🎨</span> 배경색</button>
+
+      </div>
+      <div class="toolbar-group">
+        <div class="toolbar-item">
+          <div class="button-group">
+            <button class="mode-btn toggle-btn" id="penModeBtn"><span class="icon">🖊️</span> 펜</button>
+            <button class="tipup-toggle-btn" id="penTipupBtn" title="펜 옵션">
+              <span class="arrow-up">▲</span>
+            </button>
+          </div>
+        </div>
+        <div class="toolbar-item">
+          <div class="button-group">
+            <button class="mode-btn toggle-btn" id="freeTextModeBtn"><span class="icon">🔤</span> 텍스트</button>
+            <button class="tipup-toggle-btn" id="freeTextTipupBtn" title="텍스트 옵션">
+              <span class="arrow-up">▲</span>
+            </button>
+          </div>
+        </div>
+        <button class="mode-btn" id="eraserModeBtn"><span class="icon">❌</span> 선택 지우기</button>
+        <button class="action-btn" id="clearAllBtn"><span class="icon">🗑️</span> 전체 지우기</button>
+      </div>
+      <div class="toolbar-group">
+        <button class="mode-btn" id="homeBtn"><span class="icon">🏠</span> 홈</button>
+        <button class="action-btn" id="saveBtn"><span class="icon">💾</span> 저장</button>
+        <button class="action-btn" id="loadGeneralBtn"><span class="icon">📂</span> 불러오기</button>
+        <button class="action-btn" id="scheduleBtn"><span class="icon">⏰</span> 스케줄</button>
+      </div>
+    </div>
+  </div>
+ </div>
+
+        <div class="tip-up-settings" data-tipup="bgcolor" style="display:none;">
+          <div class="colors-container">
+            <div class="color-btn" data-color="#D6B588" title="나무색" style="background-color:#D6B588;"></div>
+            <div class="color-btn" data-color="#222222" title="밝은 검정" style="background-color:#222222;"></div>
+            <div class="color-btn" data-color="#006622" title="어두운 초록" style="background-color:#006622;"></div>
+          </div>
+        </div>
+
+          <div id="penSettings" class="tip-up-settings" style="display:none;">
+            <div class="pen-options-row">
+              <div class="colors-container">
+                <div class="color-btn" data-tool="pen" data-color="#000000" style="background-color: #000000;" title="검정색"></div>
+                <div class="color-btn" data-tool="pen" data-color="#ff0000" style="background-color: #ff0000;" title="빨간색"></div>
+                <div class="color-btn" data-tool="pen" data-color="#ffff00" style="background-color: #ffff00;" title="노란색"></div>
+                <div class="color-btn" data-tool="pen" data-color="#0000ff" style="background-color: #0000ff;" title="파란색"></div>
+                <div class="color-btn" data-tool="pen" data-color="#ffffff" style="background-color: #ffffff; border: 1px solid #cccccc;" title="흰색"></div>
+              </div>
+              <select id="penSizeSelect" class="size-select" data-tool="pen" title="펜 크기 선택">
+                <option value="1">1</option>
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="freeTextSettings" class="tip-up-settings" style="display:none;">
+            <div class="text-options-row">
+              <div class="colors-container">
+                <div class="color-btn" data-tool="freeText" data-color="#000000" style="background-color: #000000;" title="검정색"></div>
+                <div class="color-btn" data-tool="freeText" data-color="#ff0000" style="background-color: #ff0000;" title="빨간색"></div>
+                <div class="color-btn" data-tool="freeText" data-color="#ffff00" style="background-color: #ffff00;" title="노란색"></div>
+                <div class="color-btn" data-tool="freeText" data-color="#0000ff" style="background-color: #0000ff;" title="파란색"></div>
+                <div class="color-btn" data-tool="freeText" data-color="#ffffff" style="background-color: #ffffff; border: 1px solid #cccccc;" title="흰색"></div>
+              </div>
+              <select id="freeTextSizeSelect" class="size-select" data-tool="freeText" title="텍스트 상자 크기 선택">
+                <option value="12">12</option>
+                <option value="24">24</option>
+                <option value="48" selected>48</option>
+                <option value="72">72</option>
+                <option value="128">128</option>
+              </select>
+            </div>
+          </div>
+
+
+
+  <!-- 저장 확인 모달 -->
+  <div id="saveConfirmModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" id="closeSaveConfirmModal">&times;</span>
+      <h2>화면 저장</h2>
+      <p>저장할 화면의 제목을 입력해주세요.</p>
+      <input type="text" id="saveScreenNameInput" placeholder="제목 없음">
+      <p id="saveModalTimestamp" style="font-size: 0.9em; color: #555; margin-top: 5px;"></p>
+      <div class="modal-actions">
+        <button class="action-btn" id="confirmSaveBtn">확인</button>
+        <button class="action-btn" id="cancelSaveBtn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 스케줄 모달 -->
+  <div id="scheduleModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="close-btn" id="closeScheduleModalBtn">&times;</span>
+      <h2>스케줄 설정</h2>
+      <div class="schedule-form-section">
+        <label>요일 선택 (중복 가능):</label>
+        <div id="scheduleDayCheckboxes">
+          <label><input type="checkbox" name="scheduleDay" value="0"> 일</label>
+          <label><input type="checkbox" name="scheduleDay" value="1"> 월</label>
+          <label><input type="checkbox" name="scheduleDay" value="2"> 화</label>
+          <label><input type="checkbox" name="scheduleDay" value="3"> 수</label>
+          <label><input type="checkbox" name="scheduleDay" value="4"> 목</label>
+          <label><input type="checkbox" name="scheduleDay" value="5"> 금</label>
+          <label><input type="checkbox" name="scheduleDay" value="6"> 토</label>
+        </div>
+      </div>
+      <div class="schedule-form-section">
+        <label for="scheduleTime">시간 (24시간제 HH:MM):</label>
+        <input type="time" id="scheduleTime" name="scheduleTime" required>
+      </div>
+      <div class="schedule-form-section">
+        <label for="scheduledContentSelect">로드할 화면 선택:</label>
+        <div class="flex-container-for-select-button"> 
+          <select id="scheduledContentSelect"> <!-- flex-grow 인라인 스타일 제거 -->
+            <option value="">-- 화면 선택 --</option>
+            <option value="current_canvas_new_save">** 현재 캔버스 내용으로 새 화면 저장 **</option>
+          </select>
+          <button id="deleteSelectedScheduledScreenBtn" class="action-btn-small delete-btn" title="선택된 저장 화면 삭제">화면삭제</button>
+        </div>
+      </div>
+      <button id="addScheduleEntryBtn" class="action-btn">스케줄 추가/수정</button>
+      <hr>
+      <h3>등록된 스케줄 목록</h3>
+      <ul id="scheduleList"></ul>
+    </div>
+  </div>
+
+  <!-- 불러오기 모달 -->
+  <div id="loadSavedScreenModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="close-btn" id="closeLoadSavedScreenModalBtn">&times;</span>
+      <h2>저장된 화면 불러오기/삭제</h2>
+      <div id="savedScreenListContainer">
+        <p id="noSavedScreens" style="display:none;">저장된 화면이 없습니다.</p>
+        <ul id="savedScreenList">
+          <!-- JavaScript에 의해 채워짐 -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 전체 지우기 확인 모달 -->
+  <div id="clearConfirmModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" id="closeClearConfirmModal">&times;</span>
+      <h2>전체 지우기 확인</h2>
+      <p>선택한 레이어의 모든 내용을 삭제하시겠습니까?<br>이 작업은 되돌릴 수 없습니다.</p>
+      <div class="modal-actions">
+        <button class="action-btn" id="confirmClearBtn" style="background:#ff4444;color:#fff;">확인</button>
+        <button class="action-btn" id="cancelClearBtn">취소</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="viewport-info" style="display: none;"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="data.js"></script>
+  <script type="module" src="clipboard.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
