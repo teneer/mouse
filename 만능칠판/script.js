@@ -643,6 +643,7 @@ fabricCanvas.on('mouse:wheel', function(opt) {
 });
 
     fabricCanvas.on('object:modified', (e) => { if (dataManager) dataManager.debouncedSaveCanvasState(); });
+    debouncedRecordState();
 
     document.addEventListener('click', (e) => {
         const target = e.target;
@@ -1063,12 +1064,8 @@ fabricCanvas.on('mouse:wheel', function(opt) {
     // --- 모달 외부 클릭 수정 끝 ---
 
 
-initializeClipboard(fabricCanvas, {
-    getTargetLayerForDrawing: getTargetLayerForDrawing,
-    debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
-});
-
     const debouncedRecordState = debounce(() => recordState(fabricCanvas), 300);
+    
     initializeClipboard(fabricCanvas, {
         getTargetLayerForDrawing: getTargetLayerForDrawing,
         debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
