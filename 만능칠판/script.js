@@ -642,8 +642,11 @@ fabricCanvas.on('mouse:wheel', function(opt) {
     }
 });
 
-    fabricCanvas.on('object:modified', (e) => { if (dataManager) dataManager.debouncedSaveCanvasState(); });
-    debouncedRecordState();
+    fabricCanvas.on('object:modified', (e) => { 
+        if (dataManager) dataManager.debouncedSaveCanvasState(); 
+        debouncedRecordState();
+    });
+    
 
     document.addEventListener('click', (e) => {
         const target = e.target;
