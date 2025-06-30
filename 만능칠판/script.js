@@ -81,7 +81,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const toolbarWrapper = document.getElementById('toolbarWrapper');
     const toolbarScaleWrap = document.getElementById('toolbarScaleWrap');
 
-    const debouncedRecordState = debounce(() => recordState(fabricCanvas), 300);
 
     let currentMode = 'select';
     let isPanning = false;
@@ -1069,6 +1068,13 @@ initializeClipboard(fabricCanvas, {
     debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
 });
 
+    const debouncedRecordState = debounce(() => recordState(fabricCanvas), 300);
+    initializeClipboard(fabricCanvas, {
+        getTargetLayerForDrawing: getTargetLayerForDrawing,
+        debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
+    }, debouncedRecordState);
+    
+    
 initializeHistory(fabricCanvas);
     
     if (typeof initializeDataAndScheduleFunctions === 'function') {
