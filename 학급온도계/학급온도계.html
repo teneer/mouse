@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학급 점수판</title>
+    <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+    <div class="container">
+        <h1>학급 점수판</h1>
+        
+        <div class="main-scoreboard">
+            <div class="main-controls">
+                <button class="main-btn" onclick="decrement()">−</button>
+                <span id="number">0</span>
+                <button class="main-btn" onclick="increment()">+</button>
+            </div>
+            <div id="change" class="change"></div>
+
+        </div>
+        
+        <h2 id="scoreboard-title" style="display: none;">모둠 점수판</h2>
+        
+        <div id="scoreboard" class="scoreboard"></div>
+        
+        <div id="create-teams-btn-wrap" class="create-teams-btn-wrap">
+            <button class="create-teams-btn" onclick="showTeamSetupModal()">모둠 점수판 생성</button>
+        </div>
+    </div>
+    
+    <div id="team-setup-modal" class="team-setup-modal" style="display: none;">
+        <div class="team-setup-box">
+            <label for="team-count">생성할 모둠 개수(1~24):</label>
+            <input type="number" id="team-count" min="1" max="24" value="4">
+            <button onclick="createTeams()">생성</button>
+        </div>
+    </div>
+    
+    <div class="settings-panel-toggle">
+        <button id="settings-toggle-btn">⚙️</button>
+    </div>
+    
+    <div id="settings-panel" class="settings-panel">
+        <h3>설정</h3>
+        <button onclick="showTeamSetupModal()">모둠 추가</button>
+        <button onclick="resetScore()">메인 점수 초기화</button>
+        <button onclick="resetAllTeams()">모든 모둠 점수 초기화</button>
+    </div>
+    
+
+    <script src="script.js"></script>
+
+</body>
+</html>
