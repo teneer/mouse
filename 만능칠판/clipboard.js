@@ -2,7 +2,7 @@
 
 let _clipboard = null;
 
-export function initializeClipboard(fabricCanvas, utils) {
+export function initializeClipboard(fabricCanvas, utils, recordStateFunc) {
     document.addEventListener('keydown', (e) => {
         if (!e.ctrlKey && !e.metaKey) return;
 
@@ -20,12 +20,12 @@ export function initializeClipboard(fabricCanvas, utils) {
             case 'v':
                 if (_clipboard) {
                     e.preventDefault();
-                    paste(fabricCanvas, utils.getTargetLayerForDrawing, utils.debouncedSaveCanvasState);
+                    paste(fabricCanvas, utils.getTargetLayerForDrawing, utils.debouncedSaveCanvasState, recordStateFunc);
                 }
                 break;
             case 'x':
                 e.preventDefault();
-                cut(fabricCanvas, utils.debouncedSaveCanvasState);
+                cut(fabricCanvas, utils.debouncedSaveCanvasState, recordStateFunc);
                 break;
             case 'a':
                 e.preventDefault();
@@ -56,7 +56,7 @@ function copy(canvas) {
     }, ['customLayer', 'id']);
 }
 
-function paste(canvas, getTargetLayerFunc, saveFunc) {
+function paste(canvas, getTargetLayerFunc, saveFunc, recordStateFunc) {
     if (!_clipboard) return;
     _clipboard.clone(function(clonedObj) {
         canvas.discardActiveObject();
@@ -81,6 +81,9 @@ function paste(canvas, getTargetLayerFunc, saveFunc) {
         }
         canvas.requestRenderAll();
         if(saveFunc) saveFunc();
+        if (recordStateFunc) {
+            recordStateFunc(canvas);
+        }
         _clipboard.set({
             left: clonedObj.left,
             top: clonedObj.top
@@ -88,7 +91,7 @@ function paste(canvas, getTargetLayerFunc, saveFunc) {
     }, ['customLayer', 'id']);
 }
 
-function cut(canvas, saveFunc) {
+function cut(canvas, saveFunc, recordStateFunc) {
     const activeObject = canvas.getActiveObject();
     if (!activeObject) return;
     copy(canvas);
@@ -100,6 +103,9 @@ function cut(canvas, saveFunc) {
     canvas.discardActiveObject();
     canvas.renderAll();
     if(saveFunc) saveFunc();
+    if (recordStateFunc) {
+        recordStateFunc(canvas);
+    }
 }
 
 function selectAll(canvas) {

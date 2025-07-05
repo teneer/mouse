@@ -1,4 +1,5 @@
 import { initializeClipboard } from './clipboard.js';
+import { initializeHistory, recordState } from './history.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const canvasElement = document.getElementById('whiteboardCanvas');
@@ -397,6 +398,7 @@ fabricCanvas.on('touch:end', function(opt) {
             fabricCanvas.setBackgroundColor(option.dataset.color, () => {
                 fabricCanvas.renderAll();
                 if (dataManager) dataManager.debouncedSaveCanvasState();
+                debouncedRecordState();
             });
             closeAllTipups();
         });
@@ -457,6 +459,7 @@ fabricCanvas.on('touch:end', function(opt) {
         updateLayerObjectsState();
         fabricCanvas.renderAll();
         if (dataManager) dataManager.debouncedSaveCanvasState();
+        debouncedRecordState();
     });
 
     freeTextModeBtn.addEventListener('click', () => {
@@ -528,6 +531,7 @@ fabricCanvas.on('touch:end', function(opt) {
         text.on('editing:exited', function() {
             if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
                 dataManager.debouncedSaveCanvasState();
+                debouncedRecordState();
             }
             currentMode = 'select';
             fabricCanvas.isDrawingMode = false;
@@ -561,6 +565,7 @@ fabricCanvas.on('touch:end', function(opt) {
             fabricCanvas.discardActiveObject();
             fabricCanvas.renderAll();
             if (dataManager) dataManager.debouncedSaveCanvasState();
+            debouncedRecordState();
         }
     });
     clearAllBtn.addEventListener('click', () => { clearConfirmModal.style.display = 'block'; });
@@ -580,6 +585,7 @@ fabricCanvas.on('touch:end', function(opt) {
         clearConfirmModal.style.display = 'none';
         fabricCanvas.renderAll();
         if (objectsToRemove.length > 0 && dataManager) dataManager.debouncedSaveCanvasState();
+        debouncedRecordState();
     });
     cancelClearBtn.addEventListener('click', () => { clearConfirmModal.style.display = 'none'; });
     if(closeClearConfirmModal) closeClearConfirmModal.onclick = () => clearConfirmModal.style.display = 'none';
@@ -636,7 +642,11 @@ fabricCanvas.on('mouse:wheel', function(opt) {
     }
 });
 
-    fabricCanvas.on('object:modified', (e) => { if (dataManager) dataManager.debouncedSaveCanvasState(); });
+    fabricCanvas.on('object:modified', (e) => { 
+        if (dataManager) dataManager.debouncedSaveCanvasState(); 
+        debouncedRecordState();
+    });
+    
 
     document.addEventListener('click', (e) => {
         const target = e.target;
@@ -1057,11 +1067,16 @@ fabricCanvas.on('mouse:wheel', function(opt) {
     // --- 모달 외부 클릭 수정 끝 ---
 
 
-initializeClipboard(fabricCanvas, {
-    getTargetLayerForDrawing: getTargetLayerForDrawing,
-    debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
-});
-
+    const debouncedRecordState = debounce(() => recordState(fabricCanvas), 300);
+    
+    initializeClipboard(fabricCanvas, {
+        getTargetLayerForDrawing: getTargetLayerForDrawing,
+        debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
+    }, debouncedRecordState);
+    
+    
+initializeHistory(fabricCanvas);
+    
     if (typeof initializeDataAndScheduleFunctions === 'function') {
         dataManager = initializeDataAndScheduleFunctions(
             fabricCanvas,
@@ -1165,7 +1180,7 @@ initializeClipboard(fabricCanvas, {
                     dataManager.debouncedSaveCanvasState();
                 }
                 // 만약 Undo/Redo 히스토리 기능이 있다면 여기서 히스토리 저장 호출
-                // 예: if (typeof saveCanvasHistory === 'function') saveCanvasHistory('deleteSelectionViaKey');
+                debouncedRecordState();
             }
         }
     });

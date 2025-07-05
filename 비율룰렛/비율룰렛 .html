@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>고급 비율 룰렛 (v28 - 오류 수정 및 최종)</title>
+<title>비율룰레 (v30)</title>
 <style>
   /* --- CSS 스타일 (이전과 동일) --- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -287,7 +287,7 @@ let currentRotation = 0, items = [], sectorData = [];
 let resultHistoryList = [], inputHistoryList = [], favoritesList = [];
 let isSpinning = false, debounceTimer, animationFrameId = null, lastDisplayedSector = null, showPercentage = true, isStopping = false;
 const baseColors = ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#E7E9ED','#77DD77'];
-const spinSound = new Audio('Sound/spin.MP3'), resultSound = new Audio('Sound/result.MP3');
+const spinSound = new Audio('Sound/spin.mp3'), resultSound = new Audio('Sound/result.mp3');
 let rouletteElement, resultDisplay, spinButton, dataInputElement, errorElement, toggleBtn, inputHistoryListElement, rouletteTitleElement, pointerLabelBoxWrapper, currentItemNameElement, resultHistoryHeading, inputHistoryHeading, togglePercentageBtn, shuffleBtn;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -577,6 +577,98 @@ function spinRoulette() {
     }
     animationFrameId = requestAnimationFrame(step);
 }
+// --- spinRoulette 함수: 14~15바퀴 랜덤 감속 ---
+function spinRoulette() {
+    if (isSpinning || !items || items.length === 0 || !sectorData || sectorData.length === 0) {
+        if (!items || items.length === 0 || !sectorData || sectorData.length === 0) showError('룰렛에 유효한 항목이 없습니다.');
+        return;
+    }
+    spinSound.currentTime = 0;
+    spinSound.play().catch(()=>{});
+    isSpinning = true;
+    isStopping = false;
+    spinButton.disabled = true;
+    spinButton.textContent = '멈추기';
+    spinButton.classList.add('stop-mode');
+    resultDisplay.textContent = '돌아가는 중...';
+    lastDisplayedSector = null;
+    rouletteElement.style.transition = 'none';
+
+    // 입력 기록 저장 등 기존 코드 유지
+    const currentDisplayedItems = [...items];
+    if (currentDisplayedItems.length > 0) {
+        const duplicateIndex = inputHistoryList.findIndex(entry => areItemSetsEqual(entry.items, currentDisplayedItems));
+        if (duplicateIndex === -1) {
+            inputHistoryList.unshift({ timestamp: Date.now(), items: currentDisplayedItems });
+            if (inputHistoryList.length > 20) inputHistoryList.pop();
+            updateInputHistoryDisplay();
+        } else {
+            const existing = inputHistoryList.splice(duplicateIndex, 1)[0];
+            existing.timestamp = Date.now();
+            inputHistoryList.unshift(existing);
+            updateInputHistoryDisplay();
+        }
+    }
+    saveData();
+
+    // --- 목표 각도: 14~15바퀴 + 0~360도 랜덤 ---
+    const baseRounds = 14 + Math.random(); // 14~15 바퀴
+    const randomStopOffset = Math.random() * 360; // 0~360도
+    const targetRotation = currentRotation - (baseRounds * 360) - randomStopOffset;
+    const initialRotation = currentRotation;
+    const rotationAmount = targetRotation - initialRotation;
+    const duration = 7200; // 7.2초 감속
+    let startTime = null;
+
+    const step = (timestamp) => {
+        if (!isSpinning || isStopping) {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            return;
+        }
+        if (!startTime) startTime = timestamp;
+        const elapsedTime = timestamp - startTime;
+        const progress = Math.min(elapsedTime / duration, 1);
+        const easedProgress = easeOutQuart(progress);
+        const currentFrameRotation = initialRotation + rotationAmount * easedProgress;
+        rouletteElement.style.transform = `rotate(${currentFrameRotation}deg)`;
+        currentRotation = currentFrameRotation;
+
+        // 섹터 표시 등 기존 코드 유지
+        if (sectorData && sectorData.length > 0) {
+            let currentPointerAngle = (180 - (currentRotation % 360) + 360) % 360;
+            let currentSector = sectorData.find(sector => {
+                const start = sector.startAngle % 360;
+                let end = sector.endAngle % 360;
+                const epsilon = 0.001;
+                if (Math.abs(sector.endAngle - sector.startAngle) >= 360 - epsilon) return true;
+                if (Math.abs(start - end) < epsilon && sector.endAngle > sector.startAngle) end = 360;
+                if (start > end)
+                    return currentPointerAngle >= start - epsilon || currentPointerAngle < end - epsilon;
+                else
+                    return currentPointerAngle >= start - epsilon && currentPointerAngle < end - epsilon;
+            });
+            if (currentSector && currentSector !== lastDisplayedSector) {
+                currentItemNameElement.textContent = currentSector.name;
+                lastDisplayedSector = currentSector;
+            }
+        }
+
+        if (progress < 1) {
+            animationFrameId = requestAnimationFrame(step);
+        } else {
+            animationFrameId = null;
+            determineResult();
+        }
+    };
+
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+    }
+    animationFrameId = requestAnimationFrame(step);
+}
+
+// --- stopRoulette 함수: 1초 감속 후 정지 ---
 function stopRoulette() {
     if (!isSpinning || isStopping) return;
     isStopping = true;
@@ -591,12 +683,8 @@ function stopRoulette() {
 
     const stopDuration = 1000; // 1초 감속
     let stopStartTime = null;
-    let lastTimestamp = null;
-    // 현재 속도를 추정 (직전 프레임의 감속 공식과 동일하게)
-    let initialSpeed = 0;
-    // 추정: 1초 전 회전량으로 근사 (혹은 마지막 currentSpeed 사용)
-    // 아래는 이전 spinRoulette의 currentSpeed를 활용
-    initialSpeed = typeof currentSpeed === "number" ? currentSpeed : 720; // fallback
+    const stopInitialRotation = currentRotation;
+    const stopTargetRotation = currentRotation - 360; // 1바퀴 추가 감속
 
     const stopStep = (timestamp) => {
         if (!isStopping) {
@@ -604,22 +692,15 @@ function stopRoulette() {
             animationFrameId = null;
             return;
         }
-        if (!stopStartTime) {
-            stopStartTime = timestamp;
-            lastTimestamp = timestamp;
-        }
+        if (!stopStartTime) stopStartTime = timestamp;
         const elapsedTime = timestamp - stopStartTime;
         const progress = Math.min(elapsedTime / stopDuration, 1);
-        const deltaTime = (timestamp - lastTimestamp) / 1000;
-        lastTimestamp = timestamp;
+        const eased = easeOutQuart(progress);
+        const currentFrameRotation = stopInitialRotation + (stopTargetRotation - stopInitialRotation) * eased;
+        rouletteElement.style.transform = `rotate(${currentFrameRotation}deg)`;
+        currentRotation = currentFrameRotation;
 
-        // 선형 감속
-        let speed = initialSpeed * (1 - progress);
-
-        currentRotation -= speed * deltaTime;
-        rouletteElement.style.transform = `rotate(${currentRotation}deg)`;
-
-        // 섹터 표시
+        // 섹터 표시 등 기존 코드 유지
         if (sectorData && sectorData.length > 0) {
             let currentPointerAngle = (180 - (currentRotation % 360) + 360) % 360;
             let currentSector = sectorData.find(sector => {
@@ -649,7 +730,6 @@ function stopRoulette() {
 
     animationFrameId = requestAnimationFrame(stopStep);
 }
-
 function determineResult() {
     animationFrameId = null; isStopping = false;
     try {
@@ -1019,56 +1099,6 @@ function handleInputHistoryInteraction(event) {
     }
 }
 
-function handleFavoritesPopupInlineEdit(event) {
-    const target = event.target;
-    const li = target.closest('li');
-    if (!li) return;
-    const index = parseInt(li.getAttribute('data-index'));
-    if (isNaN(index) || index < 0 || index >= favoritesList.length) return;
-
-    // ✏️ 수정 버튼 클릭
-    if (target.classList.contains('edit-favorite-btn')) {
-        favoritesList.forEach(fav => delete fav._editing);
-        favoritesList[index]._editing = true;
-        showFavoritesPopup();
-        setTimeout(() => {
-            const input = document.querySelector('.edit-favorite-input');
-            if (input) input.focus();
-        }, 0);
-    }
-    // ✔️ 저장 버튼
-    else if (target.classList.contains('save-edit-favorite')) {
-        const input = li.querySelector('.edit-favorite-input');
-        const newName = input.value.trim();
-        if (!newName) {
-            showCustomAlert('이름을 입력하세요.');
-            input.focus();
-            return;
-        }
-        if (favoritesList.some((fav, i) => i !== index && fav.name === newName)) {
-            showCustomAlert('이미 사용 중인 이름입니다.');
-            input.focus();
-            return;
-        }
-        favoritesList[index].name = newName;
-        delete favoritesList[index]._editing;
-        saveData();
-        showFavoritesPopup();
-    }
-    // ❌ 취소 버튼
-    else if (target.classList.contains('cancel-edit-favorite')) {
-        delete favoritesList[index]._editing;
-        showFavoritesPopup();
-    }
-    // 삭제 버튼
-    else if (target.classList.contains('delete-favorite-button')) {
-        if (confirm(`'${favoritesList[index].name}' 즐겨찾기를 삭제하시겠습니까?`)) {
-            favoritesList.splice(index, 1);
-            saveData();
-            showFavoritesPopup();
-        }
-    }
-}
 
 
 function showCustomAlert(message) {
