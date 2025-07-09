@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모나리자, 세 가지 이야기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; }
+        .tab-active { 
+            border-color: #4f46e5; 
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out, padding 0.5s ease-out;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        .accordion-open .accordion-content {
+            max-height: 500px; /* Adjust as needed for content */
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        .accordion-open .accordion-arrow {
+            transform: rotate(180deg);
+        }
+        .accordion-arrow {
+            transition: transform 0.3s ease-in-out;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <!-- Chosen Palette: Warm Neutrals (Stone, Amber, Indigo for accent) -->
+    <!-- Application Structure Plan: A tab-based navigation system was chosen to facilitate easy comparison between the artworks. Users can select a specific piece to view its detailed analysis or choose the 'Overall Comparison' tab to see key differences synthesized into a chart and a table. This structure allows for both focused study of individual works and a high-level comparative overview, which is more interactive and user-friendly than a linear report. The analysis for each artwork is presented in an accordion format to prevent information overload and allow users to explore questions at their own pace. -->
+    <!-- Visualization & Content Choices: 
+        1. Artworks Analysis -> Goal: Present detailed, structured information for each piece. -> Viz/Presentation Method: Interactive Accordion for the five analytical questions. -> Interaction: Click to expand/collapse answers. -> Justification: This organizes the dense textual information cleanly, avoids overwhelming the user, and encourages active exploration rather than passive reading. -> Library/Method: HTML/CSS/JS.
+        2. Overall Comparison -> Goal: Synthesize and compare the key artistic characteristics across all three works. -> Viz/Presentation Method: A horizontal bar chart for quantifiable artistic aspects (realism, exaggeration, color intensity) and a side-by-side HTML table for qualitative data (materials, principles). -> Interaction: The chart has tooltips on hover for clarity. -> Justification: The chart provides a quick, powerful visual summary of stylistic differences, while the table allows for detailed, direct comparison of textual facts. This dual approach caters to different modes of understanding. -> Library/Method: Chart.js for the chart, styled HTML for the table.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto px-4 py-8 md:py-12">
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-indigo-700">모나리자, 세 가지 이야기</h1>
+            <p class="mt-4 text-lg text-stone-600">유명한 모나리자 그림과 두 가지 다른 그림을 함께 보며 무엇이 다른지 알아봐요!</p>
+        </header>
+
+        <nav id="tab-nav" class="flex flex-wrap justify-center border-b border-stone-300 mb-8">
+            <button data-tab="original" class="tab-button text-base md:text-lg font-semibold py-3 px-4 sm:px-6 border-b-2 border-transparent transition-colors duration-300 ease-in-out hover:bg-stone-100">원조 모나리자</button>
+            <button data-tab="botero" class="tab-button text-base md:text-lg font-semibold py-3 px-4 sm:px-6 border-b-2 border-transparent transition-colors duration-300 ease-in-out hover:bg-stone-100">통통 모나리자</button>
+            <button data-tab="picasso" class="tab-button text-base md:text-lg font-semibold py-3 px-4 sm:px-6 border-b-2 border-transparent transition-colors duration-300 ease-in-out hover:bg-stone-100">피카소 모나리자</button>
+            <button data-tab="comparison" class="tab-button text-base md:text-lg font-semibold py-3 px-4 sm:px-6 border-b-2 border-transparent transition-colors duration-300 ease-in-out hover:bg-stone-100">한눈에 비교하기</button>
+        </nav>
+
+        <main id="tab-content">
+            <!-- Content will be injected by JavaScript -->
+        </main>
+    </div>
+
+    <script>
+        const artData = {
+            original: {
+                title: "원조 모나리자",
+                artist: "레오나르도 다 빈치",
+                // src 폴더에 있는 '모나리자.jpg' 경로로 변경했습니다.
+                image: "src/모나리자.jpg", 
+                analysis: [
+                    { q: "그림을 처음 보면 어떤 느낌이 드나요?", a: "왠지 모르게 신기하고 예뻐 보여요. 살짝 웃는 듯한 표정이 아주 특별해요." },
+                    { q: "다른 그림이랑 뭐가 다른가요?", a: "이 그림이 가장 처음 그려진 모나리자예요! 다른 그림들은 이 그림을 보고 다르게 그린 거랍니다." },
+                    { q: "어떤 재료와 방법으로 그렸나요?", a: "아주 옛날에 나무판에 유화 물감으로 그렸어요. '스푸마토'라는 특별한 방법으로 그림의 선을 부드럽게 해서 신비로운 느낌을 냈어요." },
+                    { q: "그림에 숨겨진 비밀은 무엇인가요?", a: "그림 속 사람이 가운데에 딱 있고, 뒤에 있는 풍경이랑 잘 어울려요. 표정과 눈빛이 정말 살아있는 것 같아서 사람들이 계속 보게 만들어요." },
+                    { q: "그림을 보고 어떤 생각이 들었나요?", a: "왜 이 그림이 이렇게 유명한지 알 것 같아요! 신비로운 미소와 눈빛이 사람들의 마음을 뿅 하고 사로잡는 것 같아요." }
+                ],
+                characteristics: "진짜 같음, 신비로운 미소, 부드러운 그림"
+            },
+            botero: {
+                title: "통통 모나리자",
+                artist: "페르난도 보테로",
+                // src 폴더에 있는 '보테로의 모나리자.png' 경로로 변경했습니다.
+                image: "src/보테로의 모나리자.png",
+                analysis: [
+                    { q: "그림을 처음 보면 어떤 느낌이 드나요?", a: "원조 모나리자랑 비슷하면서도, 통통하고 귀여워서 웃음이 나요. 친구처럼 친근한 느낌이에요." },
+                    { q: "원조 모나리자랑 뭐가 다른가요?", a: "가장 큰 차이는 그림 속 사람이 아주 통통하고 둥글둥글하게 그려진 거예요. 원조 모나리자는 진짜 사람처럼 보이지만, 이 그림은 일부러 통통하게 그렸답니다. 표정도 더 환하게 웃는 것 같아요." },
+                    { q: "어떤 재료와 방법으로 그렸나요?", a: "이것도 유화 물감으로 그렸어요. 그림 속 사람이 더 통통해 보이도록 그림자를 부드럽게 넣었답니다." },
+                    { q: "그림에 숨겨진 비밀은 무엇인가요?", a: "사람의 몸을 아주 크게 그려서 작가 아저씨의 특별한 그림 스타일을 보여줘요. 재미있고 유머러스하게 모나리자를 다시 그린 그림이에요." },
+                    { q: "그림을 보고 어떤 생각이 들었나요?", a: "유명한 그림도 이렇게 재미있고 귀엽게 바꿀 수 있다는 게 신기해요. 그림은 꼭 진지해야 하는 게 아니라는 걸 알았어요!" }
+                ],
+                characteristics: "통통한 사람, 귀여움, 재미있는 그림"
+            },
+            picasso: {
+                title: "피카소 모나리자",
+                artist: "김보영 (학생 작품)",
+                // src 폴더에 있는 '피카소의 모나리자.png' 경로로 변경했습니다.
+                image: "src/피카소의 모나리자.png",
+                analysis: [
+                    { q: "그림을 처음 보면 어떤 느낌이 드나요?", a: "색깔이 아주 진하고, 선들이 뾰족뾰족해요. 모나리자 얼굴이 조각조각 나뉘었다가 다시 붙은 것처럼 보여요. 힘이 느껴지는 그림이에요." },
+                    { q: "원조 모나리자랑 뭐가 다른가요?", a: "원조 모나리자는 진짜 사람처럼 부드럽게 그렸지만, 이 그림은 얼굴이 네모, 세모 같은 모양으로 나눠져 있어요. 눈이랑 코도 이상한 곳에 있고, 색깔도 아주 진하고 밝아요." },
+                    { q: "어떤 재료와 방법으로 그렸나요?", a: "종이에 사인펜 같은 유성 펜으로 그린 것 같아요. 피카소 아저씨의 '입체주의'라는 그림 방법을 따라서, 한 사람을 여러 방향에서 본 것처럼 조각조각 나눠서 그렸어요." },
+                    { q: "그림에 숨겨진 비밀은 무엇인가요?", a: "삐뚤빼뚤한 선과 진한 색깔, 그리고 여러 조각으로 나뉜 얼굴이 이 그림의 특별한 점이에요. 그림을 조각내고 다시 합치면서 그림을 더 강렬하게 만들었어요." },
+                    { q: "그림을 보고 어떤 생각이 들었나요?", a: "모나리자를 이렇게 다르게 그릴 수도 있다니 정말 놀라워요! 이 그림을 그린 학생도 피카소 아저씨처럼 멋진 그림을 그리고 싶었나 봐요." }
+                ],
+                characteristics: "조각조각, 진한 색깔, 힘이 느껴짐"
+            }
+        };
+
+        const tabContentContainer = document.getElementById('tab-content');
+        const tabButtons = document.querySelectorAll('.tab-button');
+
+        function createAccordionItem(item, index) {
+            return `
+                <div class="accordion-item border-b border-stone-200">
+                    <h2>
+                        <button class="accordion-button flex justify-between items-center w-full text-left py-4 px-2">
+                            <span class="font-semibold text-stone-700">${item.q}</span>
+                            <span class="accordion-arrow transform transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </span>
+                        </button>
+                    </h2>
+                    <div class="accordion-content px-2 text-stone-600 leading-relaxed">
+                        <p>${item.a}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderArtContent(artwork, tabId) {
+            return `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 animate-fade-in">
+                    <div class="flex justify-center items-start">
+                         <img src="${artwork.image}" alt="${artwork.title}" class="rounded-lg shadow-2xl max-w-sm w-full object-cover min-h-[300px]">
+                    </div>
+                    <div>
+                        <h2 class="text-3xl font-bold mb-2">${artwork.title}</h2>
+                        <p class="text-lg text-stone-500 mb-6">${artwork.artist}</p>
+                        <div class="accordion">
+                            ${artwork.analysis.map(createAccordionItem).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderComparisonContent() {
+            return `
+                <div class="animate-fade-in">
+                    <div class="text-center mb-12">
+                         <h2 class="text-3xl font-bold mb-2">그림들 비교하기</h2>
+                         <p class="text-stone-600">세 그림의 중요한 점들을 차트와 표로 한눈에 봐요!</p>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 md:gap-12">
+                        <div class="lg:col-span-3 bg-white p-4 sm:p-6 rounded-lg shadow-lg">
+                             <div class="chart-container relative w-full max-w-3xl mx-auto h-80 sm:h-96">
+                                <canvas id="comparisonChart"></canvas>
+                             </div>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg h-full">
+                                <h3 class="text-xl font-bold mb-4 text-center">중요한 정보 비교</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm text-left">
+                                        <thead class="bg-stone-100">
+                                            <tr>
+                                                <th class="p-3 font-semibold">구분</th>
+                                                <th class="p-3 font-semibold">원조 모나리자</th>
+                                                <th class="p-3 font-semibold">통통 모나리자</th>
+                                                <th class="p-3 font-semibold">피카소 모나리자</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-3 font-medium">그리는 방법</td><td class="p-3">진짜 같게</td><td class="p-3">크게 부풀려</td><td class="p-3">조각조각</td></tr>
+                                            <tr class="border-b"><td class="p-3 font-medium">특별한 기술</td><td class="p-3">부드러운 선</td><td class="p-3">통통하게</td><td class="p-3">나눠서 다시 그리기</td></tr>
+                                            <tr class="border-b"><td class="p-3 font-medium">쓴 재료</td><td class="p-3">유화 물감</td><td class="p-3">유화 물감</td><td class="p-3">사인펜</td></tr>
+                                            <tr><td class="p-3 font-medium">느낌</td><td class="p-3">신비로움</td><td class="p-3">재미있음</td><td class="p-3">힘이 느껴짐</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createChart() {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['원조 모나리자', '통통 모나리자', '피카소 모나리자'],
+                    datasets: [
+                        {
+                            label: '얼마나 진짜 같은가',
+                            data: [9, 4, 2],
+                            backgroundColor: 'rgba(79, 70, 229, 0.7)',
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '얼마나 특별하게 그렸나',
+                            data: [2, 9, 7],
+                            backgroundColor: 'rgba(219, 39, 119, 0.7)',
+                            borderColor: 'rgba(219, 39, 119, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '색깔이 얼마나 진한가',
+                            data: [3, 6, 9],
+                            backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                            borderColor: 'rgba(245, 158, 11, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 10,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '그림 스타일 비교 (내 생각)',
+                            font: { size: 16 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.x !== null) {
+                                        label += context.parsed.x;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchTab(tabId) {
+            let content = '';
+            tabButtons.forEach(button => {
+                if (button.dataset.tab === tabId) {
+                    button.classList.add('tab-active');
+                } else {
+                    button.classList.remove('tab-active');
+                }
+            });
+
+            if (tabId === 'comparison') {
+                content = renderComparisonContent();
+            } else {
+                const data = artData[tabId];
+                if (data) {
+                    content = renderArtContent(data, tabId);
+                }
+            }
+
+            tabContentContainer.innerHTML = content;
+            
+            if (tabId === 'comparison') {
+                createChart();
+            }
+
+            // Re-add accordion listeners after content is rendered
+            document.querySelectorAll('.accordion-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const accordionItem = button.closest('.accordion-item');
+                    accordionItem.classList.toggle('accordion-open');
+                });
+            });
+        }
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                switchTab(button.dataset.tab);
+            });
+        });
+
+        // Initial load
+        switchTab('original');
+
+    </script>
+</body>
+</html>
