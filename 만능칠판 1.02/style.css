@@ -1,0 +1,608 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #fafbfc;
+  height: 100vh;
+  overflow: hidden;
+  overflow-x: hidden;
+}
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  border: none;
+  background: #fff;
+}
+
+#toolbarWrapper {
+
+  width: 100%;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#toolbarScaleWrap{
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 100%;                 /* 원본 폭에서는 100%로 채운다 */
+  transform-origin: bottom left;
+  z-index: 1000;
+}
+
+
+
+#toolbarToggle {
+  display: none; /* From attached file [1] */
+  margin-bottom: 4px; /* From attached file [1] */
+}
+#toolbarWrapper:hover #toolbarToggle {
+  display: block; /* From attached file [1] */
+}
+#toolbarHideBtn {
+  background: #fff; /* From attached file [1] */
+  border: 1px solid #d6dbe1; /* From attached file [1] */
+  border-radius: 50%; /* From attached file [1] */
+  width: 32px; /* From attached file [1] */
+  height: 32px; /* From attached file [1] */
+  cursor: pointer; /* From attached file [1] */
+  display: flex; /* From attached file [1] */
+  align-items: center; /* From attached file [1] */
+  justify-content: center; /* From attached file [1] */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08); /* From attached file [1] */
+  transition: background 0.2s, box-shadow 0.2s; /* From attached file [1] */
+}
+#toolbarHideBtn:hover {
+  background: #f0f4fa; /* From attached file [1] */
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); /* From attached file [1] */
+}
+.arrow-down {
+  font-size: 18px; /* From attached file [1] */
+  color: #888; /* From attached file [1] */
+  display: inline-block; /* From attached file [1] */
+  /* pointer-events: none; /* 첨부 파일[1]에 없음 */
+}
+
+/* === 툴바 한 줄 배치 및 스크롤 적용 === */
+#toolbar {
+  width: calc(100% - 16px);
+  background: #e0e4ea;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -2px 16px rgba(90,110,130,0.08);
+  padding: 8px 0 8px 0;
+  margin-bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  border-top: 1.5px solid #b6c8e8;
+  transition: box-shadow 0.2s;
+  overflow-x: auto; /* <<<< 추가: 내용 넘칠 경우 가로 스크롤 */
+
+}
+
+
+.toolbar-group {
+  position: relative; /* From attached file [1] */
+  display: flex; /* From attached file [1] */
+  align-items: center; /* From attached file [1] */
+  gap: 12px; /* 그룹 내 아이템 간 간격 (From attached file [1]) */
+  flex-shrink: 0;
+}
+.layer-checkbox-group {
+  flex-direction: column; /* From attached file [1] */
+  gap: 0; /* From attached file [1] */
+  background: #f6f7fa; /* From attached file [1] */
+  border-radius: 10px; /* From attached file [1] */
+  padding: 6px 10px; /* From attached file [1] */
+  box-shadow: 0 0 0 1.5px #e0e4ea inset; /* From attached file [1] */
+}
+.layer-checkbox-row {
+  margin-bottom: 2px; /* From attached file [1] */
+}
+.layer-checkbox-row:last-child {
+  margin-bottom: 0; /* From attached file [1] */
+}
+.toolbar-item { /* HTML 구조에 따라 사용 */
+  display: flex;
+  align-items: center;
+}
+
+/* 버튼 공통 스타일 (첨부 CSS[1] 기준) */
+.mode-btn, .tipup-toggle-btn, .action-btn {
+  height: 40px; /* From attached file [1] */
+  min-height: 40px; /* From attached file [1] */
+  max-height: 40px; /* From attached file [1] */
+  box-sizing: border-box; /* From attached file [1] */
+  line-height: 1.2; /* From attached file [1] */
+  padding: 0 16px; /* From attached file [1] */
+  display: flex; /* From attached file [1] */
+  align-items: center; /* From attached file [1] */
+  justify-content: center; /* From attached file [1] */
+  background-color: #f5f7fa; /* From attached file [1] */
+  border: 1.5px solid #e0e4ea; /* From attached file [1] */
+  font-size: 15px; /* From attached file [1] */
+  cursor: pointer; /* From attached file [1] */
+  border-radius: 8px; /* 기본적으로 모든 버튼에 둥근 모서리 (From attached file [1]) */
+  box-shadow: 0 1px 2px rgba(80,90,110,0.04); /* From attached file [1] */
+  transition: background 0.18s, border 0.18s, box-shadow 0.18s; /* From attached file [1] */
+  white-space: nowrap;
+}
+
+/* === 버튼 그룹 스타일 수정 (펜/텍스트는 완전한 둥근 테두리, 팁업은 기존 스타일 유지하며 간격 없이 붙이기) === */
+.button-group {
+  display: flex; /* From attached file [1] */
+  align-items: center; /* From attached file [1] */
+  /* gap: 0; /* From attached file [1] - 제거하여 버튼들이 붙도록 */
+}
+
+/* 버튼 그룹 내 펜/텍스트 모드 버튼 */
+.button-group > .mode-btn {
+  /* .mode-btn 공통 스타일 (border-radius: 8px, border: 1.5px solid #e0e4ea 등) 상속 */
+  /* margin-right: 0; /* 간격 없음 - 아래 tipup-toggle-btn의 margin-left로 제어 */
+}
+
+/* 버튼 그룹 내 팁업 토글 버튼 */
+.button-group > .tipup-toggle-btn {
+  /* 첨부 CSS[1]의 .tipup-toggle-btn 스타일을 그대로 유지 (테두리, 배경, 둥근 모서리 등) */
+  /* border-radius: 0 8px 8px 0; /* 첨부 CSS[1] 에 정의되어 있음 */
+  /* border-left: 1.5px solid #e0e4ea; /* 첨부 CSS[1] 에 정의되어 있음 */
+  min-width: 36px; /* From attached file [1] */
+  width: 36px; /* From attached file [1] */
+  padding: 0; /* From attached file [1] */
+  margin-left: -1.5px; /* <<<< 추가: mode-btn의 오른쪽 테두리 두께만큼 왼쪽으로 당겨서 붙임 */
+}
+
+/* 버튼 호버 및 활성 스타일 (첨부 CSS[1] 기준) */
+.mode-btn:hover, .action-btn:hover,
+.button-group > .mode-btn:hover {
+  background: #e8f0fe; /* From attached file [1] */
+  border-color: #a9c1fa; /* From attached file [1] */
+}
+
+.tipup-toggle-btn:hover,
+.button-group > .tipup-toggle-btn:hover {
+  background: #e8f0fe; /* From attached file [1] */
+  border-color: #a9c1fa; /* From attached file [1] - 팁업 버튼도 동일한 호버 효과 */
+}
+
+.mode-btn:active, .action-btn:active,
+.button-group > .mode-btn:active {
+  background: #dbeafe; /* From attached file [1] */
+  border-color: #7ba1f7; /* From attached file [1] */
+}
+.tipup-toggle-btn:active,
+.button-group > .tipup-toggle-btn:active {
+  background: #dbeafe; /* From attached file [1] */
+  border-color: #7ba1f7; /* From attached file [1] - 팁업 버튼도 동일한 활성 효과 */
+}
+
+
+.mode-btn.toggle-btn.active-select {
+  background-color: #e7f3ff; /* From attached file [1] */
+  font-weight: bold; /* From attached file [1] */
+  border-color: #5a8dee; /* From attached file [1] */
+  color: #2563eb; /* From attached file [1] */
+}
+.mode-btn.toggle-btn.active-move {
+  background-color: #fff7e7; /* From attached file [1] */
+  font-weight: bold; /* From attached file [1] */
+  border-color: #ffb84d; /* From attached file [1] */
+  color: #b97800; /* From attached file [1] */
+}
+.action-btn:disabled, .mode-btn:disabled {
+  opacity: 0.5; /* From attached file [1] */
+  cursor: not-allowed; /* From attached file [1] */
+}
+#bgColorBtn {
+  min-width: 90px; /* From attached file [1] */
+}
+.icon {
+  margin-right: 5px; /* From attached file [1] */
+  font-size: 19px; /* From attached file [1] */
+  vertical-align: middle; /* From attached file [1] */
+}
+
+.arrow-up {
+  font-size: 18px; /* From attached file [1] */
+  color: #888; /* From attached file [1] */
+  pointer-events: none; /* From attached file [1] */
+}
+
+/* 팁업 창 스타일 (첨부 CSS[1] 기준) */
+.tip-up-settings {
+  position: fixed; 
+  z-index: 1010; /* From attached file [1] */
+  padding: 8px 12px; /* From attached file [1] */
+  background-color: #fff; /* From attached file [1] */
+  border: 1.5px solid #e0e4ea; /* From attached file [1] */
+  border-radius: 12px; /* From attached file [1] */
+  box-shadow: 0 4px 24px rgba(80,90,110,0.13); /* From attached file [1] */
+  display: none; 
+  flex-direction: column; /* From attached file [1] */
+  gap: 10px; /* From attached file [1] */
+  width: max-content; /* From attached file [1] */
+  min-width: 0; /* From attached file [1] */
+  animation: fadeInAbove 0.18s ease-out; /* From attached file [1] */
+}
+
+@keyframes fadeInAbove { /* From attached file [1] */
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pen-options-row,
+.text-options-row {
+  display: flex; /* From attached file [1] */
+  align-items: center; /* From attached file [1] */
+  gap: 12px; /* From attached file [1] */
+  margin-bottom: 0; /* From attached file [1] */
+}
+
+.colors-container {
+  display: flex; /* From attached file [1] */
+  gap: 8px; /* From attached file [1] */
+}
+
+.size-select {
+  margin-left: 8px; /* From attached file [1] */
+  padding: 4px 8px; /* From attached file [1] */
+  border: 1.5px solid #e0e4ea; /* From attached file [1] */
+  border-radius: 6px; /* From attached file [1] */
+  font-size: 14px; /* From attached file [1] */
+  background: #f9fafb; /* From attached file [1] */
+}
+
+.color-btn {
+  width: 22px; /* From attached file [1] */
+  height: 22px; /* From attached file [1] */
+  border-radius: 50%; /* From attached file [1] */
+  margin-right: 0; /* From attached file [1] */
+  cursor: pointer; /* From attached file [1] */
+  border: 2px solid #e0e4ea; /* From attached file [1] */
+  box-sizing: border-box; /* From attached file [1] */
+  position: relative; /* From attached file [1] */
+  transition: border 0.15s; /* From attached file [1] */
+}
+.color-btn.selected {
+  border-color: #2563eb !important; /* From attached file [1] */
+  box-shadow: 0 0 0 2px #a9c1fa; /* From attached file [1] */
+}
+.color-btn::after {
+  content: '✓'; /* From attached file [1] */
+  font-size: 14px; /* From attached file [1] */
+  font-weight: bold; /* From attached file [1] */
+  color: transparent; /* From attached file [1] */
+  position: absolute; /* From attached file [1] */
+  top: 50%; /* From attached file [1] */
+  left: 50%; /* From attached file [1] */
+  transform: translate(-50%, -50%); /* From attached file [1] */
+  line-height: 1; /* From attached file [1] */
+}
+.color-btn.selected::after {
+  color: #2563eb; /* From attached file [1] */
+}
+.color-btn[data-color="#000000"].selected::after,
+.color-btn[data-color="#000"].selected::after,
+.color-btn[data-color="#222222"].selected::after {
+  color: #fff; /* From attached file [1] */
+}
+
+input[type="checkbox"] {
+  accent-color: #5a8dee; /* From attached file [1] */
+  width: 16px; /* From attached file [1] */
+  height: 16px; /* From attached file [1] */
+  margin-right: 4px; /* From attached file [1] */
+  vertical-align: middle;
+}
+
+.modal {
+  display: none; /* From attached file [1] */
+  position: fixed; /* From attached file [1] */
+  z-index: 1050; /* From attached file [1] */
+  left: 0; top: 0; width: 100%; height: 100%; /* From attached file [1] */
+  overflow: auto; /* From attached file [1] */
+  background-color: rgba(0,0,0,0.18); /* From attached file [1] */
+}
+.modal-content {
+  background-color: #fff; /* From attached file [1] */
+  margin: 10% auto; /* From attached file [1] */
+  padding: 26px; /* From attached file [1] */
+  border: 1.5px solid #e0e4ea; /* From attached file [1] */
+  width: 80%; /* From attached file [1] */
+  max-width: 480px; /* From attached file [1] */
+  border-radius: 14px; /* From attached file [1] */
+  position: relative; /* From attached file [1] */
+  box-shadow: 0 8px 36px rgba(90,110,130,0.15); /* From attached file [1] */
+}
+
+.close-btn {
+  color: #aaa; float: right; font-size: 28px; font-weight: bold; /* From attached file [1] */
+  position: absolute; top: 12px; right: 18px; /* From attached file [1] */
+  cursor: pointer; /* From attached file [1] */
+  transition: color 0.18s; /* From attached file [1] */
+  line-height: 1;
+}
+.close-btn:hover, .close-btn:focus {
+  color: #5a8dee; text-decoration: none; /* From attached file [1] */
+}
+
+#saveConfirmModal .modal-content input[type="text"] {
+  width: calc(100% - 22px);
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  border: 1.5px solid #d1d9e6;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 15px;
+}
+#saveConfirmModal .modal-content input[type="text"]:focus {
+  border-color: #5a8dee;
+  box-shadow: 0 0 0 2px rgba(90, 141, 238, 0.2);
+  outline: none;
+}
+
+.modal-actions {
+  text-align: right;
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#loadSavedScreenModal #savedScreenListContainer { margin-top: 15px; } /* From attached file [1] */
+#loadSavedScreenModal #savedScreenList { list-style-type: none; padding: 0; } /* From attached file [1] */
+
+#loadSavedScreenModal #savedScreenList li {
+  padding: 10px; border: 1px solid #eee; margin-bottom: 8px; border-radius: 4px; /* From attached file [1] */
+  display: flex; justify-content: space-between; align-items: center; /* From attached file [1] */
+  cursor: pointer; transition: background-color 0.2s; /* From attached file [1] */
+}
+#loadSavedScreenModal #savedScreenList li:hover { background-color: #f0f0f0; } /* From attached file [1] */
+
+#loadSavedScreenModal .screen-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  margin-right: 10px;
+}
+
+#loadSavedScreenModal .screen-name {
+  font-weight: 600;
+  font-size: 1.05em;
+  color: #2c3e50;
+  margin-bottom: 2px;
+}
+
+#loadSavedScreenModal .screen-timestamp {
+  font-size: 0.85em;
+  color: #7f8c8d;
+}
+
+#loadSavedScreenModal .delete-saved-item-btn {
+  background-color: #f44336; color: white; border: none; /* From attached file [1] */
+  padding: 6px 12px; border-radius: 4px; cursor: pointer; /* From attached file [1] */
+  font-size: 13px; margin-left: 10px; /* From attached file [1] */
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+#loadSavedScreenModal .delete-saved-item-btn:hover { background-color: #da190b; } /* From attached file [1] */
+
+#loadSavedScreenModal #savedScreenList li.saved-screen-list-item { /* 구체적인 선택자 사용 */
+  padding: 10px 12px; /* 패딩 조정 가능 */
+  border: 1px solid #eee;
+  margin-bottom: 8px;
+  border-radius: 6px; /* 모달 컨텐츠와 유사하게 */
+  display: flex; /* Flexbox 적용 */
+  justify-content: space-between; /* 이름 그룹과 버튼 그룹을 양쪽 끝으로 */
+  align-items: center; /* 세로 중앙 정렬 */
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+#loadSavedScreenModal #savedScreenList li.saved-screen-list-item:hover {
+  background-color: #f0f4fa; /* 호버 색상 조정 */
+}
+
+
+.screen-info-container {
+  display: flex; /* 이름과 타임스탬프를 가로로 배열 */
+  flex-direction: column; /* 기본은 세로로, 아래에서 row로 변경 가능 */
+  /* 또는 flex-direction: row; align-items: baseline; gap: 5px; 로 한 줄에 표시 */
+  flex-grow: 1; /* 사용 가능한 공간을 최대한 차지 */
+  margin-right: 10px; /* 버튼과의 간격 */
+  overflow: hidden; /* 내부 요소가 넘칠 경우 중요 */
+}
+
+.screen-name-display {
+  font-weight: 600;
+  font-size: 1.0em; /* 크기 조정 가능 */
+  color: #333;
+  white-space: nowrap; /* 줄 바꿈 방지 */
+  overflow: hidden; /* 넘치는 내용 숨김 */
+  text-overflow: ellipsis; /* 말줄임표(...)로 표시 */
+  display: block; /* ellipsis가 제대로 작동하려면 필요할 수 있음 */
+  /* max-width: 100%; /* 부모(.screen-info-container) 너비 내에서 ellipsis 적용 */
+}
+
+.screen-timestamp-display {
+  font-size: 0.8em;
+  color: #666;
+  white-space: nowrap; /* 줄 바꿈 방지 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block; /* 한 줄을 차지하도록 */
+  margin-top: 2px;
+}
+
+.screen-item-actions {
+  display: flex; /* 버튼들을 가로로 나란히 */
+  flex-shrink: 0; /* 버튼 영역이 줄어들지 않도록 */
+  gap: 6px; /* 버튼 사이 간격 */
+}
+/* 기존 .delete-saved-item-btn 스타일은 유지되거나 필요시 여기서 미세 조정 */
+
+
+
+
+
+
+.schedule-form-section { margin-bottom: 15px; } /* From attached file [1] */
+.schedule-form-section > label { display: block; margin-bottom: 5px; font-weight: bold; } /* From attached file [1] */
+#scheduleDayCheckboxes { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 10px; } /* From attached file [1] */
+#scheduleDayCheckboxes label { margin-right: 15px; font-weight: normal; display: inline-flex; align-items: center; padding: 5px 0; } /* From attached file [1] */
+#scheduleDayCheckboxes label:last-child { margin-right: 0; } /* From attached file [1] */
+
+#scheduleTime {
+  width: calc(50% - 22px); padding: 10px; margin-bottom: 10px; /* From attached file [1] (width 수정됨) */
+  border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; /* From attached file [1] */
+  font-size: 15px;
+}
+
+
+/* 스케줄 모달 - "로드할 화면 선택" 섹션의 select와 button을 감싸는 div */
+.schedule-form-section > div.flex-container-for-select-button { /* 더 구체적인 클래스명 사용 권장 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#scheduledContentSelect {
+  padding: 10px; 
+  border: 1px solid #ccc; 
+  border-radius: 4px; 
+  box-sizing: border-box;
+  font-size: 15px;
+  flex-grow: 1; /* 사용 가능한 공간을 최대한 차지 */
+  /* --- 핵심 수정 --- */
+  min-width: 0; /* flex 아이템이 내용보다 작아질 수 있도록 허용 (매우 중요) */
+  max-width: 100%; /* 부모 컨테이너를 넘지 않도록 함 */
+  /* 브라우저가 option 텍스트가 길 경우 select 자체의 너비를 늘리는 것을
+     제어하기 위해, select 자체에 text-overflow를 직접 적용하기는 어렵습니다.
+     대신, option의 텍스트가 select 너비를 초과할 때 브라우저가 기본적으로
+     처리하는 방식(보통 내부 가로 스크롤 또는 말줄임표)에 의존합니다.
+     select 요소 자체에 너비 제한을 두는 것이 중요합니다. */
+}
+
+#deleteSelectedScheduledScreenBtn { 
+  padding: 8px 10px; 
+  font-size: 13px; 
+  height: auto; 
+  min-height: auto; 
+  background-color: #f44336; 
+  color: white; 
+  border: none;
+  flex-shrink: 0; /* 버튼 크기가 줄어들지 않도록 */
+  /* 기존 delete-btn 클래스가 있다면 해당 스타일 우선 적용될 수 있음 */
+}
+#deleteSelectedScheduledScreenBtn:hover { 
+  background-color: #d32f2f; 
+}
+
+.action-btn-small { padding: 6px 10px; font-size: 12px; border-radius: 3px; } /* From attached file [1] */
+
+#addScheduleEntryBtn.action-btn {
+  background-color: #4CAF50; color: white; /* From attached file [1] */
+  border-color: #45a049;
+  padding: 10px 18px; /* From attached file [1] (padding 수정됨) */
+  font-size: 16px; /* From attached file [1] */
+  width: 100%;
+  margin-top: 10px;
+}
+#addScheduleEntryBtn.action-btn:hover {
+  background-color: #45a049; /* From attached file [1] */
+  border-color: #45a049;
+}
+
+#scheduleList { list-style-type: none; padding: 0; margin-top: 15px; } /* From attached file [1] */
+#scheduleList li {
+  padding: 10px 8px; /* From attached file [1] (padding 수정됨) */
+  border-bottom: 1px solid #ecf0f1; /* From attached file [1] (색상 수정됨) */
+  display: flex; /* From attached file [1] */
+  justify-content: space-between; /* From attached file [1] */
+  align-items: center; /* From attached file [1] */
+  font-size: 15px;
+}
+#scheduleList li:last-child { border-bottom: none; } /* From attached file [1] */
+#scheduleList button {
+    padding: 5px 10px; /* From attached file [1] */
+    border-radius: 5px; /* From attached file [1] (radius 수정됨) */
+    font-size: 13px; /* From attached file [1] (size 수정됨) */
+    border: none; /* From attached file [1] */
+    color: white; /* From attached file [1] */
+    cursor: pointer; /* From attached file [1] */
+    transition: background-color 0.2s; /* From attached file [1] */
+}
+#scheduleList button.delete-schedule-btn {
+  background-color: #e67e22; /* From attached file [1] (색상 수정됨) */
+}
+#scheduleList button.delete-schedule-btn:hover { background-color: #d35400; } /* From attached file [1] (색상 수정됨) */
+#scheduleList button:not(.delete-schedule-btn) { /* 수정 버튼 */
+  background-color: #3498db; /* From attached file [1] (색상 수정됨) */
+  margin-left: 8px;
+}
+#scheduleList button:not(.delete-schedule-btn):hover { background-color: #2980b9;} /* From attached file [1] (색상 수정됨) */
+
+
+#scheduleList li.schedule-list-item {
+  padding: 10px 8px;
+  border-bottom: 1px solid #ecf0f1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+}
+#scheduleList li.schedule-list-item:last-child {
+  border-bottom: none;
+}
+
+.schedule-info-container {
+  flex-grow: 1;
+  margin-right: 10px;
+  overflow: hidden;
+}
+
+.schedule-text-display {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-item-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+/* 기존 #scheduleList button 스타일은 유지되거나 필요시 여기서 미세 조정 */
+
+
+
+
+
+
+
+#viewport-info {
+  position: fixed; /* From attached file [1] */
+  display: none; /* From attached file [1] */
+  z-index: 9999; /* From attached file [1] */
+  background-color: rgba(240, 244, 250, 0.95); /* From attached file [1] */
+  border: 1px solid #b6c8e8; /* From attached file [1] */
+  border-radius: 8px; /* From attached file [1] */
+  padding: 8px 12px; /* From attached file [1] */
+  color: #1c3d5a; /* From attached file [1] */
+  font-size: 13px; /* From attached file [1] */
+  line-height: 1.5; /* From attached file [1] */
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1); /* From attached file [1] */
+  width: max-content; /* From attached file [1] */
+}
+
+#viewport-info div {
+  white-space: nowrap; /* From attached file [1] */
+}
