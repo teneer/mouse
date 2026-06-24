@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학급 점수판-5</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>학급 점수판-5</h1>
+        <div class="main-scoreboard">
+            <div class="main-controls">
+                <button id="main-decrease-btn" class="main-btn">−</button>
+                <span id="number">0</span>
+                <button id="main-increase-btn" class="main-btn">+</button>
+            </div>
+            <div id="change"></div>
+            <div id="star-progress-container"></div>
+        </div>
+        <h2 id="scoreboard-title" style="display: none;">모둠 점수판 <span id="conversion-rule"></span></h2>
+        <div id="scoreboard" class="scoreboard"></div>
+        <div id="create-teams-btn-wrap">
+            <button id="create-teams-btn" onclick="showTeamSetupModal()">모둠 점수판 생성</button>
+        </div>
+    </div>
+
+    <div id="team-setup-modal" class="modal-background">
+        <div class="modal-box">
+            <h3>모둠 생성</h3>
+            <div class="modal-content">
+                <label for="team-count">생성할 모둠 개수 (1~24):</label>
+                <input type="number" id="team-count" min="1" max="24" value="4">
+            </div>
+            <div class="modal-buttons">
+                <button onclick="createTeams()">생성</button>
+                <button class="cancel" onclick="hideTeamSetupModal()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="management-modal" class="modal-background">
+        <div class="modal-box management-box">
+            <h3>점수판 관리</h3>
+            <div class="modal-content">
+                <div class="management-section">
+                    <h4>학급 점수</h4>
+                    <input type="number" id="manage-main-score" class="manage-input">
+                </div>
+                <div class="management-section">
+                    <h4>모둠 관리</h4>
+                    <div id="team-management-list"></div>
+                    <button id="add-team-btn" class="add-team-btn">+ 새 모둠 추가</button>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="save-management-btn">저장</button>
+                <button class="cancel" id="close-management-btn">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-panel-toggle">
+        <button id="settings-toggle-btn">⚙️</button>
+    </div>
+    <div id="settings-panel" class="settings-panel">
+        <h3>설정</h3>
+        <button id="open-goal-modal-btn">목표 관리</button>
+        <button id="open-management-modal-btn">점수판 관리</button>
+        <button id="reset-main-btn">학급 점수 초기화</button>
+        <button id="reset-teams-btn">모둠 점수 초기화</button>
+    </div>
+
+    <div id="goal-management-view" class="fullscreen-view">
+        <div class="goal-header">
+            <h2>목표 관리</h2>
+            <button id="close-goal-view-btn" class="close-btn">완료</button>
+        </div>
+        <div class="goal-container">
+            <div class="goal-column">
+                <h3>학급 목표</h3>
+                <div class="goal-list-header">
+                    <span>도달 점수</span>
+                    <span>목표 달성 문구</span>
+                </div>
+                <div id="class-goals-list" class="goal-list"></div>
+                <button class="add-row-btn" data-type="class">+ 학급 목표 추가</button>
+            </div>
+            <div class="goal-column">
+                <h3>모둠 목표 (총점 기준)</h3>
+                <div class="goal-list-header">
+                    <span>도달 점수</span>
+                    <span>목표 달성 문구</span>
+                </div>
+                <div id="team-goals-list" class="goal-list"></div>
+                <button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="goal-alert" class="goal-alert">
+        <div class="goal-alert-content">
+            <span class="goal-alert-icon">🎉</span>
+            <p id="goal-alert-message"></p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

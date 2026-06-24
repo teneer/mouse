@@ -1,0 +1,160 @@
+/* 모든 요소의 크기 계산을 직관적으로 변경 */
+* {
+  box-sizing: border-box;
+}
+:root {
+  --primary-color: #3498db; --primary-dark: #2980b9; --secondary-color: #2ecc71;
+  --accent-color: #e74c3c; --text-color: #2d3a4b; --light-bg: #f9fafb;
+  --card-bg: #ffffff; --shadow-color: rgba(0, 0, 0, 0.1);
+}
+html { height: 100%; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif; background: var(--light-bg);
+  background-image: linear-gradient(to bottom right, #f1f9fe, #eafaf1);
+  margin: 0; min-height: 100vh
+  overflow-x: hidden; /* 가로 스크롤 방지 */
+  overflow-y: auto;   /* 내용이 넘칠 때만 세로 스크롤 생성 */
+}
+h1, h2 { color: var(--text-color); text-align: center; }
+h1 { margin-top: 36px; text-shadow: 1px 1px 2px var(--shadow-color); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.main-scoreboard {
+  background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 20px var(--shadow-color);
+  padding: 32px 24px 24px 24px; margin: 36px auto 32px auto; max-width: 400px;
+  text-align: center; position: relative; border-top: 5px solid var(--primary-color);
+}
+.main-controls { display: flex; justify-content: center; align-items: center; gap: 24px; margin-bottom: 8px; }
+.main-btn {
+  font-size: 34px; padding: 12px 30px; background: #e6eaf0; border: none;
+  border-radius: 8px; cursor: pointer; transition: background 0.2s, transform 0.1s;
+}
+.main-btn:active { background: #d1d8e0; transform: scale(0.95); }
+#number { font-size: 72px; min-width: 90px; margin: 0 16px; display: inline-block; transition: color 0.2s, transform 0.2s; color: var(--text-color); }
+#change {
+  font-size: 32px; color: var(--secondary-color); position: absolute; left: 50%;
+  top: 55px; transform: translateX(-50%); opacity: 0;
+  transition: opacity 0.4s, top 0.4s; pointer-events: none;
+}
+.increase { color: var(--secondary-color) !important; animation: pop 0.2s; }
+.decrease { color: var(--accent-color) !important; animation: pop 0.2s; }
+.scoreboard { 
+  margin: 48px auto 0 auto; display: flex; flex-wrap: wrap; 
+  justify-content: center; gap: 28px; max-width: 1200px; 
+}
+.team-card {
+  background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 15px var(--shadow-color);
+  padding: 10px 25px 25px 25px; min-width: 190px; max-width: 210px; flex: 0 0 auto;
+  position: relative; margin-bottom: 18px; cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.1s; user-select: none; box-sizing: border-box;
+  border-top: 4px solid var(--secondary-color);
+}
+.team-card:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); }
+.team-card:active { transform: scale(0.98); }
+.team-remove-btn {
+    position: absolute; top: 0; right: 0; z-index: 2; width: 34px; height: 34px;
+    background: rgba(231, 76, 60, 0.1); color: var(--accent-color); border: none;
+    border-radius: 0 16px 0 8px; font-size: 20px; font-weight: bold; display: flex;
+    align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s, color 0.2s;
+}
+.team-remove-btn:hover { background: var(--accent-color); color: #fff; }
+.team-name {
+    font-size: 18px; margin-bottom: 8px; font-weight: normal; color: var(--text-color);
+    padding: 2px 8px; border-radius: 6px; max-width: calc(100% - 16px);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; 
+}
+.team-controls { display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 10px; }
+.team-number { font-size: 40px; margin: 0; text-align: center; transition: color 0.2s, transform 0.2s; color: var(--text-color); }
+.team-change {
+    font-size: 24px; color: var(--secondary-color); position: absolute; left: 50%;
+    top: 10px; transform: translateX(-50%); opacity: 0;
+    transition: opacity 0.4s, top 0.4s; pointer-events: none;
+}
+.team-minus-btn {
+    position: absolute; left: 0; bottom: 0; z-index: 2; width: 38px; height: 38px;
+    background: rgba(0, 0, 0, 0.05); color: var(--text-color); border: none;
+    border-radius: 0 0 0 16px; font-size: 26px; font-weight: bold; display: flex;
+    align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s, color 0.2s;
+}
+.team-minus-btn:hover { background: rgba(0, 0, 0, 0.1); color: var(--accent-color); }
+.team-increase, .team-decrease { animation: pop 0.2s; }
+.team-card:nth-child(10n+1){border-top-color:#1561ad;background-color:rgba(21,97,173,0.1);}
+.team-card:nth-child(10n+2){border-top-color:#2ecc71;background-color:rgba(46,204,113,0.1);}
+.team-card:nth-child(10n+3){border-top-color:#e74c3c;background-color:rgba(231,76,60,0.1);}
+.team-card:nth-child(10n+4){border-top-color:#f39c12;background-color:rgba(243,156,18,0.1);}
+.team-card:nth-child(10n+5){border-top-color:#9b59b6;background-color:rgba(155,89,182,0.1);}
+.team-card:nth-child(10n+6){border-top-color:#12343b;background-color:rgba(18,52,59,0.1);}
+.team-card:nth-child(10n+7){border-top-color:#c7af6b;background-color:rgba(199,175,107,0.1);}
+.team-card:nth-child(10n+8){border-top-color:#3d7c47;background-color:rgba(61,124,71,0.1);}
+.team-card:nth-child(10n+9){border-top-color:#431c5d;background-color:rgba(67,28,93,0.1);}
+.team-card:nth-child(10n+10){border-top-color:#eb1736;background-color:rgba(235,23,54,0.1);}
+#conversion-rule { display: inline-block; font-size: 14px; font-weight: 500; color: #555; background-color: rgba(0, 0, 0, 0.05); padding: 4px 10px; border-radius: 12px; margin-left: 10px; vertical-align: middle; }
+@keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@media (max-width: 700px) { .scoreboard { max-width: 400px; justify-content: center; gap: 18px; } .team-card { min-width: 120px; max-width: 150px; padding: 18px 10px 14px 10px; } }
+.settings-panel-toggle { position: fixed; top: 20px; right: 20px; z-index: 1001; }
+#settings-toggle-btn { background: var(--card-bg); border: 1px solid #ddd; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; box-shadow: 0 2px 10px var(--shadow-color); transition: transform 0.2s, box-shadow 0.2s; }
+#settings-toggle-btn:hover { box-shadow: 0 4px 15px var(--shadow-color); transform: translateY(-2px); }
+.settings-panel { position: fixed; top: 80px; right: 0; width: 250px; background: var(--card-bg); border-radius: 12px 0 0 12px; box-shadow: -5px 5px 20px var(--shadow-color); padding: 20px; box-sizing: border-box; z-index: 1000; transform: translateX(100%); transition: transform 0.4s ease-in-out; display: flex; flex-direction: column; gap: 10px; }
+.settings-panel.open { transform: translateX(0); }
+.settings-panel h3 { margin-top: 0; color: var(--text-color); text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+.settings-panel button { width: 100%; padding: 12px; font-size: 16px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
+.settings-panel button:hover { background-color: var(--primary-dark); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-background { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 2000; justify-content: center; align-items: center; animation: fadeIn 0.3s; }
+.modal-box { background: var(--card-bg); border-radius: 16px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); width: 500px; box-sizing: border-box; max-height: 85vh; display: flex; flex-direction: column; }
+.modal-box h3 { margin: 0; padding: 20px 30px; border-bottom: 1px solid #eee; font-size: 18px; flex-shrink: 0; }
+.modal-content { padding: 20px 30px; overflow-y: auto; flex-grow: 1; }
+.modal-box label { display: block; margin-bottom: 10px; color: var(--text-color); }
+.modal-buttons { display: flex; justify-content: flex-end; gap: 15px; padding: 20px 30px; border-top: 1px solid #eee; flex-shrink: 0; }
+.modal-buttons button { padding: 10px 25px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; transition: background-color .2s; }
+.modal-buttons button#save-management-btn, .modal-buttons button:not(.cancel) { background-color: var(--primary-color); color: white; }
+.modal-buttons button#save-management-btn:hover, .modal-buttons button:not(.cancel):hover { background-color: var(--primary-dark); }
+.modal-buttons button.cancel { background-color: #f0f0f0; color: #333; }
+.modal-buttons button.cancel:hover { background-color: #e0e0e0; }
+.management-box { text-align: left; }
+.management-section { margin-bottom: 25px; } .management-section:last-child { margin-bottom: 0; }
+.management-section h4 { margin: 0 0 10px 0; font-size: 16px; color: var(--text-color); }
+#manage-main-score { width: 100%; box-sizing: border-box; font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
+#team-management-list .team-manage-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.manage-input { font-size: 16px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+.manage-input:focus { border-color: var(--primary-color); outline: none; }
+#team-management-list .manage-name { flex-grow: 1; }
+#team-management-list .manage-score { width: 80px; text-align: center; }
+#team-management-list .delete-team-btn { background: #fce8e6; color: var(--accent-color); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 18px; cursor: pointer; line-height: 32px; flex-shrink: 0; }
+.add-team-btn { width: 100%; padding: 10px; margin-top: 10px; background: #e8f5e9; color: var(--secondary-dark); border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 500; }
+.fullscreen-view { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--light-bg); z-index: 3000; flex-direction: column; }
+.goal-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: var(--card-bg); border-bottom: 1px solid #ddd; flex-shrink: 0; }
+.goal-header h2 { margin: 0; }
+.close-btn { padding: 10px 25px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; background-color: var(--primary-color); color: white; }
+.goal-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; padding: 30px; overflow-y: auto; flex-grow: 1; }
+.goal-column { background-color: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: 0 2px 10px var(--shadow-color); }
+.goal-column h3 { margin-top: 0; }
+.goal-list { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+.goal-list-header { display: grid; grid-template-columns: 60px 1fr 40px; gap: 10px; font-size: 14px; color: #555; font-weight: 500; padding: 0 10px; }
+.goal-row { display: grid; grid-template-columns: 60px 1fr 40px; gap: 10px; align-items: center; background: #f9f9f9; padding: 10px; border-radius: 8px; }
+.goal-row input { font-size: 15px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
+.delete-row-btn { background: #fce8e6; color: var(--accent-color); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 18px; cursor: pointer; }
+.add-row-btn { width: 100%; padding: 12px; margin-top: 20px; background: #e8f5e9; color: var(--secondary-dark); border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; }
+.goal-alert { position: fixed; top: -150px; left: 50%; transform: translateX(-50%); background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 9999; transition: top 0.5s ease-in-out; }
+.goal-alert.show { top: 30px; }
+.goal-alert-content { display: flex; align-items: center; }
+.goal-alert-icon { font-size: 32px; margin-right: 20px; animation: tada 1s; }
+.goal-alert-message { font-size: 18px; font-weight: 500; margin: 0; }
+@keyframes tada { from{transform:scale3d(1,1,1)} 10%,20%{transform:scale3d(.9,.9,.9) rotate3d(0,0,1,-3deg)} 30%,50%,70%,90%{transform:scale3d(1.1,1.1,1.1) rotate3d(0,0,1,3deg)} 40%,60%,80%{transform:scale3d(1.1,1.1,1.1) rotate3d(0,0,1,-3deg)} to{transform:scale3d(1,1,1)} }
+
+/* ▼▼▼ [새 기능] 별 프로그레스 바 스타일 ▼▼▼ */
+#star-progress-container {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 15px;
+    height: 24px;
+}
+.star {
+    font-size: 24px;
+    color: #e0e0e0; /* 비활성 별 색상 */
+    transition: color 0.3s, transform 0.2s;
+}
+.star.filled {
+    color: #fdd835; /* 활성 별 색상 (노란색) */
+    transform: scale(1.2);
+}

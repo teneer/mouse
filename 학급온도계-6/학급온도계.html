@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학급 점수판 v.60</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>학급 점수판 v.60</h1>
+
+        <div id="display-area">
+            
+            <div id="top-row">
+                <div id="class-area">
+                    <div class="main-scoreboard">
+                        <div class="main-controls">
+                            <button id="main-decrease-btn" class="main-btn">−</button>
+                            <span id="number">0</span>
+                            <button id="main-increase-btn" class="main-btn">+</button>
+                        </div>
+                        <div id="change"></div>
+                        <div id="star-progress-container"></div>
+                    </div>
+                </div>
+
+                <div id="goal-panel">
+                    <div class="goal-header-row">
+                        <label class="goal-check-label">
+                            <input type="checkbox" id="goal-complete-checkbox"> 목표 완료
+                        </label>
+                        <span id="goal-close-btn" style="cursor:pointer; font-size:1.5rem; color:#888;">✖</span>
+                    </div>
+                    <div class="goal-content">
+                        <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
+                        <div id="goal-panel-message" style="font-size: 2em; font-weight: bold; word-break: keep-all; color: #2d3a4b;">
+                            목표 달성!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="bottom-row">
+                <h2 id="scoreboard-title" style="display: none;">모둠 점수판 <span id="conversion-rule"></span></h2>
+                <div id="scoreboard" class="scoreboard"></div>
+                
+                <div id="create-teams-btn-wrap">
+                    <button id="create-teams-btn" onclick="showTeamSetupModal()">모둠 점수판 생성</button>
+                </div>
+            </div>
+
+        </div> <div class="settings-panel-toggle">
+            <button id="settings-toggle-btn">⚙️</button>
+        </div>
+        
+        <div id="settings-panel" class="settings-panel">
+            <h3>설정</h3>
+            <button id="open-goal-modal-btn">목표 관리</button>
+            <button id="open-management-modal-btn">점수판 관리</button>
+            <button id="reset-main-btn">학급 점수 초기화</button>
+            <button id="reset-teams-btn">모둠 점수 초기화</button>
+        </div>
+
+    </div>
+
+    <div id="team-setup-modal" class="modal-background">
+        <div class="modal-box">
+            <h3>모둠 생성</h3>
+            <div class="modal-content">
+                <label for="team-count">모둠 수:</label>
+                <input type="number" id="team-count" min="1" max="12" value="6">
+            </div>
+            <div class="modal-footer" style="padding: 20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="closeTeamSetupModal()" style="padding:8px 16px;">취소</button>
+                <button onclick="createTeams()" style="padding:8px 16px; background:#3498db; color:white; border:none; border-radius:4px;">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="management-modal" class="fullscreen-view">
+        <div class="goal-header">
+            <h2>점수판 관리</h2>
+            <button id="save-management-btn" class="close-btn">저장 및 닫기</button>
+        </div>
+        <div class="management-content" style="padding:20px; max-width:600px; margin:0 auto;">
+             <div class="setting-item" style="margin-bottom:20px;">
+                <label style="display:block; font-weight:bold; margin-bottom:5px;">학급 점수 수정:</label>
+                <input type="number" id="manage-main-score" style="width:100%; padding:8px; font-size:16px;">
+            </div>
+             
+             <div class="setting-item">
+                <label style="display:block; font-weight:bold; margin-bottom:5px;">모둠 점수 관리:</label>
+                <div id="team-management-list"></div>
+                <button id="add-team-btn" class="add-row-btn" style="margin-top:10px;">+ 모둠 추가</button>
+            </div>
+
+            <div style="margin-top:20px; text-align:right;">
+                <button id="close-management-btn" style="background:#ccc; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="goal-management-view" class="fullscreen-view">
+        <div class="goal-header">
+            <h2>목표 관리</h2>
+            <button id="close-goal-view-btn" class="close-btn">완료</button>
+        </div>
+        <div class="goal-container">
+            <div class="goal-column">
+                <h3>학급 목표</h3>
+                <div class="goal-list-header">
+                    <span>도달 점수</span>
+                    <span>목표 달성 문구</span>
+                </div>
+                <div id="class-goals-list" class="goal-list"></div>
+                <button class="add-row-btn" data-type="class">+ 학급 목표 추가</button>
+            </div>
+            <div class="goal-column">
+                <h3>모둠 목표 (총점 기준)</h3>
+                <div class="goal-list-header">
+                    <span>도달 점수</span>
+                    <span>목표 달성 문구</span>
+                </div>
+                <div id="team-goals-list" class="goal-list"></div>
+                <button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
