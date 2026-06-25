@@ -19,8 +19,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const canvasContainer = document.getElementById('canvas-container');
 
     // --- DOM 요소 가져오기 ---
-    const selectMoveToggleBtn = document.getElementById('selectMoveToggleBtn');
-    const selectMoveLabel = document.getElementById('selectMoveLabel');
 
     const editLayerCheckbox = document.querySelector('input[data-layer="editLayer"]');
     const scheduleLayerCheckbox = document.querySelector('input[data-layer="scheduleLayer"]');
@@ -192,48 +190,20 @@ function positionTipup(buttonElement, tipupElement) {
         window.lastOpenedTipup = tipupElement;
     }
 }    
-    function positionViewportInfo() {
-        if (!viewportInfoDiv || !selectMoveToggleBtn || viewportInfoDiv.style.display === 'none') return;
-        const btnRect = selectMoveToggleBtn.getBoundingClientRect();
-        const infoHeight = viewportInfoDiv.offsetHeight;
-        const infoWidth = viewportInfoDiv.offsetWidth;
-        let topPosition = btnRect.top - infoHeight - 8;
-        let leftPosition = btnRect.left + (btnRect.width / 2) - (infoWidth / 2);
-        if (topPosition < 5) topPosition = 5;
-        if (leftPosition < 5) leftPosition = 5;
-        if (leftPosition + infoWidth > window.innerWidth - 5) leftPosition = window.innerWidth - infoWidth - 5;
-        viewportInfoDiv.style.top = topPosition + 'px';
-        viewportInfoDiv.style.left = leftPosition + 'px';
-    }
+    //function positionViewportInfo() {
+        //if (!viewportInfoDiv || !selectMoveToggleBtn || viewportInfoDiv.style.display === 'none') return;
+        //const btnRect = selectMoveToggleBtn.getBoundingClientRect();
+        //const infoHeight = viewportInfoDiv.offsetHeight;
+        //const infoWidth = viewportInfoDiv.offsetWidth;
+        //let topPosition = btnRect.top - infoHeight - 8;
+        //let leftPosition = btnRect.left + (btnRect.width / 2) - (infoWidth / 2);
+        //if (topPosition < 5) topPosition = 5;
+        //if (leftPosition < 5) leftPosition = 5;
+        //if (leftPosition + infoWidth > window.innerWidth - 5) leftPosition = window.innerWidth - infoWidth - 5;
+        //viewportInfoDiv.style.top = topPosition + 'px';
+        //viewportInfoDiv.style.left = leftPosition + 'px';
+    //}
 
-    function updateButtonActiveState() {
-        selectMoveToggleBtn.classList.remove('active-select', 'active-move');
-        penModeBtn.classList.remove('active-select');
-        freeTextModeBtn.classList.remove('active-select');
-
-        if (currentMode === 'select') {
-            selectMoveToggleBtn.classList.add('active-select');
-            selectMoveLabel.textContent = '선택';
-        } else if (currentMode === 'move') {
-            selectMoveToggleBtn.classList.add('active-move');
-            selectMoveLabel.textContent = '이동';
-        } else if (currentMode === 'pen') {
-            penModeBtn.classList.add('active-select');
-            selectMoveLabel.textContent = '선택';
-        } else if (currentMode === 'text') {
-            freeTextModeBtn.classList.add('active-select');
-            selectMoveLabel.textContent = '선택';
-        }
-
-        if (viewportInfoDiv) {
-            const showInfo = currentMode === 'move' && toolbarVisible;
-            viewportInfoDiv.style.display = showInfo ? 'block' : 'none';
-            if (showInfo) {
-                updateViewportInfo();
-                positionViewportInfo();
-            }
-        }
-    }
 
     function getTargetLayerForDrawing() {
         if (editLayerCheckbox.checked) return 'editLayer';
@@ -258,23 +228,23 @@ function positionTipup(buttonElement, tipupElement) {
         });
     }
 
-    selectMoveToggleBtn.addEventListener('click', () => {
-        if (currentMode === 'select') {
-            currentMode = 'move';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.selection = false;
-            fabricCanvas.defaultCursor = 'grab';
-            fabricCanvas.forEachObject(obj => obj.selectable = false);
-        } else {
-            currentMode = 'select';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.selection = true;
-            fabricCanvas.defaultCursor = 'default';
-            updateLayerObjectsState();
-        }
-        fabricCanvas.off('mouse:down', addTextToCanvas);
-        updateButtonActiveState();
-    });
+    //selectMoveToggleBtn.addEventListener('click', () => {
+        //if (currentMode === 'select') {
+            //currentMode = 'move';
+            //fabricCanvas.isDrawingMode = false;
+            //fabricCanvas.selection = false;
+            //fabricCanvas.defaultCursor = 'grab';
+            //fabricCanvas.forEachObject(obj => obj.selectable = false);
+        //} else {
+            //currentMode = 'select';
+            //fabricCanvas.isDrawingMode = false;
+            //fabricCanvas.selection = true;
+            //fabricCanvas.defaultCursor = 'default';
+            //updateLayerObjectsState();
+        //}
+        //fabricCanvas.off('mouse:down', addTextToCanvas);
+        //updateButtonActiveState();
+    //});
 
 // ================================================================
     // 🌟 [수정 및 교체] 마우스 및 터치 전자칠판 뷰포트 이동(Pan) 통합 로직
@@ -1240,6 +1210,81 @@ function applyToolbarScale(){
 
 window.addEventListener('resize', applyToolbarScale);
 applyToolbarScale();   
+
+/* =================================================================
+     [새 기능 추가] 형광펜, 마우스 우클릭 이동, 휠 줌, 실시간 안내창
+     ================================================================= */
+  const indicator = document.getElementById('floating-indicator');
+  const highlighterBtn = document.getElementById('highlighterBtn');
+
+  // 1. 실시간 배율 안내창 표시 함수
+  function showIndicator(clientX, clientY, zoomLevel) {
+    if (!indicator) return;
+    const percent = Math.round(zoomLevel * 100);
+    indicator.innerHTML = `🔍 배율: ${percent}%`;
+    indicator.style.left = `${clientX + 20}px`;
+    indicator.style.top = `${clientY + 15}px`;
+    indicator.style.display = 'block';
+  }
+
+  function hideIndicator() {
+    if (indicator) indicator.style.display = 'none';
+  }
+
+  // 2. 형광펜 기능 (기존 펜 두께를 연동하여 3배 두껍고 투명하게 설정)
+  if (highlighterBtn) {
+    highlighterBtn.addEventListener('click', () => {
+      fabricCanvas.isDrawingMode = true;
+      const brush = new fabric.PencilBrush(fabricCanvas);
+      brush.color = 'rgba(255, 255, 0, 0.4)'; // 노란색 반투명 효과
+      
+      // 기존 펜 두께 조절창(penSizeSelect)의 현재 값을 가져옴
+      const sizeInput = document.getElementById('penSizeSelect');
+      const baseSize = sizeInput ? parseInt(sizeInput.value) : 5;
+      brush.width = baseSize * 3; // 형광펜은 기본 펜의 3배 두께
+      
+      fabricCanvas.freeDrawingBrush = brush;
+    });
+  }
+
+  // 3. 우클릭 이동 기능을 위해 브라우저 기본 우클릭 메뉴(Context Menu) 차단
+  canvasElement.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 4. Fabric.js 마우스 이벤트 (언제든 우클릭 드래그로 화면 이동)
+  fabricCanvas.on('mouse:down', function(opt) {
+    var evt = opt.e;
+    if (evt.button === 2) { // 마우스 우클릭 감지
+      this.isDragging = true;
+      this.selection = false; // 드래그 중 요소 다중선택 방지
+      this.lastPosX = evt.clientX;
+      this.lastPosY = evt.clientY;
+    }
+  });
+
+  fabricCanvas.on('mouse:move', function(opt) {
+    if (this.isDragging) {
+      var e = opt.e;
+      var vpt = this.viewportTransform;
+      vpt[4] += e.clientX - this.lastPosX;
+      vpt[5] += e.clientY - this.lastPosY;
+      this.requestRenderAll();
+      this.lastPosX = e.clientX;
+      this.lastPosY = e.clientY;
+      showIndicator(e.clientX, e.clientY, this.getZoom());
+    }
+  });
+
+  fabricCanvas.on('mouse:up', function(opt) {
+    this.isDragging = false;
+    this.selection = true;
+    hideIndicator();
+  });
+
+  
+    // 마우스 휠 조작이 끝나면 1초 뒤 안내창 자동 숨김
+    clearTimeout(window.zoomTimeout);
+    window.zoomTimeout = setTimeout(hideIndicator, 1000);
+  });
 
 
 
