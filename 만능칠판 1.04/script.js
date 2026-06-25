@@ -26,424 +26,361 @@ document.addEventListener('DOMContentLoaded', async () => {
     const scheduleLayerCheckbox = document.querySelector('input[data-layer="scheduleLayer"]');
 
     const bgColorBtn = document.getElementById('bgColorBtn');
-    const bgColorTipup = document.querySelector('.tip-up-settings[data-tipup=\"bgcolor\"]');
+    const bgColorTipup = document.querySelector('.tip-up-settings[data-tipup="bgcolor"]');
     const bgColorOptions = bgColorTipup.querySelectorAll('.color-btn');
 
     const penModeBtn = document.getElementById('penModeBtn');
-    const penTipup = document.querySelector('.tip-up-settings[data-tipup=\"pen\"]');
-    const penColorOptions = penTipup.querySelectorAll('.color-btn');
-    const penWidthSlider = document.getElementById('penWidthSlider');
-    const penWidthVal = document.getElementById('penWidthVal');
+    const penTipupBtn = document.getElementById('penTipupBtn');
+    const penSettings = document.getElementById('penSettings');
+    const penColorOptions = penSettings.querySelectorAll('.color-btn[data-tool="pen"]');
+    const penSizeSelect = document.getElementById('penSizeSelect');
+
+    const freeTextModeBtn = document.getElementById('freeTextModeBtn');
+    const freeTextTipupBtn = document.getElementById('freeTextTipupBtn');
+    const freeTextSettings = document.getElementById('freeTextSettings');
+    const freeTextColorOptions = freeTextSettings.querySelectorAll('.color-btn[data-tool="freeText"]');
+    const freeTextSizeSelect = document.getElementById('freeTextSizeSelect');
 
     const eraserModeBtn = document.getElementById('eraserModeBtn');
-    const eraserTipup = document.querySelector('.tip-up-settings[data-tipup=\"eraser\"]');
-    const eraserWidthSlider = document.getElementById('eraserWidthSlider');
-    const eraserWidthVal = document.getElementById('eraserWidthVal');
-
-    const textModeBtn = document.getElementById('textModeBtn');
-    const textTipup = document.querySelector('.tip-up-settings[data-tipup=\"text\"]');
-    const textColorOptions = textTipup.querySelectorAll('.color-btn');
-    const fontSizeSlider = document.getElementById('fontSizeSlider');
-    const fontSizeVal = document.getElementById('fontSizeVal');
-
-    const clearBtn = document.getElementById('clearBtn');
-    const addScheduleBtn = document.getElementById('addScheduleBtn');
-    const loadSavedScreenBtn = document.getElementById('loadSavedScreenBtn');
-    const saveScreenBtn = document.getElementById('saveScreenBtn');
-
-    // 모달 관련 요소들
+    const clearAllBtn = document.getElementById('clearAllBtn');
     const clearConfirmModal = document.getElementById('clearConfirmModal');
     const confirmClearBtn = document.getElementById('confirmClearBtn');
     const cancelClearBtn = document.getElementById('cancelClearBtn');
     const closeClearConfirmModal = document.getElementById('closeClearConfirmModal');
 
+    const saveBtn = document.getElementById('saveBtn');
+    const loadGeneralBtn = document.getElementById('loadGeneralBtn');
+    const scheduleBtn = document.getElementById('scheduleBtn');
+
+    const saveConfirmModal = document.getElementById('saveConfirmModal');
+    const closeSaveConfirmModalBtn = document.getElementById('closeSaveConfirmModal');
+    const saveScreenNameInput = document.getElementById('saveScreenNameInput');
+    const saveModalTimestamp = document.getElementById('saveModalTimestamp');
+    const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+    const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+
+
     const loadSavedScreenModal = document.getElementById('loadSavedScreenModal');
     const closeLoadSavedScreenModalBtn = document.getElementById('closeLoadSavedScreenModalBtn');
-    const savedScreenList = document.getElementById('savedScreenList');
-    const noSavedScreens = document.getElementById('noSavedScreens');
+    const savedScreenListUl = document.getElementById('savedScreenList');
+    const noSavedScreensP = document.getElementById('noSavedScreens');
 
-    const saveScreenModal = document.getElementById('saveScreenModal');
-    const closeSaveScreenModalBtn = document.getElementById('closeSaveScreenModalBtn');
-    const saveScreenForm = document.getElementById('saveScreenForm');
-    const screenBaseNameInput = document.getElementById('screenBaseName');
-    const saveEditLayerCheckbox = document.getElementById('saveEditLayer');
-    const saveScheduleLayerCheckbox = document.getElementById('saveScheduleLayer');
+    const scheduleModal = document.getElementById('scheduleModal');
+    const closeScheduleModalBtn = document.getElementById('closeScheduleModalBtn');
+    const scheduleDayCheckboxesContainer = document.getElementById('scheduleDayCheckboxes');
+    const scheduleTimeInput = document.getElementById('scheduleTime');
+    const scheduledContentSelect = document.getElementById('scheduledContentSelect');
+    const deleteSelectedScheduledScreenBtn = document.getElementById('deleteSelectedScheduledScreenBtn');
+    const addScheduleEntryBtn = document.getElementById('addScheduleEntryBtn');
+    const scheduleListUl = document.getElementById('scheduleList');
 
-    // 전역 상태 변수들
-    let currentMode = 'select'; // 'select', 'move', 'pen', 'eraser', 'text'
-    let isPanning = false;         // ⚠️ 상단 선언부 유지
-    let lastPanPoint = { x: 0, y: 0 }; // ⚠️ 상단 선언부 유지
+    const homeBtn = document.getElementById('homeBtn');
+    const toolbarHideBtn = document.getElementById('toolbarHideBtn');
+    const toolbarElement = document.getElementById('toolbar');
+    const toolbarToggleElement = document.getElementById('toolbarToggle');
+    const toolbarWrapper = document.getElementById('toolbarWrapper');
+    const toolbarScaleWrap = document.getElementById('toolbarScaleWrap');
+
+
+    let currentMode = 'select';
+    let isPanning = false;
+    let lastPanPoint = { x: 0, y: 0 };
+    let toolbarVisible = true;
 
     let currentPenColor = '#000000';
-    let currentPenWidth = 5;
-    let currentEraserWidth = 30;
+    let currentPenSize = 5;
     let currentTextColor = '#000000';
-    let currentFontSize = 40;
+    let currentTextSize = 48;
+
+    let dataManager;
+
+    function debounce(func, delay) {
+      let timeoutId;
+      return function(...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          func.apply(this, args);
+        }, delay);
+      };
+    }
 
     const MIN_ZOOM = 0.1;
-    const MAX_ZOOM = 10;
+    const MAX_ZOOM = 10.0;
+    const DEFAULT_ZOOM = 1.0;
 
-    // 디바운스 유틸리티 함수
-    function debounce(func, wait) {
-        let timeout;
-        return function(...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
+    function setInitialView(zoomLevel = DEFAULT_ZOOM) {
+        const containerWidth = canvasContainer.offsetWidth;
+        const containerHeight = canvasContainer.offsetHeight;
+        const viewportCenterX = containerWidth / 2;
+        const viewportCenterY = containerHeight / 2;
+        const canvasActualCenterX = fabricCanvas.width / 2;
+        const canvasActualCenterY = fabricCanvas.height / 2;
+        const panX = viewportCenterX - (canvasActualCenterX * zoomLevel);
+        const panY = viewportCenterY - (canvasActualCenterY * zoomLevel);
+        fabricCanvas.setViewportTransform([zoomLevel, 0, 0, zoomLevel, panX, panY]);
+        if (typeof updateViewportInfo === 'function') updateViewportInfo();
+        fabricCanvas.renderAll();
     }
 
-    const debouncedRecordState = debounce(() => {
-        recordState(fabricCanvas);
-    }, 300);
-
-    // 공통 헬퍼 함수 정의
-    const getTargetLayerForDrawing = () => {
-        if (editLayerCheckbox.checked) return 'editLayer';
-        if (scheduleLayerCheckbox.checked) return 'scheduleLayer';
-        return 'editLayer';
-    };
-
-    // 묘화용 유틸리티 묶음 (임포트된 모듈 등에 전달용)
-    const utilsForPaste = {
-        getTargetLayerForDrawing: getTargetLayerForDrawing,
-        debouncedSaveCanvasState: () => {
-            if (dataManager && typeof dataManager.debouncedSaveCanvasState === "function") {
-                dataManager.debouncedSaveCanvasState();
-            }
-        }
-    };
-
-    // 외부 모듈 초기화 (clipboard, history)
-    initializeClipboard(fabricCanvas, utilsForPaste, debouncedRecordState);
-    initializeHistory(fabricCanvas);
-
-    // 전역 단축키 처리 모듈 (data.js) 로드 후 인스턴스 획득
-    let dataManager = null;
-    if (typeof initializeDataAndScheduleFunctions === 'function') {
-        dataManager = initializeDataAndScheduleFunctions(fabricCanvas, {
-            debounce: debounce,
-            updateButtonActiveState: updateButtonActiveState,
-            updateLayerObjectsState: updateLayerObjectsState,
-            renderAll: () => fabricCanvas.renderAll()
-        }, utilsForPaste);
-        
-        if (dataManager && typeof dataManager.loadInitialCanvas === 'function') {
-            await dataManager.loadInitialCanvas();
-        }
+    let viewportInfoDiv = document.getElementById('viewport-info');
+    if (!viewportInfoDiv) {
+        viewportInfoDiv = document.createElement('div');
+        viewportInfoDiv.id = 'viewport-info';
+        document.body.appendChild(viewportInfoDiv);
     }
 
-    // 마우스 휠 줌 기능
-    fabricCanvas.on('mouse:wheel', function(opt) {
-        const delta = opt.e.deltaY;
-        let zoom = fabricCanvas.getZoom();
-        zoom *= 0.999 ** delta;
-        if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
-        if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
-        fabricCanvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-        opt.e.preventDefault();
-        opt.e.stopPropagation();
-        updateViewportInfo();
-    });
+    fabricCanvas.freeDrawingBrush.color = currentPenColor;
+    fabricCanvas.freeDrawingBrush.width = currentPenSize;
+    penSizeSelect.value = currentPenSize;
+    const initialPenColorBtn = document.querySelector(`#penSettings .color-btn[data-tool="pen"][data-color="${currentPenColor}"]`);
+    if (initialPenColorBtn) initialPenColorBtn.classList.add('selected');
 
-    // 뷰포트 정보 업데이트 디스플레이 함수
-    function updateViewportInfo() {
-        const vInfo = document.getElementById('viewport-info');
-        if(!vInfo) return;
-        const zoomPercent = Math.round(fabricCanvas.getZoom() * 100);
-        const vPoint = fabricCanvas.viewportTransform;
-        const panX = Math.round(vPoint[4]);
-        const panY = Math.round(vPoint[5]);
-        vInfo.innerText = `Zoom: ${zoomPercent}% | PanX: ${panX}px, PanY: ${panY}px`;
-    }
+    freeTextSizeSelect.value = currentTextSize;
+    const initialTextColorBtn = document.querySelector(`#freeTextSettings .color-btn[data-tool="freeText"][data-color="${currentTextColor}"]`);
+    if (initialTextColorBtn) initialTextColorBtn.classList.add('selected');
 
-    // 텍스트 추가 모드 전용 클릭 핸들러
-    function addTextToCanvas(opt) {
-        if (currentMode !== 'text') return;
-        
-        const pointer = fabricCanvas.getPointer(opt.e);
-        const targetLayer = getTargetLayerForDrawing();
-
-        const text = new fabric.IText('텍스트를 입력하세요', {
-            left: pointer.x,
-            top: pointer.y,
-            fontSize: currentFontSize,
-            fill: currentTextColor,
-            fontFamily: 'Segoe UI',
-            customLayer: targetLayer
+    window.lastOpenedTipup = null;
+    function closeAllTipups(exceptTipup = null) {
+        document.querySelectorAll('.tip-up-settings').forEach(tipup => {
+            if (tipup !== exceptTipup) tipup.style.display = 'none';
         });
-
-        fabricCanvas.add(text);
-        fabricCanvas.setActiveObject(text);
-        text.enterEditing();
-        text.selectAll();
-
-        currentMode = 'select';
-        fabricCanvas.isDrawingMode = false;
-        fabricCanvas.defaultCursor = 'default';
-        updateButtonActiveState();
-        updateLayerObjectsState();
-
-        if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-            dataManager.debouncedSaveCanvasState();
-        }
-        debouncedRecordState();
+        if (exceptTipup === null) window.lastOpenedTipup = null;
     }
 
-    // 툴바 버튼 활성화 클래스 제어 함수
+function positionTipup(buttonElement, tipupElement) {
+    // 팁업을 띄울 기준이 되는 요소(앵커)를 찾습니다.
+    // 클릭된 버튼이 .button-group 안에 있으면 그룹 전체를, 아니면 버튼 자체를 기준으로 합니다.
+    const anchorElement = buttonElement.closest('.button-group') || buttonElement;
+    const anchorRect = anchorElement.getBoundingClientRect(); // 기준 요소의 화면 좌표
+
+    // 팁업을 먼저 화면에 표시해야 정확한 높이(offsetHeight)를 알 수 있습니다.
+    // 단, 보이지 않게 처리합니다.
+    tipupElement.style.display = 'flex'; // 또는 'block'
+    tipupElement.style.visibility = 'hidden';
+    tipupElement.style.opacity = '0';
+
+    const tipupHeight = tipupElement.offsetHeight;
+
+    tipupElement.style.position = 'fixed';
+
+    // 1. Y 좌표: 기준 요소의 상단(anchorRect.top)에서 팁업의 높이와 약간의 여백(8px)만큼 위로 올립니다.
+    // 이렇게 하면 팁업이 버튼을 가리지 않습니다.
+    tipupElement.style.top = (anchorRect.top - tipupHeight - 8) + 'px';
+
+    // 2. X 좌표: 기준 요소의 왼쪽(anchorRect.left)에 정확히 맞춥니다.
+    tipupElement.style.left = anchorRect.left + 'px';
+
+    // 화면 경계 처리 (기존과 동일)
+    if (parseFloat(tipupElement.style.left) < 0) {
+        tipupElement.style.left = '5px';
+    }
+    if (parseFloat(tipupElement.style.left) + tipupElement.offsetWidth > window.innerWidth) {
+        tipupElement.style.left = (window.innerWidth - tipupElement.offsetWidth - 5) + 'px';
+    }
+
+    // 토글 로직
+    const isVisible = tipupElement.style.visibility === 'visible';
+
+    if (isVisible && tipupElement === window.lastOpenedTipup) {
+        tipupElement.style.display = 'none';
+        window.lastOpenedTipup = null;
+    } else {
+        closeAllTipups();
+        tipupElement.style.display = 'flex'; // 다시 보이게
+        tipupElement.style.visibility = 'visible'; // 다시 보이게
+        tipupElement.style.opacity = '1'; // 다시 보이게
+        window.lastOpenedTipup = tipupElement;
+    }
+}    
+    function positionViewportInfo() {
+        if (!viewportInfoDiv || !selectMoveToggleBtn || viewportInfoDiv.style.display === 'none') return;
+        const btnRect = selectMoveToggleBtn.getBoundingClientRect();
+        const infoHeight = viewportInfoDiv.offsetHeight;
+        const infoWidth = viewportInfoDiv.offsetWidth;
+        let topPosition = btnRect.top - infoHeight - 8;
+        let leftPosition = btnRect.left + (btnRect.width / 2) - (infoWidth / 2);
+        if (topPosition < 5) topPosition = 5;
+        if (leftPosition < 5) leftPosition = 5;
+        if (leftPosition + infoWidth > window.innerWidth - 5) leftPosition = window.innerWidth - infoWidth - 5;
+        viewportInfoDiv.style.top = topPosition + 'px';
+        viewportInfoDiv.style.left = leftPosition + 'px';
+    }
+
     function updateButtonActiveState() {
-        const allButtons = [selectMoveToggleBtn, penModeBtn, eraserModeBtn, textModeBtn];
-        allButtons.forEach(btn => btn.classList.remove('active-select', 'active-pen', 'active-eraser', 'active-text'));
+        selectMoveToggleBtn.classList.remove('active-select', 'active-move');
+        penModeBtn.classList.remove('active-select');
+        freeTextModeBtn.classList.remove('active-select');
 
         if (currentMode === 'select') {
             selectMoveToggleBtn.classList.add('active-select');
-            selectMoveLabel.innerText = '선택';
+            selectMoveLabel.textContent = '선택';
         } else if (currentMode === 'move') {
-            selectMoveToggleBtn.classList.add('active-select');
-            selectMoveLabel.innerText = '이동';
+            selectMoveToggleBtn.classList.add('active-move');
+            selectMoveLabel.textContent = '이동';
         } else if (currentMode === 'pen') {
-            penModeBtn.classList.add('active-pen');
-        } else if (currentMode === 'eraser') {
-            eraserModeBtn.classList.add('active-eraser');
+            penModeBtn.classList.add('active-select');
+            selectMoveLabel.textContent = '선택';
         } else if (currentMode === 'text') {
-            textModeBtn.classList.add('active-text');
+            freeTextModeBtn.classList.add('active-select');
+            selectMoveLabel.textContent = '선택';
+        }
+
+        if (viewportInfoDiv) {
+            const showInfo = currentMode === 'move' && toolbarVisible;
+            viewportInfoDiv.style.display = showInfo ? 'block' : 'none';
+            if (showInfo) {
+                updateViewportInfo();
+                positionViewportInfo();
+            }
         }
     }
 
-    // 팝업 레이어 닫기 도우미
-    function closeAllTipups() {
-        const allTipups = [penTipup, eraserTipup, textTipup, bgColorTipup];
-        allTipups.forEach(tu => tu.classList.remove('active'));
+    function getTargetLayerForDrawing() {
+        if (editLayerCheckbox.checked) return 'editLayer';
+        if (scheduleLayerCheckbox.checked) return 'scheduleLayer';
+        return null;
     }
 
-    function positionTipup(button, tipup) {
-        closeAllTipups();
-        tipup.classList.add('active');
+
+    if (toolbarHideBtn && toolbarElement && toolbarToggleElement) {
+        toolbarHideBtn.addEventListener('click', () => {
+            toolbarVisible = !toolbarVisible;
+            toolbarElement.style.display = toolbarVisible ? 'flex' : 'none';
+            toolbarToggleElement.style.display = toolbarVisible ? (toolbarWrapper.matches(':hover') ? 'block' : '') : 'block';
+            toolbarHideBtn.innerHTML = toolbarVisible ? '<span class="arrow-down">▼</span>' : '<span class="arrow-up">▲</span>';
+            if (typeof updateButtonActiveState === 'function') updateButtonActiveState();
+        });
+        toolbarWrapper.addEventListener('mouseenter', () => {
+            if (toolbarVisible) toolbarToggleElement.style.display = 'block';
+        });
+        toolbarWrapper.addEventListener('mouseleave', () => {
+            if (toolbarVisible) toolbarToggleElement.style.display = '';
+        });
     }
 
-    document.addEventListener('click', () => {
-        closeAllTipups();
-    });
-
-    const tipupsStopProp = [penTipup, eraserTipup, textTipup, bgColorTipup];
-    tipupsStopProp.forEach(tu => {
-        tu.addEventListener('click', (e) => e.stopPropagation());
-    });
-
-
-    // =================================================================
-    // 💡 [수정반영] 마우스 드래그 & 터치 멀티제스처 통합 제어 시스템 (오류 수정)
-    // =================================================================
-
-    // 1️⃣ [PC 전용] 스페이스바 단축키 핸들러
-    let isSpacePressed = false;
-
-    document.addEventListener('keydown', (e) => {
-        const activeElement = document.activeElement;
-        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') return;
-        if (fabricCanvas.getActiveObject()?.isEditing) return;
-
-        if (e.code === 'Space' && !isSpacePressed) {
-            e.preventDefault();
-            isSpacePressed = true;
-            fabricCanvas.setCursor('grab');
-            
+    selectMoveToggleBtn.addEventListener('click', () => {
+        if (currentMode === 'select') {
+            currentMode = 'move';
+            fabricCanvas.isDrawingMode = false;
             fabricCanvas.selection = false;
-            fabricCanvas.forEachObject(obj => {
-                obj.selectable = false;
-                obj.evented = false;
-            });
-            fabricCanvas.requestRenderAll();
-        }
-    });
-
-    document.addEventListener('keyup', (e) => {
-        if (e.code === 'Space') {
-            isSpacePressed = false;
-            isPanning = false;
-
+            fabricCanvas.defaultCursor = 'grab';
+            fabricCanvas.forEachObject(obj => obj.selectable = false);
+        } else {
+            currentMode = 'select';
+            fabricCanvas.isDrawingMode = false;
             fabricCanvas.selection = true;
-            if (typeof updateLayerObjectsState === 'function') updateLayerObjectsState();
-            fabricCanvas.requestRenderAll();
+            fabricCanvas.defaultCursor = 'default';
+            updateLayerObjectsState();
         }
+        fabricCanvas.off('mouse:down', addTextToCanvas);
+        updateButtonActiveState();
     });
 
-    // 2️⃣ 멀티터치 전용 제어 변수 (isPanning, lastPanPoint는 중복 선언 제거함)
-    let touchStartDist = 0;
-    let touchStartZoom = 1;
-    let touchStartCenter = { x: 0, y: 0 };
-    let isTwoFingerGesture = false;
-    let gestureType = 'none'; 
-    const GESTURE_LOCK_THRESHOLD = 15;
-
-    function getTouchDistance(touches) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
+// ================================================================
+    // 🌟 [수정 및 교체] 마우스 및 터치 전자칠판 뷰포트 이동(Pan) 통합 로직
+    // ================================================================
+    
+    // 마우스와 터치 이벤트 객체 양쪽에서 안전하게 화면 좌표를 추출하는 헬퍼 함수
+    function getPointerCoords(e) {
+        if (!e) return null;
+        // 1. 손가락 터치 이벤트 처리
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        // 2. 터치가 끝나는 시점의 이벤트 처리
+        if (e.changedTouches && e.changedTouches.length > 0) {
+            return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        }
+        // 3. 일반 마우스 또는 포인터 이벤트 처리
+        if (e.clientX !== undefined && e.clientY !== undefined) {
+            return { x: e.clientX, y: e.clientY };
+        }
+        return null;
     }
 
-    function getTouchCenter(touches) {
-        return {
-            x: (touches[0].clientX + touches[1].clientX) / 2,
-            y: (touches[0].clientY + touches[1].clientY) / 2
-        };
-    }
-
-    // 3️⃣ [PC] 마우스 드래그(Pan) 이벤트 핸들러
-    fabricCanvas.on('mouse:down', function(opt) {
-        const e = opt.e;
-        if ((currentMode === 'move' || isSpacePressed) && !e.touches) {
-            isPanning = true;
-            lastPanPoint = { x: e.clientX, y: e.clientY };
-            fabricCanvas.setCursor('grabbing');
+    fabricCanvas.on('mouse:down', (opt) => {
+        if (currentMode === 'move' && opt.e) {
+            const coords = getPointerCoords(opt.e);
+            if (coords) {
+                isPanning = true;
+                lastPanPoint = coords;
+                fabricCanvas.setCursor('grabbing');
+            }
         }
     });
 
-    fabricCanvas.on('mouse:move', function(opt) {
-        const e = opt.e;
-        if (isPanning && (currentMode === 'move' || isSpacePressed) && !e.touches) {
-            const deltaX = e.clientX - lastPanPoint.x;
-            const deltaY = e.clientY - lastPanPoint.y;
-            
-            lastPanPoint = { x: e.clientX, y: e.clientY };
-            fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-            if (typeof updateViewportInfo === 'function') updateViewportInfo();
+    fabricCanvas.on('mouse:move', (opt) => {
+        if (isPanning && currentMode === 'move' && opt.e) {
+            const coords = getPointerCoords(opt.e);
+            if (coords && lastPanPoint) {
+                const deltaX = coords.x - lastPanPoint.x;
+                const deltaY = coords.y - lastPanPoint.y;
+                
+                // 🛡️ 중요: NaN(오류 좌표) 방어막 - 연산 결과가 정상적인 숫자일 때만 화면 이동
+                if (!isNaN(deltaX) && !isNaN(deltaY)) {
+                    lastPanPoint = coords;
+                    fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
+                    updateViewportInfo();
+                }
+            }
         }
     });
 
-    fabricCanvas.on('mouse:up', function() {
-        if (!isTwoFingerGesture) {
+    fabricCanvas.on('mouse:up', () => {
+        if (currentMode === 'move') {
             isPanning = false;
-            fabricCanvas.setCursor(isSpacePressed ? 'grab' : (currentMode === 'move' ? 'default' : fabricCanvas.defaultCursor));
+            fabricCanvas.setCursor('grab');
             if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
                 dataManager.debouncedSaveCanvasState();
             }
         }
     });
 
-    // 4️⃣ [터치] 멀티터치 팬 & 피칭 줌 (시차 보정형)
+    // --- 터치 이벤트 핸들러 시작 ---
+
     fabricCanvas.on('touch:start', function(opt) {
-        const e = opt.e;
-        if (!e || !e.touches) return;
-
-        if (e.touches.length === 1) {
-            isTwoFingerGesture = false;
-            gestureType = 'none';
-
-            if (currentMode === 'move') {
-                if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (currentMode === 'move' && opt.e) {
+            const coords = getPointerCoords(opt.e);
+            if (coords) {
+                if (typeof opt.e.preventDefault === 'function') opt.e.preventDefault(); // 브라우저 스크롤 튕김 방지
                 isPanning = true;
-                lastPanPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                lastPanPoint = coords;
             }
-        } 
-        else if (e.touches.length === 2) {
-            if (typeof e.preventDefault === 'function') e.preventDefault();
-            isTwoFingerGesture = true;
-            isPanning = false;
-
-            if (fabricCanvas.isDrawingMode) {
-                fabricCanvas.isDrawingMode = false;
-                fabricCanvas.clearContext(fabricCanvas.contextTop); 
-                if (fabricCanvas.freeDrawingBrush && fabricCanvas.freeDrawingBrush._reset) {
-                    fabricCanvas.freeDrawingBrush._reset();
-                }
-            }
-
-            touchStartDist = getTouchDistance(e.touches);
-            touchStartZoom = fabricCanvas.getZoom();
-            touchStartCenter = getTouchCenter(e.touches);
-            lastPanPoint = touchStartCenter;
-            gestureType = 'none';
         }
     });
 
     fabricCanvas.on('touch:move', function(opt) {
-        const e = opt.e;
-        if (!e || !e.touches) return;
-
-        if (e.touches.length === 1 && isPanning && currentMode === 'move') {
-            if (typeof e.preventDefault === 'function') e.preventDefault();
-            const touch = e.touches[0];
-            const deltaX = touch.clientX - lastPanPoint.x;
-            const deltaY = touch.clientY - lastPanPoint.y;
-            
-            lastPanPoint = { x: touch.clientX, y: touch.clientY };
-            fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-            if (typeof updateViewportInfo === 'function') updateViewportInfo();
-        } 
-        else if (e.touches.length === 2 && isTwoFingerGesture) {
-            if (typeof e.preventDefault === 'function') e.preventDefault();
-            
-            const currentCenter = getTouchCenter(e.touches);
-            const currentDist = getTouchDistance(e.touches);
-
-            if (gestureType === 'none') {
-                const distChange = Math.abs(currentDist - touchStartDist);
-                const panChange = Math.sqrt(
-                    Math.pow(currentCenter.x - touchStartCenter.x, 2) + 
-                    Math.pow(currentCenter.y - touchStartCenter.y, 2)
-                );
-
-                if (panChange > GESTURE_LOCK_THRESHOLD || distChange > GESTURE_LOCK_THRESHOLD) {
-                    if (panChange > distChange) {
-                        gestureType = 'pan';
-                    } else {
-                        gestureType = 'zoom';
-                    }
+        if (isPanning && currentMode === 'move' && opt.e) {
+            const coords = getPointerCoords(opt.e);
+            if (coords && lastPanPoint) {
+                if (typeof opt.e.preventDefault === 'function') opt.e.preventDefault();
+                const deltaX = coords.x - lastPanPoint.x;
+                const deltaY = coords.y - lastPanPoint.y;
+                
+                // 🛡️ 터치 이동 시에도 NaN 방어막 적용
+                if (!isNaN(deltaX) && !isNaN(deltaY)) {
+                    lastPanPoint = coords;
+                    fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
+                    updateViewportInfo();
                 }
-            }
-
-            if (gestureType === 'pan') {
-                const deltaX = currentCenter.x - lastPanPoint.x;
-                const deltaY = currentCenter.y - lastPanPoint.y;
-                lastPanPoint = currentCenter;
-                
-                fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-                if (typeof updateViewportInfo === 'function') updateViewportInfo();
-            } 
-            else if (gestureType === 'zoom') {
-                let newZoom = touchStartZoom * (currentDist / touchStartDist);
-                
-                if (newZoom > MAX_ZOOM) newZoom = MAX_ZOOM;
-                if (newZoom < MIN_ZOOM) newZoom = MIN_ZOOM;
-
-                const fabricPoint = new fabric.Point(currentCenter.x, currentCenter.y);
-                fabricCanvas.zoomToPoint(fabricPoint, newZoom);
-                
-                const deltaX = currentCenter.x - lastPanPoint.x;
-                const deltaY = currentCenter.y - lastPanPoint.y;
-                lastPanPoint = currentCenter;
-                fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-
-                if (typeof updateViewportInfo === 'function') updateViewportInfo();
             }
         }
     });
 
     fabricCanvas.on('touch:end', function(opt) {
-        isPanning = false;
-        const touchesCount = (opt.e && opt.e.touches) ? opt.e.touches.length : 0;
-
-        if (touchesCount === 0) {
-            isTwoFingerGesture = false;
-            gestureType = 'none';
-            
-            if (currentMode === 'pen') {
-                fabricCanvas.isDrawingMode = true;
+        if (currentMode === 'move') {
+            isPanning = false;
+            if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
+                dataManager.debouncedSaveCanvasState();
             }
-        } 
-        else if (touchesCount === 1) {
-            isTwoFingerGesture = false;
-        }
-
-        if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-            dataManager.debouncedSaveCanvasState();
         }
     });
 
+    // --- 터치 이벤트 핸들러 끝 ---
 
-    // ==========================================
-    // 5️⃣ 레이어 객체 제어 상태 관리 로직
-    // ==========================================
+
+
+
     function updateLayerObjectsState() {
         const editLayerVisible = editLayerCheckbox.checked;
         const scheduleLayerVisible = scheduleLayerCheckbox.checked;
@@ -482,12 +419,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         fabricCanvas.requestRenderAll();
+        
+        console.log('script.js: View reset to home after schedule load.'); // 확인용 로그
     }
     editLayerCheckbox.addEventListener('change', updateLayerObjectsState);
     scheduleLayerCheckbox.addEventListener('change', updateLayerObjectsState);
 
 
-    // 배경색 설정 이벤트 바인딩
     bgColorBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         positionTipup(bgColorBtn, bgColorTipup);
@@ -503,343 +441,806 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // 선택/이동 모드 전환 토글 버튼 처리
-    selectMoveToggleBtn.addEventListener('click', () => {
-        if (currentMode === 'select') {
-            currentMode = 'move';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.defaultCursor = 'grab';
-        } else {
-            currentMode = 'select';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.defaultCursor = 'default';
-        }
-        fabricCanvas.off('mouse:down', addTextToCanvas);
-        updateButtonActiveState();
-        updateLayerObjectsState();
-    });
-
-    // 펜 그리기 모드 이벤트 바인딩
-    penModeBtn.addEventListener('click', (e) => {
+    penModeBtn.addEventListener('click', () => {
         if (currentMode === 'pen') {
             currentMode = 'select';
             fabricCanvas.isDrawingMode = false;
             fabricCanvas.defaultCursor = 'default';
             updateLayerObjectsState();
         } else {
-            e.stopPropagation();
             currentMode = 'pen';
             fabricCanvas.isDrawingMode = true;
-            
-            const currentBrush = new fabric.PencilBrush(fabricCanvas);
-            currentBrush.color = currentPenColor;
-            currentBrush.width = currentPenWidth;
-            fabricCanvas.freeDrawingBrush = currentBrush;
-            
-            positionTipup(penModeBtn, penTipup);
-            updateLayerObjectsState();
+            fabricCanvas.selection = false;
+            fabricCanvas.defaultCursor = 'crosshair';
+            fabricCanvas.freeDrawingBrush.color = currentPenColor;
+            fabricCanvas.freeDrawingBrush.width = currentPenSize;
+            fabricCanvas.forEachObject(obj => {
+                 obj.selectable = false;
+                 obj.evented = true;
+            });
+            fabricCanvas.off('mouse:down', addTextToCanvas);
         }
-        fabricCanvas.off('mouse:down', addTextToCanvas);
         updateButtonActiveState();
     });
-
+    penTipupBtn.addEventListener('click', (e) => { e.stopPropagation(); positionTipup(penTipupBtn, penSettings); });
     penColorOptions.forEach(option => {
         option.addEventListener('click', () => {
             currentPenColor = option.dataset.color;
-            if (fabricCanvas.freeDrawingBrush && currentMode === 'pen') {
-                fabricCanvas.freeDrawingBrush.color = currentPenColor;
-            }
-            penColorOptions.forEach(btn => btn.classList.remove('selected'));
-            option.classList.add('selected');
+            fabricCanvas.freeDrawingBrush.color = currentPenColor;
+            penColorOptions.forEach(o => o.classList.remove('selected'));
+            const currentActiveBtn = penSettings.querySelector(`.color-btn[data-tool="pen"][data-color="${currentPenColor}"]`);
+            if(currentActiveBtn) currentActiveBtn.classList.add('selected');
         });
     });
-
-    penWidthSlider.addEventListener('input', () => {
-        currentPenWidth = parseInt(penWidthSlider.value);
-        penWidthVal.innerText = currentPenWidth;
-        if (fabricCanvas.freeDrawingBrush && currentMode === 'pen') {
-            fabricCanvas.freeDrawingBrush.width = currentPenWidth;
-        }
+    penSizeSelect.addEventListener('change', () => {
+        currentPenSize = parseInt(penSizeSelect.value);
+        fabricCanvas.freeDrawingBrush.width = currentPenSize;
     });
-
-    // 지우개 모드 이벤트 바인딩
-    eraserModeBtn.addEventListener('click', (e) => {
-        if (currentMode === 'eraser') {
-            currentMode = 'select';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.defaultCursor = 'default';
-            updateLayerObjectsState();
-        } else {
-            e.stopPropagation();
-            currentMode = 'eraser';
-            fabricCanvas.isDrawingMode = true;
-
-            const eraserBrush = new fabric.EraserBrush(fabricCanvas);
-            eraserBrush.width = currentEraserWidth;
-            fabricCanvas.freeDrawingBrush = eraserBrush;
-
-            positionTipup(eraserModeBtn, eraserTipup);
-            updateLayerObjectsState();
-        }
-        fabricCanvas.off('mouse:down', addTextToCanvas);
-        updateButtonActiveState();
-    });
-
-    eraserWidthSlider.addEventListener('input', () => {
-        currentEraserWidth = parseInt(eraserWidthSlider.value);
-        eraserWidthVal.innerText = currentEraserWidth;
-        if (fabricCanvas.freeDrawingBrush && currentMode === 'eraser') {
-            fabricCanvas.freeDrawingBrush.width = currentEraserWidth;
-        }
-    });
-
-    // 텍스트 모드 이벤트 바인딩
-    textModeBtn.addEventListener('click', (e) => {
-        if (currentMode === 'text') {
-            currentMode = 'select';
-            fabricCanvas.off('mouse:down', addTextToCanvas);
-            fabricCanvas.defaultCursor = 'default';
-        } else {
-            e.stopPropagation();
-            currentMode = 'text';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.defaultCursor = 'text';
-            
-            fabricCanvas.off('mouse:down', addTextToCanvas);
-            fabricCanvas.on('mouse:down', addTextToCanvas);
-            
-            positionTipup(textModeBtn, textTipup);
-        }
-        updateButtonActiveState();
-        updateLayerObjectsState();
-    });
-
-    textColorOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            currentTextColor = option.dataset.color;
-            textColorOptions.forEach(btn => btn.classList.remove('selected'));
-            option.classList.add('selected');
-        });
-    });
-
-    fontSizeSlider.addEventListener('input', () => {
-        currentFontSize = parseInt(fontSizeSlider.value);
-        fontSizeVal.innerText = currentFontSize;
-    });
-
-    // 드로잉 패스 객체 생성 시 메타데이터 주입
-    fabricCanvas.on('path:created', function(opt) {
-        const path = opt.path;
+    fabricCanvas.on('path:created', function(e) {
+        if (!e.path) return;
         const targetLayer = getTargetLayerForDrawing();
-        path.set('customLayer', targetLayer);
-        
-        if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-            dataManager.debouncedSaveCanvasState();
-        }
-        debouncedRecordState();
-    });
-
-    fabricCanvas.on('object:modified', function() {
-        if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-            dataManager.debouncedSaveCanvasState();
-        }
-        debouncedRecordState();
-    });
-
-    // 전체 지우기 모달 및 로직 처리
-    clearBtn.addEventListener('click', () => {
-        clearConfirmModal.style.display = 'block';
-    });
-
-    closeClearConfirmModal.addEventListener('click', () => {
-        clearConfirmModal.style.display = 'none';
-    });
-
-    cancelClearBtn.addEventListener('click', () => {
-        clearConfirmModal.style.display = 'none';
-    });
-
-    confirmClearBtn.addEventListener('click', () => {
-        const editLayerVisible = editLayerCheckbox.checked;
-        const scheduleLayerVisible = scheduleLayerCheckbox.checked;
-
-        const objectsToRemove = [];
-        fabricCanvas.forEachObject(obj => {
-            if ((obj.customLayer === 'editLayer' || !obj.customLayer) && editLayerVisible) {
-                objectsToRemove.push(obj);
-            } else if (obj.customLayer === 'scheduleLayer' && scheduleLayerVisible) {
-                objectsToRemove.push(obj);
-            }
-        });
-
-        objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
-        fabricCanvas.discardActiveObject();
-        fabricCanvas.renderAll();
-
-        clearConfirmModal.style.display = 'none';
-        
-        if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-            dataManager.debouncedSaveCanvasState();
-        }
-        debouncedRecordState();
-    });
-
-    // 화면 저장 및 수동 모달 연동 로직
-    saveScreenBtn.addEventListener('click', () => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const date = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-
-        screenBaseNameInput.value = `${year}${month}${date}_${hours}${minutes}`;
-        saveEditLayerCheckbox.checked = editLayerCheckbox.checked;
-        saveScheduleLayerCheckbox.checked = scheduleLayerCheckbox.checked;
-
-        saveScreenModal.style.display = 'block';
-    });
-
-    closeSaveScreenModalBtn.addEventListener('click', () => {
-        saveScreenModal.style.display = 'none';
-    });
-
-    saveScreenForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const baseName = screenBaseNameInput.value.trim();
-        if (!baseName) return;
-
-        const editSelected = saveEditLayerCheckbox.checked;
-        const scheduleSelected = saveScheduleLayerCheckbox.checked;
-
-        if (!editSelected && !scheduleSelected) {
-            alert('저장할 레이어를 최소 하나 이상 선택해 주세요.');
+        if (targetLayer) {
+            e.path.customLayer = targetLayer;
+            const objects = fabricCanvas.getObjects();
+            objects.sort((a, b) => {
+                if (a.customLayer === 'editLayer' && b.customLayer !== 'editLayer') return 1;
+                if (a.customLayer !== 'editLayer' && b.customLayer === 'editLayer') return -1;
+                return 0;
+            });
+            objects.forEach((obj, index) => fabricCanvas.moveTo(obj, index));
+        } else {
+            alert("그림을 추가할 레이어를 선택해주세요 (편집용 또는 스케줄용).");
+            fabricCanvas.remove(e.path);
             return;
         }
-
-        const now = new Date();
-        const timestampString = now.toLocaleString('ko-KR');
-
-        if (dataManager && typeof dataManager.saveNamedScreen === 'function') {
-            await dataManager.saveNamedScreen(baseName, timestampString, editSelected, scheduleSelected);
-            saveScreenModal.style.display = 'none';
-            alert(`"${baseName}" 화면이 성공적으로 수동 저장되었습니다.`);
-        }
+        updateLayerObjectsState();
+        fabricCanvas.renderAll();
+        if (dataManager) dataManager.debouncedSaveCanvasState();
+        debouncedRecordState();
     });
 
-    // 불러오기 모달 연동 및 화면 목록 렌더링
-    loadSavedScreenBtn.addEventListener('click', async () => {
-        if (!dataManager || typeof dataManager.getSavedScreensList !== 'function') return;
-
-        const screens = await dataManager.getSavedScreensList();
-        savedScreenList.innerHTML = '';
-
-        if (screens.length === 0) {
-            noSavedScreens.style.display = 'block';
+    freeTextModeBtn.addEventListener('click', () => {
+        if (currentMode === 'text') {
+            currentMode = 'select';
+            fabricCanvas.isDrawingMode = false;
+            fabricCanvas.defaultCursor = 'default';
+            fabricCanvas.off('mouse:down', addTextToCanvas);
+            fabricCanvas.selection = true;
+            updateLayerObjectsState();
         } else {
-            noSavedScreens.style.display = 'none';
+            fabricCanvas.isDrawingMode = false;
+            currentMode = 'text';
+            fabricCanvas.selection = false;
+            fabricCanvas.defaultCursor = 'text';
+            fabricCanvas.forEachObject(obj => {
+                obj.selectable = false;
+                obj.evented = false;
+            });
+            fabricCanvas.discardActiveObject();
+            fabricCanvas.renderAll();
+            fabricCanvas.on('mouse:down', addTextToCanvas);
+        }
+        updateButtonActiveState();
+    });
+
+    freeTextTipupBtn.addEventListener('click', (e) => { e.stopPropagation(); positionTipup(freeTextTipupBtn, freeTextSettings); });
+    freeTextColorOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            currentTextColor = option.dataset.color;
+            const activeObject = fabricCanvas.getActiveObject();
+            if (activeObject && (activeObject.type === 'i-text' || activeObject.type === 'textbox')) {
+                activeObject.set('fill', currentTextColor);
+                fabricCanvas.renderAll();
+                if (dataManager) dataManager.debouncedSaveCanvasState();
+            }
+            freeTextColorOptions.forEach(o => o.classList.remove('selected'));
+            const currentActiveBtn = freeTextSettings.querySelector(`.color-btn[data-tool="freeText"][data-color="${currentTextColor}"]`);
+            if(currentActiveBtn) currentActiveBtn.classList.add('selected');
+        });
+    });
+    freeTextSizeSelect.addEventListener('change', () => {
+        currentTextSize = parseInt(freeTextSizeSelect.value);
+        const activeObject = fabricCanvas.getActiveObject();
+        if (activeObject && (activeObject.type === 'i-text' || activeObject.type === 'textbox')) {
+            activeObject.set('fontSize', currentTextSize);
+            fabricCanvas.renderAll();
+            if (dataManager) dataManager.debouncedSaveCanvasState();
+        }
+    });
+    function addTextToCanvas(options) {
+        if (currentMode !== 'text' || options.target || !options.e) return;
+    
+        const targetLayer = getTargetLayerForDrawing();
+        if (!targetLayer) {
+            alert('텍스트를 배치할 레이어를 선택해주세요 (편집용 또는 스케줄용).');
+            return;
+        }
+    
+        const pointer = fabricCanvas.getPointer(options.e);
+        const text = new fabric.IText('텍스트 입력', {
+            left: pointer.x, top: pointer.y,
+            fontSize: currentTextSize, fill: currentTextColor,
+            customLayer: targetLayer, padding: 5,
+            originX: 'left', originY: 'top'
+        });
+        fabricCanvas.add(text);
+    
+        text.on('editing:exited', function() {
+            if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
+                dataManager.debouncedSaveCanvasState();
+                debouncedRecordState();
+            }
+            currentMode = 'select';
+            fabricCanvas.isDrawingMode = false;
+            fabricCanvas.selection = true;
+            fabricCanvas.defaultCursor = 'default';
+            fabricCanvas.off('mouse:down', addTextToCanvas);
+    
+            updateButtonActiveState();
+            updateLayerObjectsState();
+        });
+    
+        const objects = fabricCanvas.getObjects();
+        objects.sort((a, b) => {
+            if (a.customLayer === 'editLayer' && b.customLayer !== 'editLayer') return 1;
+            if (a.customLayer !== 'editLayer' && b.customLayer === 'editLayer') return -1;
+            return 0;
+        });
+        objects.forEach((obj, index) => fabricCanvas.moveTo(obj, index));
+                                  
+        fabricCanvas.setActiveObject(text);
+        text.enterEditing();
+        text.selectAll();
+        fabricCanvas.renderAll();
+    }
+
+
+    eraserModeBtn.addEventListener('click', () => {
+        const activeObjects = fabricCanvas.getActiveObjects();
+        if (activeObjects.length > 0) {
+            activeObjects.forEach(obj => { fabricCanvas.remove(obj) });
+            fabricCanvas.discardActiveObject();
+            fabricCanvas.renderAll();
+            if (dataManager) dataManager.debouncedSaveCanvasState();
+            debouncedRecordState();
+        }
+    });
+    clearAllBtn.addEventListener('click', () => { clearConfirmModal.style.display = 'block'; });
+    confirmClearBtn.addEventListener('click', () => {
+        const objectsToRemove = [];
+        const editLayerChecked = editLayerCheckbox.checked;
+        const scheduleLayerChecked = scheduleLayerCheckbox.checked;
+        fabricCanvas.forEachObject(function(obj) {
+            if (editLayerChecked && (obj.customLayer === 'editLayer' || !obj.customLayer)) {
+                objectsToRemove.push(obj);
+            }
+            if (scheduleLayerChecked && obj.customLayer === 'scheduleLayer') {
+                 objectsToRemove.push(obj);
+            }
+        });
+        objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
+        clearConfirmModal.style.display = 'none';
+        fabricCanvas.renderAll();
+        if (objectsToRemove.length > 0 && dataManager) dataManager.debouncedSaveCanvasState();
+        debouncedRecordState();
+    });
+    cancelClearBtn.addEventListener('click', () => { clearConfirmModal.style.display = 'none'; });
+    if(closeClearConfirmModal) closeClearConfirmModal.onclick = () => clearConfirmModal.style.display = 'none';
+
+    homeBtn.addEventListener('click', () => { setInitialView(DEFAULT_ZOOM); });
+
+
+
+
+    function updateViewportInfo() {
+        if (!viewportInfoDiv) return;
+        const zoom = fabricCanvas.getZoom();
+        const vpt = fabricCanvas.viewportTransform;
+        const canvasActualCenterX = fabricCanvas.width / 2;
+        const canvasActualCenterY = fabricCanvas.height / 2;
+        const canvasCoordAtViewportCenter_X = ( (canvasContainer.offsetWidth / 2) - vpt[4]) / zoom;
+        const canvasCoordAtViewportCenter_Y = ( (canvasContainer.offsetHeight / 2) - vpt[5]) / zoom;
+        const userCoordX = canvasCoordAtViewportCenter_X - canvasActualCenterX;
+        const userCoordY = canvasCoordAtViewportCenter_Y - canvasActualCenterY;
+        viewportInfoDiv.innerHTML = `<div>배율: ${zoom.toFixed(1)},  X: ${userCoordX.toFixed(0)}, Y: ${userCoordY.toFixed(0)}</div>`;
+    }
+
+fabricCanvas.on('mouse:wheel', function(opt) {
+    if (!opt.e) return;
+
+    // --- 1단계: 줌 레벨 계산 및 실행 ---
+    const delta = opt.e.deltaY;
+    let zoom = fabricCanvas.getZoom();
+    
+    zoom *= 0.999 ** delta;
+    if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
+    if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
+
+    // 줌 기준점: 화면 중앙
+    const viewportCenter = new fabric.Point(
+        canvasContainer.offsetWidth / 2,
+        canvasContainer.offsetHeight / 2
+    );
+    fabricCanvas.zoomToPoint(viewportCenter, zoom);
+
+    // --- 2단계 (경계 제한 로직) ---
+    // 이 부분의 모든 로직을 생략합니다.
+
+    // --- 3단계: 최종 적용 및 후속 작업 ---
+    opt.e.preventDefault();
+    opt.e.stopPropagation();
+    
+    // 부가 기능 호출
+    if (typeof updateViewportInfo === 'function') {
+        updateViewportInfo();
+    }
+    if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
+        dataManager.debouncedSaveCanvasState();
+    }
+});
+
+    fabricCanvas.on('object:modified', (e) => { 
+        if (dataManager) dataManager.debouncedSaveCanvasState(); 
+        debouncedRecordState();
+    });
+    
+
+    document.addEventListener('click', (e) => {
+        const target = e.target;
+        if (!target.closest('.tip-up-settings') && 
+            !target.closest('.tipup-toggle-btn') && 
+            target !== bgColorBtn && !bgColorBtn.contains(target) ) {
+            closeAllTipups();
+        }
+    });
+    
+
+    if (toolbarElement && toolbarToggleElement && toolbarHideBtn) {
+        toolbarElement.style.display = toolbarVisible ? 'flex' : 'none';
+        toolbarToggleElement.style.display = toolbarVisible ? (toolbarWrapper.matches(':hover') ? 'block' : '') : 'block';
+        toolbarHideBtn.innerHTML = toolbarVisible ? '<span class="arrow-down">▼</span>' : '<span class="arrow-up">▲</span>';
+    }
+    
+    function formatDateForSaveDisplay(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${year}년 ${month}월 ${day}일 ${hours}시 ${minutes}분 ${seconds}초`;
+    }
+    
+    let currentSaveOperationCallback = null;
+
+    function openSaveConfirmModal(callback) {
+        currentSaveOperationCallback = callback;
+        saveScreenNameInput.value = "제목 없음"; // 기본값 "제목 없음"
+        saveModalTimestamp.textContent = formatDateForSaveDisplay(new Date());
+        saveConfirmModal.style.display = 'block';
+        saveScreenNameInput.focus();
+        saveScreenNameInput.select(); // 입력 필드 내용 전체 선택
+    }
+
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            if (!dataManager) { console.error("DataManager 미초기화"); return; }
+    
+            openSaveConfirmModal(async (baseName, timestampString) => {
+                // data.js에서 baseName과 timestampString을 조합하여 screenKey를 생성하고,
+                // baseName은 displayName으로, timestampString은 savedAt으로 저장할 것임.
+                const editChecked = editLayerCheckbox.checked;
+                const scheduleChecked = scheduleLayerCheckbox.checked;
+    
+                if (!editChecked && !scheduleChecked) {
+                    alert("저장할 내용을 포함할 레이어를 하나 이상 선택해주세요 (툴바 체크박스).");
+                    saveConfirmModal.style.display = 'none';
+                    return;
+                }
+                let objectsToSaveCount = 0;
+                fabricCanvas.getObjects().forEach(obj => {
+                    if (editChecked && scheduleChecked) {
+                        objectsToSaveCount++;
+                    } else if (editChecked && (obj.customLayer === 'editLayer' || !obj.customLayer)) {
+                        objectsToSaveCount++;
+                    } else if (scheduleChecked && obj.customLayer === 'scheduleLayer') {
+                        objectsToSaveCount++;
+                    }
+                });
+    
+                if (objectsToSaveCount === 0) {
+                    if (!confirm("선택된 레이어에 저장할 내용이 없습니다. 빈 화면으로 저장하시겠습니까?")) {
+                        saveConfirmModal.style.display = 'none';
+                        return;
+                    }
+                }
+    
+                try {
+                    // dataManager.saveNamedScreen는 이제 baseName과 timestampString을 받음
+                    const savedKey = await dataManager.saveNamedScreen(baseName, timestampString, editChecked, scheduleChecked);
+                    alert(`'${baseName}' 화면 저장 완료 (저장 시각: ${timestampString}).`);
+                    if (scheduleModal.style.display === 'block') populateScheduledContentSelect();
+                    if (loadSavedScreenModal.style.display === 'block') populateSavedScreenList();
+                } catch (error) {
+                    alert(`화면 저장 실패: ${error}`);
+                    console.error("화면 저장 실패:", error);
+                }
+                saveConfirmModal.style.display = 'none';
+            });
+        });
+    }
+    
+    if (confirmSaveBtn) {
+        confirmSaveBtn.addEventListener('click', () => {
+            const baseName = saveScreenNameInput.value.trim();
+            const timestampString = saveModalTimestamp.textContent;
+            if (baseName === "") {
+                alert("화면 제목을 입력해주세요.");
+                return;
+            }
+            if (currentSaveOperationCallback) {
+                currentSaveOperationCallback(baseName, timestampString);
+            }
+        });
+    }
+    
+    if (cancelSaveBtn) cancelSaveBtn.onclick = () => saveConfirmModal.style.display = 'none';
+    if (closeSaveConfirmModalBtn) closeSaveConfirmModalBtn.onclick = () => saveConfirmModal.style.display = 'none';
+
+
+    async function populateSavedScreenList() {
+        if (!savedScreenListUl || !noSavedScreensP || !dataManager) return;
+        try {
+            // dataManager.getSavedScreensList()는 이제 {key, displayName, savedAt} 객체 배열 반환
+            const screens = await dataManager.getSavedScreensList();
+            savedScreenListUl.innerHTML = '';
+            noSavedScreensP.style.display = screens.length === 0 ? 'block' : 'none';
+            savedScreenListUl.style.display = screens.length > 0 ? 'block' : 'none';
+    
             screens.forEach(screen => {
                 const li = document.createElement('li');
-                li.className = 'saved-screen-item';
-                li.style.display = 'flex';
-                li.style.justifyContent = 'space-between';
-                li.style.alignItems = 'center';
-                li.style.padding = '8px';
-                li.style.borderBottom = '1px solid #eee';
+    
+                li.classList.add('saved-screen-list-item'); // CSS에서 사용할 클래스 추가
 
-                const infoDiv = document.createElement('div');
-                infoDiv.innerHTML = `<strong>${screen.displayName}</strong><br><small style="color:#777;">저장일시: ${screen.savedAt}</small>`;
-                li.appendChild(infoDiv);
+                // 화면 정보 (이름 + 타임스탬프)를 담을 div
+                const screenInfoDiv = document.createElement('div');
+                screenInfoDiv.classList.add('screen-info-container'); // CSS 클래스
 
-                const actionsDiv = document.createElement('createElement');
-                actionsDiv.className = 'saved-screen-actions';
-                actionsDiv.style.display = 'flex';
-                actionsDiv.style.gap = '6px';
+                const nameSpan = document.createElement('span');
+                nameSpan.classList.add('screen-name-display'); // CSS 클래스
+                nameSpan.textContent = screen.displayName;
+                nameSpan.title = `${screen.displayName} (${screen.savedAt})`; // 툴팁용 전체 텍스트
+                screenInfoDiv.appendChild(nameSpan);
 
-                const loadBtn = document.createElement('button');
-                loadBtn.className = 'action-btn';
-                loadBtn.innerText = '불러오기';
-                loadBtn.addEventListener('click', async () => {
-                    if (confirm(`"${screen.displayName}" 상태를 불러오시겠습니까?\n현재 캔버스의 일치하는 레이어 내용이 대체됩니다.`)) {
-                        await dataManager.loadNamedScreen(screen.key);
-                        loadSavedScreenModal.style.display = 'none';
+                const timestampSpan = document.createElement('span');
+                timestampSpan.classList.add('screen-timestamp-display'); // CSS 클래스
+                timestampSpan.textContent = `(${screen.savedAt})`;
+                // timestampSpan.title = `${screen.displayName} (${screen.savedAt})`; // 이름에도 이미 있으므로 중복 방지
+                screenInfoDiv.appendChild(timestampSpan);
+                
+                li.appendChild(screenInfoDiv);
+
+                // 버튼들을 담을 div
+                const buttonsDiv = document.createElement('div');
+                buttonsDiv.classList.add('screen-item-actions'); // CSS 클래스
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '삭제';
+                deleteBtn.classList.add('delete-saved-item-btn'); // 기존 클래스 유지
+                deleteBtn.onclick = async (evt) => {
+                    evt.stopPropagation();
+                    if (confirm(`'${screen.displayName}' (${screen.savedAt}) 화면을 정말 삭제하시겠습니까? 관련된 모든 스케줄도 함께 삭제됩니다.`)) {
+                        try {
+                            await dataManager.deleteNamedScreen(screen.key);
+                            populateSavedScreenList();
+                            if (scheduleModal.style.display === 'block') populateScheduledContentSelect();
+                        } catch (delErr) { alert("화면 삭제 오류: " + delErr); }
+                    }
+                };
+                buttonsDiv.appendChild(deleteBtn);
+                // 만약 '수정' 버튼도 있다면 여기에 추가
+                // const editBtn = document.createElement('button');
+                // ...
+                // buttonsDiv.appendChild(editBtn);
+
+                li.appendChild(buttonsDiv);
+                // -- HTML 구조 변경 끝 --
+
+                li.addEventListener('click', async () => {
+                    // ... (기존 클릭 이벤트 리스너 내용은 유지) ...
+                    if (confirm(`'${screen.displayName}' 화면을 불러오시겠습니까? 현재 작업 내용은 덮어씌워집니다.`)) {
+                        try {
+                            await dataManager.loadNamedScreen(screen.key); 
+                            loadSavedScreenModal.style.display = 'none';
+                        } catch (loadErr) { alert("화면 불러오기 오류: " + loadErr); }
                     }
                 });
-
-                const delBtn = document.createElement('button');
-                delBtn.className = 'action-btn';
-                delBtn.innerText = '삭제';
-                delBtn.style.background = '#ff4444';
-                delBtn.style.color = '#fff';
-                delBtn.addEventListener('click', async () => {
-                    if (confirm(`"${screen.displayName}" 저장본을 영구 삭제하시겠습니까?`)) {
-                        await dataManager.deleteNamedScreen(screen.key);
-                        li.remove();
-                        const currentScreens = await dataManager.getSavedScreensList();
-                        if (currentScreens.length === 0) noSavedScreens.style.display = 'block';
-                    }
-                });
-
-                actionsDiv.appendChild(loadBtn);
-                actionsDiv.appendChild(delBtn);
-                li.appendChild(actionsDiv);
-                savedScreenList.appendChild(li);
+                savedScreenListUl.appendChild(li);
             });
+
+        } catch (error) {
+            console.error("저장된 화면 목록 표시 오류:", error);
+            noSavedScreensP.textContent = "목록을 불러오는 중 오류 발생";
+            noSavedScreensP.style.display = 'block';
+            savedScreenListUl.style.display = 'none';
         }
-        loadSavedScreenModal.style.display = 'block';
-    });
+    }
 
-    closeLoadSavedScreenModalBtn.addEventListener('click', () => {
-        loadSavedScreenModal.style.display = 'none';
-    });
+    if (loadGeneralBtn) {
+        loadGeneralBtn.addEventListener('click', () => {
+            populateSavedScreenList();
+            loadSavedScreenModal.style.display = 'block';
+        });
+    }
+    if (closeLoadSavedScreenModalBtn) closeLoadSavedScreenModalBtn.onclick = () => loadSavedScreenModal.style.display = 'none';
 
-    // 스케줄 생성 버튼 클릭 리스너 정의
-    addScheduleBtn.addEventListener('click', () => {
-        const schedulePanel = document.getElementById('schedulePanel');
-        if (schedulePanel) {
-            schedulePanel.style.display = (schedulePanel.style.display === 'none' || schedulePanel.style.display === '') ? 'block' : 'none';
+    let currentEditingScheduleId = null;
+    async function populateScheduledContentSelect(currentScreenKeyForEdit = null) {
+        if (!scheduledContentSelect || !dataManager) return;
+        try {
+            // getSavedScreensList는 {key, displayName, savedAt} 객체 배열 반환
+            const screens = await dataManager.getSavedScreensList();
+            const originalValue = scheduledContentSelect.value; // 이전 선택된 screenKey
+            scheduledContentSelect.innerHTML = '<option value="">-- 화면 선택 --</option>';
+            const newSaveOption = document.createElement('option');
+            newSaveOption.value = "current_canvas_new_save";
+            newSaveOption.textContent = "** 현재 캔버스 내용으로 새 화면 저장 **";
+            scheduledContentSelect.appendChild(newSaveOption);
+    
+            screens.forEach(screen => {
+                const option = document.createElement('option');
+                option.value = screen.key; // option의 value는 screenKey
+                option.textContent = `${screen.displayName} (${screen.savedAt})`; // 표시되는 텍스트
+                scheduledContentSelect.appendChild(option);
+            });
+    
+            if (currentScreenKeyForEdit) {
+                 scheduledContentSelect.value = currentScreenKeyForEdit;
+            } else if (originalValue && screens.some(s => s.key === originalValue)) {
+                 scheduledContentSelect.value = originalValue;
+            }
+        } catch (error) { console.error("스케줄 모달 화면 목록 채우기 오류:", error); }
+    }
+
+    if (deleteSelectedScheduledScreenBtn && scheduledContentSelect) {
+        deleteSelectedScheduledScreenBtn.addEventListener('click', async () => {
+            if (!dataManager) { console.error("DataManager 미초기화"); return; }
+            const selectedScreenKey = scheduledContentSelect.value; // 이제 screenKey
+             if (selectedScreenKey && selectedScreenKey !== "current_canvas_new_save" && selectedScreenKey !== "") {
+                const selectedOptionText = scheduledContentSelect.options[scheduledContentSelect.selectedIndex].text;
+                if (confirm(`'${selectedOptionText}' 화면을 정말 삭제하시겠습니까? 이 화면을 사용하는 모든 스케줄도 삭제됩니다.`)) {
+                    try {
+                        await dataManager.deleteNamedScreen(selectedScreenKey); // screenKey로 삭제
+                        alert(`'${selectedOptionText}' 화면 및 관련 스케줄 삭제 완료.`);
+                        populateScheduledContentSelect();
+                        renderScheduleList();
+                        if (loadSavedScreenModal.style.display === 'block') populateSavedScreenList();
+                    } catch (err) { alert("화면 삭제 오류: " + err); }
+                }
+            } else { alert("삭제할 저장된 화면을 선택해주세요."); }
+        });
+    }
+
+    async function renderScheduleList() {
+        if (!scheduleListUl || !dataManager) return;
+        try {
+            const schedules = await dataManager.getAllScheduleEntries();
+            // 스케줄 목록에 있는 screenName (실제로는 screenKey)을 displayName과 savedAt으로 변환하기 위해
+            // 모든 저장된 화면 정보를 가져와 매핑 준비
+            const savedScreens = await dataManager.getSavedScreensList();
+            const screenMap = new Map(savedScreens.map(s => [s.key, s]));
+
+
+            scheduleListUl.innerHTML = '';
+            const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+            schedules.forEach(schedule => {
+                const li = document.createElement('li');
+                li.classList.add('schedule-list-item'); // CSS용 클래스
+
+                const scheduleInfoDiv = document.createElement('div');
+                scheduleInfoDiv.classList.add('schedule-info-container');
+
+                const daysText = schedule.days.map(d => daysOfWeek[d]).join(', ');
+                const screenDetail = screenMap.get(schedule.screenName);
+                const displayScreenName = screenDetail ? `${screenDetail.displayName} (${screenDetail.savedAt})` : schedule.screenName;
+                
+                const scheduleTextSpan = document.createElement('span');
+                scheduleTextSpan.classList.add('schedule-text-display');
+                scheduleTextSpan.textContent = `[${daysText}] ${schedule.time} - ${displayScreenName}`;
+                scheduleTextSpan.title = scheduleTextSpan.textContent; // 툴팁
+                scheduleInfoDiv.appendChild(scheduleTextSpan);
+
+                li.appendChild(scheduleInfoDiv);
+
+                const btnContainer = document.createElement('div');
+                btnContainer.classList.add('schedule-item-actions'); // CSS용 클래스
+
+                const editBtn = document.createElement('button');
+                editBtn.textContent = '수정';
+                editBtn.onclick = () => {
+                    currentEditingScheduleId = schedule.id;
+                    scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => {
+                        cb.checked = schedule.days.includes(parseInt(cb.value));
+                    });
+                    scheduleTimeInput.value = schedule.time;
+                    populateScheduledContentSelect(schedule.screenName); // screenName은 screenKey
+                    addScheduleEntryBtn.textContent = '스케줄 수정';
+                };
+                btnContainer.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '삭제';
+                deleteBtn.classList.add('delete-schedule-btn'); // 기존 클래스 유지
+                deleteBtn.onclick = async () => {
+                    if (confirm("이 스케줄을 삭제하시겠습니까?")) {
+                        try {
+                            await dataManager.deleteScheduleEntryById(schedule.id);
+                            renderScheduleList();
+                            if (currentEditingScheduleId === schedule.id) {
+                                currentEditingScheduleId = null;
+                                addScheduleEntryBtn.textContent = '스케줄 추가';
+                            }
+                        } catch (delErr) { alert("스케줄 삭제 오류: " + delErr); }
+                    }
+                };
+                btnContainer.appendChild(deleteBtn);
+
+                li.appendChild(btnContainer);
+                scheduleListUl.appendChild(li);
+            });
+
+        } catch (error) { console.error("스케줄 목록 렌더링 오류:", error); }
+    }
+
+    if (scheduleBtn) {
+        scheduleBtn.addEventListener('click', () => {
+            if (!dataManager) { console.error("DataManager 미초기화"); return; }
+            currentEditingScheduleId = null;
+            addScheduleEntryBtn.textContent = '스케줄 추가';
+            scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => cb.checked = false);
+            scheduleTimeInput.value = '';
+            populateScheduledContentSelect();
+            renderScheduleList();
+            scheduleModal.style.display = 'block';
+        });
+    }
+    if (closeScheduleModalBtn) closeScheduleModalBtn.onclick = () => scheduleModal.style.display = 'none';
+
+    if (addScheduleEntryBtn) {
+        addScheduleEntryBtn.addEventListener('click', async () => {
+            if (!dataManager) { console.error("DataManager 미초기화"); return; }
+            const selectedDays = Array.from(scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]:checked')).map(cb => parseInt(cb.value));
+            const time = scheduleTimeInput.value;
+            let screenKeyForSchedule = scheduledContentSelect.value; // 이제 screenKey
+    
+            if (selectedDays.length === 0 || !time || !screenKeyForSchedule) {
+                alert("요일, 시간, 로드할 화면을 모두 올바르게 선택 또는 입력하세요."); return;
+            }
+    
+            if (screenKeyForSchedule === "current_canvas_new_save") {
+                openSaveConfirmModal(async (baseName, timestampString) => {
+                    const editChecked = editLayerCheckbox.checked;
+                    const scheduleChecked = scheduleLayerCheckbox.checked;
+    
+                    if (!editChecked && !scheduleChecked) {
+                        alert("스케줄용 화면 저장 시에도 내용을 포함할 레이어를 하나 이상 선택해야 합니다.");
+                        saveConfirmModal.style.display = 'none';
+                        return;
+                    }
+    
+                    try {
+                        const savedKey = await dataManager.saveNamedScreen(baseName, timestampString, editChecked, scheduleChecked);
+                        alert(`'${baseName}' 화면 저장 완료. 이 화면으로 스케줄이 설정됩니다.`);
+                        await populateScheduledContentSelect(savedKey); // 새 화면의 key로 select 업데이트
+                        
+                        const scheduleEntry = { days: selectedDays, time: time, screenName: savedKey }; // screenName에 key 저장
+                        if (currentEditingScheduleId !== null) scheduleEntry.id = currentEditingScheduleId;
+                        await dataManager.addOrUpdateScheduleEntry(scheduleEntry);
+                        renderScheduleList();
+                        currentEditingScheduleId = null;
+                        addScheduleEntryBtn.textContent = '스케줄 추가';
+                        scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => cb.checked = false);
+                        scheduleTimeInput.value = '';
+                        populateScheduledContentSelect();
+
+                    } catch (saveError) {
+                        alert("새 화면 저장 오류: " + saveError);
+                    }
+                    saveConfirmModal.style.display = 'none';
+                });
+                return; 
+            }
+    
+            const scheduleEntry = { days: selectedDays, time: time, screenName: screenKeyForSchedule };
+            if (currentEditingScheduleId !== null) {
+                scheduleEntry.id = currentEditingScheduleId;
+            }
+    
+            try {
+                await dataManager.addOrUpdateScheduleEntry(scheduleEntry);
+                renderScheduleList();
+                currentEditingScheduleId = null;
+                addScheduleEntryBtn.textContent = '스케줄 추가';
+                scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => cb.checked = false);
+                scheduleTimeInput.value = '';
+                populateScheduledContentSelect();
+            } catch (error) { alert("스케줄 추가/수정 오류: " + error); }
+        });
+    }
+
+    // --- 모달 외부 클릭 시 닫기 로직 수정 ---
+    let mouseDownTarget = null; // 마우스 다운 시 대상 요소를 저장할 변수
+
+    // 각 모달 요소들을 배열로 관리
+    const modalsToManage = [
+        { element: scheduleModal, id: 'scheduleModal' },
+        { element: loadSavedScreenModal, id: 'loadSavedScreenModal' },
+        { element: clearConfirmModal, id: 'clearConfirmModal' },
+        { element: saveConfirmModal, id: 'saveConfirmModal' }
+    ];
+
+    document.addEventListener('mousedown', function(event) {
+        mouseDownTarget = event.target; // 마우스 다운 시 클릭된 요소를 기록
+    }, true); // 캡처링 단계에서 처리하여 다른 mousedown 이벤트보다 먼저 실행될 수 있도록
+
+    document.addEventListener('mouseup', function(event) {
+        // mouseup 이벤트의 대상이 mousedown 이벤트의 대상과 동일하고,
+        // 그 대상이 모달 배경(오버레이)일 경우에만 모달을 닫습니다.
+        const mouseUpTarget = event.target;
+
+        modalsToManage.forEach(modalInfo => {
+            if (modalInfo.element && modalInfo.element.style.display !== 'none') { // 모달이 열려 있을 때만
+                // mousedown과 mouseup이 동일한 요소에서 발생했고, 그 요소가 모달 배경 자신일 때
+                if (mouseDownTarget === mouseUpTarget && mouseUpTarget === modalInfo.element) {
+                    modalInfo.element.style.display = 'none';
+                    // console.log(`${modalInfo.id} closed by clicking outside (target match).`);
+                }
+            }
+        });
+        mouseDownTarget = null; // 다음 클릭을 위해 초기화
+    }, true); // 캡처링 단계
+
+    // --- 모달 외부 클릭 수정 끝 ---
+
+
+    const debouncedRecordState = debounce(() => recordState(fabricCanvas), 300);
+    
+    initializeClipboard(fabricCanvas, {
+        getTargetLayerForDrawing: getTargetLayerForDrawing,
+        debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
+    }, debouncedRecordState);
+    
+    
+initializeHistory(fabricCanvas);
+    
+    if (typeof initializeDataAndScheduleFunctions === 'function') {
+        dataManager = initializeDataAndScheduleFunctions(
+            fabricCanvas,
+            {
+                debounce: debounce,
+                onLoadSuccess: (loadedFabricInstance, loadedToLayer) => {
+                    setInitialView(loadedFabricInstance.getZoom());
+                    if (loadedToLayer === 'editLayer') {
+                        editLayerCheckbox.checked = true;
+                    }
+                    updateLayerObjectsState();
+                    updateViewportInfo();
+                    console.log(`화면 로드 완료. 대상 레이어: ${loadedToLayer || '기존 레이어 유지(자동복원)'}`);
+                    if (dataManager && dataManager.debouncedSaveCanvasState) {
+                        dataManager.debouncedSaveCanvasState();
+                    }
+                },
+                onScheduleLoadSuccess: (loadedFabricInstance, loadedToLayer) => {
+                    setInitialView(loadedFabricInstance.getZoom());
+                    scheduleLayerCheckbox.checked = true;
+                    editLayerCheckbox.checked = false;
+                    updateLayerObjectsState();
+                    updateViewportInfo();
+                    console.log(`스케줄에 의해 화면이 '${loadedToLayer}' 레이어로 로드됨.`);
+                    if (dataManager && dataManager.debouncedSaveCanvasState) {
+                        dataManager.debouncedSaveCanvasState();
+                    }
+                },
+                onScheduleLoadError: (error, screenName) => {
+                    alert(`스케줄된 화면 '${screenName}' 로드 중 오류가 발생했습니다: ${error}`);
+                },
+                onNoData: () => {
+                    setInitialView(DEFAULT_ZOOM);
+                    updateLayerObjectsState();
+                },
+                onLoadError: (error) => {
+                    console.error("화면 로드 중 일반 오류:", error);
+                    alert(`화면 로드 중 오류가 발생했습니다: ${error}`);
+                    setInitialView(DEFAULT_ZOOM);
+                    updateLayerObjectsState();
+                }
+            },
+            {
+                getTargetLayerForDrawing: getTargetLayerForDrawing,
+                getCurrentTextSize: () => currentTextSize,
+                getCurrentTextColor: () => currentTextColor,
+                debouncedSaveCanvasStateForPaste: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
+            }
+        );
+        console.log('data.js 기능 초기화 완료.');
+
+        try {
+            if (dataManager && typeof dataManager.loadInitialCanvas === 'function') {
+                await dataManager.loadInitialCanvas();
+            } else {
+                console.warn("dataManager.loadInitialCanvas를 찾을 수 없어 기본 뷰로 시작합니다.");
+                setInitialView(DEFAULT_ZOOM);
+                updateLayerObjectsState();
+            }
+        } catch (error) {
+            console.error("최초 캔버스 상태 복원 중 오류:", error);
+            setInitialView(DEFAULT_ZOOM);
+            updateLayerObjectsState();
         }
-    });
+    } else {
+        console.error("오류: initializeDataAndScheduleFunctions를 찾을 수 없습니다. data.js가 로드되었는지 확인하세요.");
+        setInitialView(DEFAULT_ZOOM);
+        updateLayerObjectsState();
+    }
 
-    // Delete 키 오브젝트 삭제 핸들러
-    document.addEventListener('keydown', (event) => {
+
+    // ---  Delete 키로 선택 객체 지우기 ---
+    document.addEventListener('keydown', function(event) {
+        // 입력 필드(input, textarea)나 IText 편집 중에는 작동하지 않도록 함
         const activeElement = document.activeElement;
-        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') return;
-        if (fabricCanvas.getActiveObject()?.isEditing) return;
+        const isInputFocused = activeElement.tagName === 'INPUT' || 
+                               activeElement.tagName === 'TEXTAREA' ||
+                               (activeElement.isContentEditable && activeElement.tagName !== 'BODY');
 
-        if (event.key === 'Delete' || event.code === 'Delete' || event.keyCode === 46) {
-            event.preventDefault();
+        const isITextEditing = fabricCanvas.getActiveObject() instanceof fabric.IText && 
+                               fabricCanvas.getActiveObject().isEditing;
 
-            const activeObjects = fabricCanvas.getActiveObjects();
+        if (isInputFocused || isITextEditing) {
+            return; // 입력 필드나 IText 편집 중이면 키보드 삭제 기능 무시
+        }
+
+        // event.key === 'Delete' (Delete 키) 또는 event.keyCode === 46 (구형 브라우저 호환성)
+        if (event.key === 'Delete' || event.code === 'Delete' || event.keyCode === 46) { // [7, 9]
+            event.preventDefault(); // 기본 동작 (예: 브라우저 뒤로가기 등) 방지
+
+            const activeObjects = fabricCanvas.getActiveObjects(); // 다중 선택된 객체들도 가져옴 [8, 10]
             if (activeObjects.length > 0) {
                 activeObjects.forEach(obj => { 
-                    fabricCanvas.remove(obj);
+                    fabricCanvas.remove(obj); // 각 선택된 객체 삭제 [8, 10]
                 });
-                fabricCanvas.discardActiveObject();
+                fabricCanvas.discardActiveObject(); // 선택 해제
                 fabricCanvas.renderAll();
                 
+                // 자동 저장 및 히스토리 저장을 위한 로직 (만약 있다면)
                 if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
                     dataManager.debouncedSaveCanvasState();
                 }
+                // 만약 Undo/Redo 히스토리 기능이 있다면 여기서 히스토리 저장 호출
                 debouncedRecordState();
             }
         }
     });
+    // --- Delete 키 핸들러 끝 ---
+
+
 
     updateButtonActiveState();
     updateLayerObjectsState();
 
-    /* === 툴바 자동 스케일 === */
-    const BASE_WIDTH = 1500;
+/* === [ADD] 툴바 자동 스케일 === */
+const BASE_WIDTH = 1500;   // 디자인 기준 폭(px)
 
-    function applyToolbarScale(){
-        const scale = Math.min(window.innerWidth / BASE_WIDTH, 1);
-        const wrap = document.getElementById('toolbarScaleWrap');
-        if(wrap) {
-            wrap.style.transform = `scale(${scale})`;
-        }
-    }
+function applyToolbarScale(){
+  const scale = Math.min(window.innerWidth / BASE_WIDTH, 1); // 1280px보다 클 땐 1
+  toolbarScaleWrap.style.transform = `scale(${scale})`;
+  /* 스케일로 줄어든 실제 픽셀폭을 다시 100%로 맞춤 */
+  toolbarScaleWrap.style.width = `${100 / scale}%`;
+}
 
-    window.addEventListener('resize', applyToolbarScale);
-    applyToolbarScale();
-});
+window.addEventListener('resize', applyToolbarScale);
+applyToolbarScale();   
+
+
+
+}); // DOMContentLoaded 끝
