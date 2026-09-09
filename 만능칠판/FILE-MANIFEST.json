@@ -1,0 +1,23 @@
+{
+  ".gitignore": 24,
+  ".nojekyll": 1,
+  "BROWSER-CHECKLIST.md": 6225,
+  "README.md": 15579,
+  "TEST-RESULTS.txt": 3930,
+  "clipboard.js": 7092,
+  "data.js": 5968,
+  "history.js": 1224,
+  "index.html": 14180,
+  "js/canvas-tools.js": 5235,
+  "js/conflicts.js": 703,
+  "js/constants.js": 590,
+  "js/files.js": 4543,
+  "js/previews.js": 1082,
+  "js/validation.js": 3819,
+  "package.json": 83,
+  "script.js": 28915,
+  "style.css": 13333,
+  "tests/canvas-tools.test.mjs": 3576,
+  "tests/core.test.mjs": 4187,
+  "만능칠판.html": 14180
+}
