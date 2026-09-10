@@ -7,7 +7,7 @@ import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {decodeFiles} from './js/files.js';
 import {validateContent} from './js/validation.js';
 const $=id=>document.getElementById(id);
-let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0;
+let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
 let autosaveTimer,toastTimer,saveFadeTimer,importAbort,syncing=false,session={views:{}},modalFocus=null;
 const history=new PageHistory(),knownVersions=new Map();
 const MAX_PAGES=10;
@@ -131,8 +131,10 @@ async function goToPageNumber(value) {
   const p=pages[target-1]; if(p && p.id!==current.id) await activatePage(p.id); else renderPages();
 }
 function updateHistory() {
-  $('undoBtn').disabled=busy||!current||!history.canUndo(current.id);
-  $('redoBtn').disabled=busy||!current||!history.canRedo(current.id);
+  // Undo/Redo availability reflects history state only. A save/import operation must not
+  // permanently make the controls appear disabled. historyBusy prevents double execution.
+  $('undoBtn').disabled=!current||historyBusy||!history.canUndo(current.id);
+  $('redoBtn').disabled=!current||historyBusy||!history.canRedo(current.id);
   const object=c?.getActiveObject();
   $('deleteSelectionBtn').disabled=busy||!object;
   updateSelectionActions();
@@ -161,10 +163,27 @@ function updateSelectionActions() {
   host.style.left=`${pos.left}px`;host.style.top=`${pos.top}px`;
 }
 async function stepHistory(direction) {
+  if(!current || historyBusy || busy || modalOpen() || tools?.gesture || isTextEditing()) return;
   const before=history.pages.get(current.id)?.index;
-  const content=history.step(current.id,direction);if(!content)return;
-  try {await loadCanvas(c,content.canvas);} catch(e){history.pages.get(current.id).index=before;await loadCanvas(c,current.content.canvas);throw e;}
-  current.content=content;tools.setMode('select');dirty=true;generation++;await flush();updateHistory();
+  const content=history.step(current.id,direction);
+  if(!content){updateHistory();return;}
+  historyBusy=true; updateHistory();
+  try {
+    await loadCanvas(c,content.canvas);
+    current.content=content;
+    tools.setMode('select');
+    dirty=true; generation++;
+    // Save the resulting state, but do not create another history entry.
+    await flush();
+  } catch(e) {
+    const h=history.pages.get(current.id);
+    if(h) h.index=before;
+    await loadCanvas(c,current.content.canvas);
+    throw e;
+  } finally {
+    historyBusy=false;
+    updateHistory();
+  }
 }
 function deleteSelected() {
   if(!allowed() || isTextEditing())return;
@@ -318,7 +337,7 @@ function wireUI() {
     if(o && ['text','i-text','textbox'].includes(o.type)){o.set('fontSize',tools.text.size);o.setCoords();c.requestRenderAll();changed();}
   };
   $('deleteSelectionBtn').onclick=deleteSelected;$('groupBtn').onclick=()=>groupObjects();$('ungroupBtn').onclick=()=>groupObjects(true);
-  $('undoBtn').onclick=()=>run(()=>stepHistory(-1));$('redoBtn').onclick=()=>run(()=>stepHistory(1));
+  $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
   $('clearAllBtn').onclick=()=>{if(allowed()&&confirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.')){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
   $('zoomInBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()*1.25);};$('zoomOutBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()/1.25);};$('homeBtn').onclick=()=>{if(allowed())tools.home(current.content.frame);};
   $('toolbarHideBtn').onclick=()=>{const hidden=!$('toolbar').hidden;$('toolbar').hidden=hidden;$('toolbarHideBtn').textContent=hidden?'▲':'▼';$('toolbarHideBtn').setAttribute('aria-expanded',String(!hidden));closePopups();};
@@ -368,10 +387,11 @@ function wireUI() {
         if(e.shiftKey&&document.activeElement===first){last.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first.focus();e.preventDefault();}
       }return;
     }
-    if(busy || isTextEditing())return;
+    if(isTextEditing())return;
     const cmd=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
-    if(cmd && key==='z'){e.preventDefault();run(()=>stepHistory(e.shiftKey?1:-1));}
-    else if(cmd && key==='y'){e.preventDefault();run(()=>stepHistory(1));}
+    if(cmd && key==='z'){e.preventDefault();stepHistory(e.shiftKey?1:-1).catch(fail);return;}
+    else if(cmd && key==='y'){e.preventDefault();stepHistory(1).catch(fail);return;}
+    if(busy)return;
     else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
     else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects(),{canvas:c}));c.requestRenderAll();}}
     else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
