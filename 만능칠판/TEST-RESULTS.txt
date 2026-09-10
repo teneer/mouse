@@ -1,146 +1,16 @@
+# 만능칠판 4.1 수정 테스트 결과
 
-> test
-> node --test tests/*.test.mjs
+- 자동 테스트: 25/25 통과
+- JavaScript syntax check: 통과 (script.js, history.js, js/canvas-tools.js, js/files.js)
+- native confirm/prompt 검색: 없음
 
-TAP version 13
-# Subtest: zoom clamps to 10% and 1000%
-ok 1 - zoom clamps to 10% and 1000%
-  ---
-  duration_ms: 1.542801
-  type: 'test'
-  ...
-# Subtest: home restores 100% at the fixed document center
-ok 2 - home restores 100% at the fixed document center
-  ---
-  duration_ms: 0.615492
-  type: 'test'
-  ...
-# Subtest: move mode disables selection and enables panning
-ok 3 - move mode disables selection and enables panning
-  ---
-  duration_ms: 0.242974
-  type: 'test'
-  ...
-# Subtest: pen and marker use separate settings and transparent marker
-ok 4 - pen and marker use separate settings and transparent marker
-  ---
-  duration_ms: 0.251607
-  type: 'test'
-  ...
-# Subtest: object erase is one history edit per gesture
-ok 5 - object erase is one history edit per gesture
-  ---
-  duration_ms: 0.322093
-  type: 'test'
-  ...
-# Subtest: eraser is object-only and repeated hits in one gesture save once
-ok 6 - eraser is object-only and repeated hits in one gesture save once
-  ---
-  duration_ms: 0.189784
-  type: 'test'
-  ...
-# Subtest: locked editor ignores pointer input
-ok 7 - locked editor ignores pointer input
-  ---
-  duration_ms: 0.173229
-  type: 'test'
-  ...
-# Subtest: text mode passes world pointer position to the editor
-ok 8 - text mode passes world pointer position to the editor
-  ---
-  duration_ms: 0.137215
-  type: 'test'
-  ...
-# Subtest: history: undo/redo is page-specific
-ok 9 - history: undo/redo is page-specific
-  ---
-  duration_ms: 1.512776
-  type: 'test'
-  ...
-# Subtest: history: an edit after undo clears redo
-ok 10 - history: an edit after undo clears redo
-  ---
-  duration_ms: 0.186038
-  type: 'test'
-  ...
-# Subtest: history: duplicate snapshots ignored
-ok 11 - history: duplicate snapshots ignored
-  ---
-  duration_ms: 0.105818
-  type: 'test'
-  ...
-# Subtest: history: item and memory bounds
-ok 12 - history: item and memory bounds
-  ---
-  duration_ms: 0.203735
-  type: 'test'
-  ...
-# Subtest: save: matching revision increments version
-ok 13 - save: matching revision increments version
-  ---
-  duration_ms: 0.153981
-  type: 'test'
-  ...
-# Subtest: save: concurrent same-page edit creates recovery page
-ok 14 - save: concurrent same-page edit creates recovery page
-  ---
-  duration_ms: 0.261622
-  type: 'test'
-  ...
-# Subtest: save: identical concurrent content does not create duplicate
-ok 15 - save: identical concurrent content does not create duplicate
-  ---
-  duration_ms: 0.104126
-  type: 'test'
-  ...
-# Subtest: save: remote deletion preserves an unsaved local edit in a recovery page
-ok 16 - save: remote deletion preserves an unsaved local edit in a recovery page
-  ---
-  duration_ms: 0.088062
-  type: 'test'
-  ...
-# Subtest: save: new page starts with version 1
-ok 17 - save: new page starts with version 1
-  ---
-  duration_ms: 0.229864
-  type: 'test'
-  ...
-# Subtest: validation: keeps supported nested groups but removes obsolete metadata
-ok 18 - validation: keeps supported nested groups but removes obsolete metadata
-  ---
-  duration_ms: 0.692998
-  type: 'test'
-  ...
-# Subtest: validation: rejects remote image URL and arbitrary Fabric class
-ok 19 - validation: rejects remote image URL and arbitrary Fabric class
-  ---
-  duration_ms: 0.991335
-  type: 'test'
-  ...
-# Subtest: validation: rejects non-finite frame and malformed path
-ok 20 - validation: rejects non-finite frame and malformed path
-  ---
-  duration_ms: 0.23386
-  type: 'test'
-  ...
-# Subtest: validation: strips method overrides and prototype keys
-ok 21 - validation: strips method overrides and prototype keys
-  ---
-  duration_ms: 0.192358
-  type: 'test'
-  ...
-# Subtest: validation: embedded PNG remains accepted
-ok 22 - validation: embedded PNG remains accepted
-  ---
-  duration_ms: 0.167971
-  type: 'test'
-  ...
-1..22
-# tests 22
-# suites 0
-# pass 22
-# fail 0
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 112.014923
+주요 수정 검증 범위:
+1. 그룹/언그룹: 이번 작업에서는 별도 개선 예정으로 변경하지 않음
+2. 모달 여백 축소 및 PDF 암호 입력도 모달화
+3. 마우스 휠/버튼 줌을 실제 화면 뷰포트 중심 기준으로 처리
+4. 클릭 선택 객체를 최상위 계층으로 승격, 드래그 영역 선택은 계층 유지
+5. 다중 이미지/PDF 1~4열 시각적 배치 기존 동작 유지
+6. 화면 저장 썸네일을 저장 순간의 실제 뷰포트 화면으로 생성하고 위치/배율 metadata 저장
+7. 색상 설정을 더 보기 > 색상 설정 하나의 모달로 통합
+8. 도구별 활성 하이라이트 및 펜/형광펜/지우개 커서 적용, 펜촉 좌표/지우개 전체 판정 범위 정렬
+9. 이미지/PDF 가져오기를 저장 성공까지 원자적으로 처리하고, 실패 시 가져오기 전 상태로 복원. 대용량 단일 작업도 1회 Undo 가능하도록 history 보강

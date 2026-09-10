@@ -35,7 +35,7 @@ test('click selection raises the clicked object to the top',()=>{
 });
 test('drag selection does not change z-order',()=>{
  const f=fixture(),a=new Rect({left:0,top:0,width:10,height:10}),b=new Rect({left:20,top:0,width:10,height:10});f.c.objects=[a,b];f.t.setMode('select');
- f.t.down({e:{clientX:5,clientY:5,button:0},target:a});f.t.move({e:{clientX:20,clientY:20}});f.t.up();
+ f.t.down({e:{clientX:50,clientY:50,button:0}});f.t.move({e:{clientX:120,clientY:120}});f.t.up();
  assert.deepEqual(f.c.objects,[a,b]);assert.equal(f.changes(),0);
 });
 test('home restores 100% at the fixed document center',()=>{

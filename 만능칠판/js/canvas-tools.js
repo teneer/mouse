@@ -3,7 +3,7 @@ export class CanvasTools {
   constructor({canvas,canEdit,onChange,onViewport,onMode,onText}) {
     Object.assign(this,{canvas,canEdit,onChange,onViewport,onMode,onText});
     this.mode='select';this.pen={color:'#000000',width:5};this.marker={color:'#ffff00',width:30};
-    this.text={color:'#000000',size:48};this.gesture=false;this.pan=null;this.erased=false;this.selectTarget=null;this.selectStart=null;this.selectMoved=false;
+    this.text={color:'#000000',size:48};this.gesture=false;this.pan=null;this.erased=false;this.selectTarget=null;this.selectStart=null;this.selectMoved=false;this.pendingZChange=false;
     const c=canvas;
     c.on('mouse:down:before',opt=>{
       if(!canEdit())return;
@@ -29,12 +29,14 @@ export class CanvasTools {
     c.discardActiveObject();c.isDrawingMode=mode==='pen'||mode==='marker';c.selection=mode==='select';c.skipTargetFind=mode==='move';
     c.getObjects().forEach(o=>o.set({selectable:mode==='select',evented:true}));
     const cursors={
-      pen:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27 viewBox=%270 0 28 28%27%3E%3Cpath d=%27M3 23L18 8l5 5L8 28 3 23z%27 fill=%27%23444444%27/%3E%3Cpath d=%27M18 8l2-2 5 5-2 2z%27 fill=%27%23222222%27/%3E%3Cpath d=%27M3 23l-1 4 4-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 3 23, crosshair',
-      marker:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2732%27 height=%2732%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M3 26L20 9l5 5L8 31 3 26z%27 fill=%27%23ffd92f%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M20 9l3-3 5 5-3 3z%27 fill=%27%23ffef85%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M3 26l-1 5 6-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 3 26, crosshair',
+      pen:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27 viewBox=%270 0 28 28%27%3E%3Cpath d=%27M3 23L18 8l5 5L8 28 3 23z%27 fill=%27%23444444%27/%3E%3Cpath d=%27M18 8l2-2 5 5-2 2z%27 fill=%27%23222222%27/%3E%3Cpath d=%27M3 23l-1 4 4-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 2 27, crosshair',
+      marker:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2732%27 height=%2732%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M3 26L20 9l5 5L8 31 3 26z%27 fill=%27%23ffd92f%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M20 9l3-3 5 5-3 3z%27 fill=%27%23ffef85%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M3 26l-1 5 6-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 2 31, crosshair',
       eraser:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2734%27 height=%2728%27 viewBox=%270 0 34 28%27%3E%3Cpath d=%27M5 18L17 6l12 12-6 6H11z%27 fill=%27%23f2a7bd%27 stroke=%27%23555555%27 stroke-width=%271.5%27/%3E%3Cpath d=%27M17 6l5 5-12 12H5z%27 fill=%27%23ffd3df%27/%3E%3Cpath d=%27M17 6l12 12-6 6-12-12z%27 fill=%27%23e888a6%27/%3E%3C/svg%3E") 17 14, crosshair'
     };
-    c.defaultCursor=mode==='move'?'grab':mode==='text'?'text':mode==='pen'?cursors.pen:mode==='marker'?cursors.marker:mode==='eraser'?cursors.eraser:'default';
-    c.hoverCursor=c.defaultCursor;
+    const cursor=mode==='move'?'grab':mode==='text'?'text':mode==='pen'?cursors.pen:mode==='marker'?cursors.marker:mode==='eraser'?cursors.eraser:'default';
+    c.defaultCursor=cursor;c.hoverCursor=cursor;c.freeDrawingCursor=cursor;
+    if(c.upperCanvasEl)c.upperCanvasEl.style.cursor=cursor;
+    if(c.lowerCanvasEl)c.lowerCanvasEl.style.cursor=cursor;
     c.perPixelTargetFind=mode==='eraser';c.targetFindTolerance=mode==='eraser'?6:0;
     if(c.isDrawingMode) {
       const settings=mode==='pen'?this.pen:this.marker;
@@ -54,7 +56,11 @@ export class CanvasTools {
     if(!this.canEdit())return;
     this.gesture=true;const c=this.canvas;
     this.selectTarget=null;this.selectStart=null;this.selectMoved=false;
-    if(this.mode==='select' && e.button===0 && target){this.selectTarget=target;this.selectStart=this.pointer(e);}
+    if(this.mode==='select' && e.button===0 && target){
+      this.selectTarget=target;this.selectStart=this.pointer(e);
+      const objects=c.getObjects(),idx=objects.indexOf(target);
+      this.pendingZChange=false;
+    }
     if(this.mode==='move' || e.button===1) {this.pan=this.pointer(e);c.setCursor('grabbing');return;}
     if(e.button && e.button!==0)return;
     if(this.mode==='text') {this.onText(c.getPointer(e));return;}
@@ -66,7 +72,7 @@ export class CanvasTools {
   move({e}) {
     if(!this.gesture || !this.canEdit())return;
     const c=this.canvas;
-    if(this.selectStart){const p=this.pointer(e);this.selectMoved=Math.hypot(p.x-this.selectStart.x,p.y-this.selectStart.y)>4;}
+    if(this.selectStart){const p=this.pointer(e);this.selectMoved=Math.hypot(p.x-this.selectStart.x,p.y-this.selectStart.y)>8;}
     if(this.pan) {
       const p=this.pointer(e),v=c.viewportTransform.slice();v[4]+=p.x-this.pan.x;v[5]+=p.y-this.pan.y;
       c.setViewportTransform(v);this.pan=p;this.onViewport();return;
@@ -87,11 +93,15 @@ export class CanvasTools {
   }
   up() {
     if(this.selectTarget && !this.selectMoved && this.mode==='select') {
-      const c=this.canvas,before=c.getObjects().indexOf(this.selectTarget);
-      c.bringToFront(this.selectTarget);this.selectTarget.setCoords();
-      const after=c.getObjects().indexOf(this.selectTarget);
-      if(after!==before)this.onChange();
+      const objects=this.canvas.getObjects(),before=objects.indexOf(this.selectTarget);
+      if(before>=0 && !this.selectTarget.excludeFromExport && before!==objects.length-1){
+        if(typeof this.canvas.moveTo==='function') this.canvas.moveTo(this.selectTarget,objects.length-1);
+        else if(typeof this.canvas.bringToFront==='function') this.canvas.bringToFront(this.selectTarget);
+        else { this.canvas.objects=objects.filter(o=>o!==this.selectTarget); this.canvas.objects.push(this.selectTarget); }
+        this.selectTarget.setCoords();this.canvas.requestRenderAll();this.onChange();
+      }
     }
+    this.pendingZChange=false;
     this.selectTarget=null;this.selectStart=null;this.selectMoved=false;
     if(this.erased){this.erased=false;this.onChange();}
     if(this.pan){this.pan=null;this.canvas.setViewportTransform(this.canvas.viewportTransform.slice());this.canvas.selection=this.mode==='select';this.canvas.skipTargetFind=this.mode==='move';this.canvas.setCursor(this.mode==='move'?'grab':'default');this.onViewport();}
@@ -99,7 +109,12 @@ export class CanvasTools {
   }
   zoom(value) {
     const c=this.canvas,z=Math.min(MAX_ZOOM,Math.max(MIN_ZOOM,value));
-    c.zoomToPoint(new fabric.Point(c.width/2,c.height/2),z);c.requestRenderAll();this.onViewport();
+    const el=c.upperCanvasEl||c.lowerCanvasEl,rect=el?.getBoundingClientRect?.();
+    const cw=typeof c.getWidth==='function'?c.getWidth():c.width,ch=typeof c.getHeight==='function'?c.getHeight():c.height;
+    const sx=rect&&rect.width>0 ? rect.width/(cw||rect.width) : 1;
+    const sy=rect&&rect.height>0 ? rect.height/(ch||rect.height) : 1;
+    const center=new fabric.Point(rect ? (rect.width/2)/sx : cw/2, rect ? (rect.height/2)/sy : ch/2);
+    c.zoomToPoint(center,z);c.requestRenderAll();this.onViewport();
   }
   home(frame) {
     const c=this.canvas;c.setViewportTransform([1,0,0,1,c.width/2-frame.cx,c.height/2-frame.cy]);c.requestRenderAll();this.onViewport();

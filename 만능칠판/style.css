@@ -548,3 +548,28 @@ button:focus-visible,select:focus-visible,input:focus-visible {outline:3px solid
 .layout-preview.columns-1 span{height:40px;}
 .layout-preview.columns-2 span,.layout-preview.columns-3 span,.layout-preview.columns-4 span{height:20px;}
 @media(max-width:600px){.layout-choice-grid{grid-template-columns:repeat(2,1fr);}.import-layout-content{width:92%;}}
+
+/* v4.1 refinements */
+.mode-btn.active-select, .mode-btn.toggle-btn.active-select, .mode-btn.active-move {
+  background-color:#e7f3ff;
+  border-color:#5a8dee;
+  color:#2563eb;
+  font-weight:700;
+  box-shadow:0 0 0 2px rgba(90,141,238,.12);
+}
+.tipup-toggle-btn.active-select { background:#e7f3ff; border-color:#5a8dee; color:#2563eb; }
+.modal-content.compact-modal-content { width:min(420px,calc(100vw - 32px)); max-width:none; padding:18px 20px; margin:8vh auto; }
+.color-settings-modal-content { width:min(640px,calc(100vw - 32px)); max-width:none; padding:18px 20px; }
+.color-settings-modal-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.color-setting-card { border:1px solid #e0e6ef; border-radius:10px; padding:10px; background:#fafcff; }
+.color-setting-card strong { display:block; margin-bottom:8px; font-size:13px; }
+.color-setting-line { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.color-value { font:600 12px ui-monospace,SFMono-Regular,Consolas,monospace; color:#475569; }
+.color-setting-line input[type=color] { width:38px; height:30px; padding:2px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; }
+#colorSettingsModal .colors-container { display:flex; flex-wrap:wrap; gap:5px; }
+#colorSettingsModal .color-btn { width:28px; min-width:28px; height:28px; min-height:28px; padding:0; border-radius:6px; }
+@media(max-width:600px){ .color-settings-modal-grid{grid-template-columns:1fr;} .modal-content{width:calc(100vw - 32px);padding:16px;} }
+
+.import-layout-content { width:min(560px,calc(100vw - 32px)); max-width:none; margin:6vh auto; }
+#saveConfirmModal .modal-content { width:min(480px,calc(100vw - 32px)); max-width:none; }
+#savedScreenListContainer { max-height:60vh; overflow:auto; }

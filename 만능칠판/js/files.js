@@ -30,7 +30,7 @@ export function fabricImage(url) {
     if(error || !img?.width) reject(Error('이미지 객체를 만들 수 없습니다.'));else resolve(img);
   }));
 }
-export async function decodeFiles(files,{signal,onProgress=()=>{}}={}) {
+export async function decodeFiles(files,{signal,onProgress=()=>{},requestPassword=null}={}) {
   const results=[];
   if (!files.length) return results;
   if (files.reduce((n,f)=>n+f.size,0)>MAX_FILE_BYTES) throw Error('한 번에 가져오는 파일은 합계 40MB 이하여야 합니다.');
@@ -42,8 +42,9 @@ export async function decodeFiles(files,{signal,onProgress=()=>{}}={}) {
         cMapUrl:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/cmaps/',cMapPacked:true,
         standardFontDataUrl:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/standard_fonts/'});
       task.onPassword=(update,reason)=>{
-        const password=window.prompt(reason===2?'PDF 암호가 틀렸습니다. 다시 입력해주세요.':'PDF 암호를 입력해주세요.');
-        if(password===null) task.destroy();else update(password);
+        Promise.resolve(requestPassword ? requestPassword(reason===2?'PDF 암호가 틀렸습니다. 다시 입력해주세요.':'PDF 암호를 입력해주세요.') : null)
+          .then(password=>{if(password===null || password===undefined) task.destroy();else update(password);})
+          .catch(()=>task.destroy());
       };
       const abort=()=>{task.destroy().catch(()=>{});};
       signal?.addEventListener('abort',abort,{once:true});
