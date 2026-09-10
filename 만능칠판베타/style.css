@@ -458,8 +458,9 @@ button:focus-visible,select:focus-visible,input:focus-visible {outline:3px solid
 #toolbarScaleWrap {pointer-events:none;}
 #toolbarWrapper>* {pointer-events:auto;}
 #toolbar .mode-btn,#toolbar .action-btn {padding:0 11px;}
-#saveStatus {position:fixed;right:14px;top:64px;font-size:12px;color:#1c3d5a;background:#f0f4fa;border:1px solid #b6c8e8;padding:5px 8px;border-radius:6px;z-index:850;pointer-events:none;}
+#saveStatus {position:fixed;right:14px;top:64px;font-size:12px;color:#1c3d5a;background:#f0f4fa;border:1px solid #b6c8e8;padding:5px 8px;border-radius:6px;z-index:850;pointer-events:none;opacity:1;transition:opacity 1.6s ease;}
 #saveStatus[data-state="error"] {color:#9f1239;background:#fff1f2;border-color:#fda4af;}
+#saveStatus.fade-out {opacity:0;}
 #zoomLabel {min-width:55px;font-size:13px;text-align:center;color:#1c3d5a;}
 .tip-up-settings {position:fixed !important;z-index:1500;max-width:calc(100vw - 24px);box-sizing:border-box;}
 .options-row {display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
@@ -476,7 +477,7 @@ button:focus-visible,select:focus-visible,input:focus-visible {outline:3px solid
 .screen-item-actions {justify-content:space-between;}
 .screen-item-actions button {font-size:13px;height:34px;min-height:34px;}
 #toast {position:fixed;left:50%;bottom:160px;transform:translateX(-50%);max-width:min(700px,90vw);padding:12px 16px;background:#1c3d5a;color:white;border-radius:8px;z-index:4000;line-height:1.5;font-size:14px;}
-#busyOverlay {position:fixed;inset:0;z-index:3000;background:rgba(255,255,255,.45);display:flex;align-items:center;justify-content:center;}
+#busyOverlay {display:none !important;}
 .busy-box {display:flex;flex-direction:column;gap:12px;background:white;border:1.5px solid #b6c8e8;border-radius:10px;padding:20px;max-width:85vw;}
 #dropOverlay {position:fixed;inset:10px;z-index:2500;pointer-events:none;border:3px dashed #2563eb;background:rgba(239,246,255,.8);display:flex;justify-content:center;align-items:center;font-size:20px;color:#1c3d5a;border-radius:12px;}
 #fatalError {position:fixed;inset:20%;z-index:5000;padding:24px;background:#fff;border:2px solid #b91c1c;border-radius:8px;color:#7f1d1d;line-height:1.7;}

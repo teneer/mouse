@@ -42,10 +42,11 @@ test('object erase is one history edit per gesture',()=>{
  const f=fixture(),obj=new Rect({left:0,top:0,width:10,height:10});f.c.objects=[obj];f.t.setMode('eraser');f.c.hit=obj;
  f.t.down({e:{clientX:0,clientY:0,button:0}});f.t.up();assert.equal(f.c.objects.length,0);assert.equal(f.changes(),1);
 });
-test('area erase deletes intersecting object only and removes helper rectangle',()=>{
+test('eraser is object-only and repeated hits in one gesture save once',()=>{
  const f=fixture(),a=new Rect({left:10,top:10,width:10,height:10}),b=new Rect({left:100,top:100,width:10,height:10});
- f.c.objects=[a,b];f.t.setMode('eraser');f.t.eraser='area';f.t.down({e:{clientX:0,clientY:0,button:0}});
- f.t.move({e:{clientX:30,clientY:30}});f.t.up();assert.deepEqual(f.c.objects,[b]);assert.equal(f.changes(),1);
+ f.c.objects=[a,b];f.t.setMode('eraser');f.c.hit=a;
+ f.t.down({e:{clientX:10,clientY:10,button:0}});f.t.move({e:{clientX:11,clientY:11}});f.t.up();
+ assert.deepEqual(f.c.objects,[b]);assert.equal(f.changes(),1);assert.equal('eraser' in f.t,false);
 });
 test('locked editor ignores pointer input',()=>{
  const f=fixture();f.t.setMode('move');f.block();f.t.down({e:{clientX:0,clientY:0,button:0}});assert.equal(f.t.gesture,false);

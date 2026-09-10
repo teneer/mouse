@@ -8,13 +8,18 @@ import {decodeFiles} from './js/files.js';
 import {validateContent} from './js/validation.js';
 const $=id=>document.getElementById(id);
 let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0;
-let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null;
+let autosaveTimer,toastTimer,saveFadeTimer,importAbort,syncing=false,session={views:{}},modalFocus=null;
 const history=new PageHistory(),knownVersions=new Map();
 const MAX_PAGES=10;
 try {session=JSON.parse(sessionStorage.getItem(SESSION_KEY)) || session;} catch {}
 if(!session.views || typeof session.views!=='object')session.views={};
 function notify(message) {$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
-function status(message,state='ok') {$('saveStatus').textContent=message;$('saveStatus').dataset.state=state;}
+function status(message,state='ok') {
+  const el=$('saveStatus');
+  clearTimeout(saveFadeTimer);
+  el.textContent=message;el.dataset.state=state;el.classList.remove('fade-out');
+  if(state==='ok' && message==='자동저장 완료') saveFadeTimer=setTimeout(()=>el.classList.add('fade-out'),1200);
+}
 function fail(error) {console.error(error);notify(error?.message || String(error));}
 function modalOpen() {return Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
 function isTextEditing() {
@@ -76,10 +81,10 @@ function restoreInteraction() {
 }
 async function run(fn,label='처리 중입니다.') {
   if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
-  finishText();busy=true;closePopups();$('busyText').textContent=label;$('busyOverlay').hidden=false;
+  finishText();busy=true;closePopups();
   c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
   try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
-  finally {busy=false;importAbort=null;$('cancelImportBtn').hidden=true;$('busyOverlay').hidden=true;restoreInteraction();updateHistory();}
+  finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
 }
 async function setPage(page,reset=false,keepView=true) {
   rememberView();const previous=current?clone(current):null;
@@ -184,8 +189,8 @@ function addText(text,point,editing=false) {
   if(editing){object.enterEditing();object.selectAll();}
 }
 async function importFiles(files,point) {
-  importAbort=new AbortController();$('cancelImportBtn').hidden=false;
-  const decoded=await decodeFiles(files,{signal:importAbort.signal,onProgress:t=>$('busyText').textContent=t});
+  importAbort=new AbortController();
+  const decoded=await decodeFiles(files,{signal:importAbort.signal});
   if(!decoded.length)return;
   tools.setMode('select');
   const center=point || fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
@@ -312,7 +317,6 @@ function wireUI() {
     tools.text.size=Number(e.target.value);const o=c.getActiveObject();
     if(o && ['text','i-text','textbox'].includes(o.type)){o.set('fontSize',tools.text.size);o.setCoords();c.requestRenderAll();changed();}
   };
-  $('eraserTypeSelect').onchange=e=>{tools.eraser=e.target.value;};
   $('deleteSelectionBtn').onclick=deleteSelected;$('groupBtn').onclick=()=>groupObjects();$('ungroupBtn').onclick=()=>groupObjects(true);
   $('undoBtn').onclick=()=>run(()=>stepHistory(-1));$('redoBtn').onclick=()=>run(()=>stepHistory(1));
   $('clearAllBtn').onclick=()=>{if(allowed()&&confirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.')){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
@@ -339,7 +343,6 @@ function wireUI() {
   $('copyBtn').onclick=()=>clipboard.copy();$('pasteBtn').onclick=()=>clipboard.paste();
   $('importFileBtn').onclick=()=>{closePopups();$('fileInput').click();};
   $('fileInput').onchange=e=>{const files=Array.from(e.target.files);e.target.value='';if(files.length)run(()=>importFiles(files),'파일을 가져오는 중입니다.');};
-  $('cancelImportBtn').onclick=()=>{importAbort?.abort();$('busyText').textContent='가져오기를 취소하는 중입니다.';};
   $('exportBackupBtn').onclick=()=>run(exportBackup,'백업 파일을 만드는 중입니다.');
   $('importBackupBtn').onclick=()=>{closePopups();$('backupInput').click();};
   $('backupInput').onchange=e=>{const file=e.target.files[0];e.target.value='';if(file)run(()=>importBackup(file),'백업을 가져오는 중입니다.');};

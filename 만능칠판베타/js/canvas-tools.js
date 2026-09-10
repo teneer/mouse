@@ -3,7 +3,7 @@ export class CanvasTools {
   constructor({canvas,canEdit,onChange,onViewport,onMode,onText}) {
     Object.assign(this,{canvas,canEdit,onChange,onViewport,onMode,onText});
     this.mode='select';this.pen={color:'#000000',width:5};this.marker={color:'#ffff00',width:30};
-    this.text={color:'#000000',size:48};this.eraser='object';this.gesture=false;this.pan=null;this.area=null;this.erased=false;
+    this.text={color:'#000000',size:48};this.gesture=false;this.pan=null;this.erased=false;
     const c=canvas;
     c.on('mouse:down:before',opt=>{
       if(!canEdit())return;
@@ -53,11 +53,7 @@ export class CanvasTools {
     if(this.mode==='text') {this.onText(c.getPointer(e));return;}
     if(this.mode==='eraser') {
       this.erased=false;
-      if(this.eraser==='area') {
-        this.areaStart=c.getPointer(e);this.area=new fabric.Rect({left:this.areaStart.x,top:this.areaStart.y,width:0,height:0,
-          fill:'rgba(37,99,235,0.10)',stroke:'#2563eb',strokeWidth:1/c.getZoom(),strokeDashArray:[5,5],selectable:false,evented:false,excludeFromExport:true});
-        c.add(this.area);
-      } else this.eraseAt(e);
+      this.eraseAt(e);
     }
   }
   move({e}) {
@@ -67,26 +63,13 @@ export class CanvasTools {
       const p=this.pointer(e),v=c.viewportTransform.slice();v[4]+=p.x-this.pan.x;v[5]+=p.y-this.pan.y;
       c.setViewportTransform(v);this.pan=p;this.onViewport();return;
     }
-    if(this.mode==='eraser') {
-      if(this.area) {
-        const p=c.getPointer(e),a=this.areaStart;
-        this.area.set({left:Math.min(p.x,a.x),top:Math.min(p.y,a.y),width:Math.abs(p.x-a.x),height:Math.abs(p.y-a.y)});this.area.setCoords();c.requestRenderAll();
-      } else this.eraseAt(e);
-    }
+    if(this.mode==='eraser') this.eraseAt(e);
   }
   eraseAt(e) {
     const target=this.canvas.findTarget(e,true);
     if(target && !target.excludeFromExport) {this.canvas.remove(target);this.erased=true;this.canvas.requestRenderAll();}
   }
   up() {
-    if(this.area) {
-      const c=this.canvas,a=this.area.getBoundingRect(true,true);c.remove(this.area);this.area=null;
-      if(a.width>2/c.getZoom() && a.height>2/c.getZoom())c.getObjects().slice().forEach(o=>{
-        const b=o.getBoundingRect(true,true);
-        if(b.left<=a.left+a.width && b.left+b.width>=a.left && b.top<=a.top+a.height && b.top+b.height>=a.top){c.remove(o);this.erased=true;}
-      });
-      c.requestRenderAll();
-    }
     if(this.erased){this.erased=false;this.onChange();}
     if(this.pan){this.pan=null;this.canvas.setViewportTransform(this.canvas.viewportTransform.slice());this.canvas.selection=this.mode==='select';this.canvas.skipTargetFind=this.mode==='move';this.canvas.setCursor(this.mode==='move'?'grab':'default');this.onViewport();}
     this.gesture=false;

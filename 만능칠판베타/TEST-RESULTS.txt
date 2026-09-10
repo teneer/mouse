@@ -1,14 +1,146 @@
-만능칠판 3.0 버전업 검사 결과
 
-2026-09-10
+> test
+> node --test tests/*.test.mjs
 
-- node --check script.js: PASS
-- node --check history.js: PASS
-- node --check data.js: PASS
-- node --check js/canvas-tools.js: PASS
-- node --test tests/*.test.mjs: PASS (22/22)
-- legacy custom color input refs (bgCustom/penCustom/markerCustom/textCustom): NONE
-- legacy page rename/page tab refs (renamePageBtn/pageTabs/pageCount): NONE
-- text:changed history listener: NONE
-
-브라우저 E2E는 이 환경에서 실행하지 않았습니다. 특히 Fabric.js 실제 선택 bounding box 위치 계산, 모바일 터치, IndexedDB 브라우저 동작, CDN 로딩은 배포 전 BROWSER-CHECKLIST.md에 따라 확인해야 합니다.
+TAP version 13
+# Subtest: zoom clamps to 10% and 1000%
+ok 1 - zoom clamps to 10% and 1000%
+  ---
+  duration_ms: 1.542801
+  type: 'test'
+  ...
+# Subtest: home restores 100% at the fixed document center
+ok 2 - home restores 100% at the fixed document center
+  ---
+  duration_ms: 0.615492
+  type: 'test'
+  ...
+# Subtest: move mode disables selection and enables panning
+ok 3 - move mode disables selection and enables panning
+  ---
+  duration_ms: 0.242974
+  type: 'test'
+  ...
+# Subtest: pen and marker use separate settings and transparent marker
+ok 4 - pen and marker use separate settings and transparent marker
+  ---
+  duration_ms: 0.251607
+  type: 'test'
+  ...
+# Subtest: object erase is one history edit per gesture
+ok 5 - object erase is one history edit per gesture
+  ---
+  duration_ms: 0.322093
+  type: 'test'
+  ...
+# Subtest: eraser is object-only and repeated hits in one gesture save once
+ok 6 - eraser is object-only and repeated hits in one gesture save once
+  ---
+  duration_ms: 0.189784
+  type: 'test'
+  ...
+# Subtest: locked editor ignores pointer input
+ok 7 - locked editor ignores pointer input
+  ---
+  duration_ms: 0.173229
+  type: 'test'
+  ...
+# Subtest: text mode passes world pointer position to the editor
+ok 8 - text mode passes world pointer position to the editor
+  ---
+  duration_ms: 0.137215
+  type: 'test'
+  ...
+# Subtest: history: undo/redo is page-specific
+ok 9 - history: undo/redo is page-specific
+  ---
+  duration_ms: 1.512776
+  type: 'test'
+  ...
+# Subtest: history: an edit after undo clears redo
+ok 10 - history: an edit after undo clears redo
+  ---
+  duration_ms: 0.186038
+  type: 'test'
+  ...
+# Subtest: history: duplicate snapshots ignored
+ok 11 - history: duplicate snapshots ignored
+  ---
+  duration_ms: 0.105818
+  type: 'test'
+  ...
+# Subtest: history: item and memory bounds
+ok 12 - history: item and memory bounds
+  ---
+  duration_ms: 0.203735
+  type: 'test'
+  ...
+# Subtest: save: matching revision increments version
+ok 13 - save: matching revision increments version
+  ---
+  duration_ms: 0.153981
+  type: 'test'
+  ...
+# Subtest: save: concurrent same-page edit creates recovery page
+ok 14 - save: concurrent same-page edit creates recovery page
+  ---
+  duration_ms: 0.261622
+  type: 'test'
+  ...
+# Subtest: save: identical concurrent content does not create duplicate
+ok 15 - save: identical concurrent content does not create duplicate
+  ---
+  duration_ms: 0.104126
+  type: 'test'
+  ...
+# Subtest: save: remote deletion preserves an unsaved local edit in a recovery page
+ok 16 - save: remote deletion preserves an unsaved local edit in a recovery page
+  ---
+  duration_ms: 0.088062
+  type: 'test'
+  ...
+# Subtest: save: new page starts with version 1
+ok 17 - save: new page starts with version 1
+  ---
+  duration_ms: 0.229864
+  type: 'test'
+  ...
+# Subtest: validation: keeps supported nested groups but removes obsolete metadata
+ok 18 - validation: keeps supported nested groups but removes obsolete metadata
+  ---
+  duration_ms: 0.692998
+  type: 'test'
+  ...
+# Subtest: validation: rejects remote image URL and arbitrary Fabric class
+ok 19 - validation: rejects remote image URL and arbitrary Fabric class
+  ---
+  duration_ms: 0.991335
+  type: 'test'
+  ...
+# Subtest: validation: rejects non-finite frame and malformed path
+ok 20 - validation: rejects non-finite frame and malformed path
+  ---
+  duration_ms: 0.23386
+  type: 'test'
+  ...
+# Subtest: validation: strips method overrides and prototype keys
+ok 21 - validation: strips method overrides and prototype keys
+  ---
+  duration_ms: 0.192358
+  type: 'test'
+  ...
+# Subtest: validation: embedded PNG remains accepted
+ok 22 - validation: embedded PNG remains accepted
+  ---
+  duration_ms: 0.167971
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 112.014923
