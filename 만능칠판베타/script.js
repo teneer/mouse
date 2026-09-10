@@ -1,1291 +1,407 @@
-import { initializeClipboard } from './clipboard.js';
-import { initializeHistory, recordState } from './history.js';
-
-document.addEventListener('DOMContentLoaded', async () => {
-    const canvasElement = document.getElementById('whiteboardCanvas');
-    const fabricCanvas = new fabric.Canvas(canvasElement, {
-        width: canvasElement.width,
-        height: canvasElement.height,
-        selection: true,
-        preserveObjectStacking: true,
-        backgroundColor: '#D6B588'
-    });
-
-    fabric.Object.prototype.cornerStyle = 'circle';
-    fabric.Object.prototype.cornerSize = 10;
-    fabric.Object.prototype.transparentCorners = false;
-    fabric.Object.prototype.setControlsVisibility({mtr: false});
-
-    const canvasContainer = document.getElementById('canvas-container');
-
-    // --- DOM 요소 가져오기 ---
-
-    const editLayerCheckbox = document.querySelector('input[data-layer="editLayer"]');
-    const scheduleLayerCheckbox = document.querySelector('input[data-layer="scheduleLayer"]');
-
-    const bgColorBtn = document.getElementById('bgColorBtn');
-    const bgColorTipup = document.querySelector('.tip-up-settings[data-tipup="bgcolor"]');
-    const bgColorOptions = bgColorTipup.querySelectorAll('.color-btn');
-
-    const penModeBtn = document.getElementById('penModeBtn');
-    const penTipupBtn = document.getElementById('penTipupBtn');
-    const penSettings = document.getElementById('penSettings');
-    const penColorOptions = penSettings.querySelectorAll('.color-btn[data-tool="pen"]');
-    const penSizeSelect = document.getElementById('penSizeSelect');
-
-    const freeTextModeBtn = document.getElementById('freeTextModeBtn');
-    const freeTextTipupBtn = document.getElementById('freeTextTipupBtn');
-    const freeTextSettings = document.getElementById('freeTextSettings');
-    const freeTextColorOptions = freeTextSettings.querySelectorAll('.color-btn[data-tool="freeText"]');
-    const freeTextSizeSelect = document.getElementById('freeTextSizeSelect');
-
-    const eraserModeBtn = document.getElementById('eraserModeBtn');
-    const clearAllBtn = document.getElementById('clearAllBtn');
-    const clearConfirmModal = document.getElementById('clearConfirmModal');
-    const confirmClearBtn = document.getElementById('confirmClearBtn');
-    const cancelClearBtn = document.getElementById('cancelClearBtn');
-    const closeClearConfirmModal = document.getElementById('closeClearConfirmModal');
-
-    const saveBtn = document.getElementById('saveBtn');
-    const loadGeneralBtn = document.getElementById('loadGeneralBtn');
-    const scheduleBtn = document.getElementById('scheduleBtn');
-
-    const saveConfirmModal = document.getElementById('saveConfirmModal');
-    const closeSaveConfirmModalBtn = document.getElementById('closeSaveConfirmModal');
-    const saveScreenNameInput = document.getElementById('saveScreenNameInput');
-    const saveModalTimestamp = document.getElementById('saveModalTimestamp');
-    const confirmSaveBtn = document.getElementById('confirmSaveBtn');
-    const cancelSaveBtn = document.getElementById('cancelSaveBtn');
-
-
-    const loadSavedScreenModal = document.getElementById('loadSavedScreenModal');
-    const closeLoadSavedScreenModalBtn = document.getElementById('closeLoadSavedScreenModalBtn');
-    const savedScreenListUl = document.getElementById('savedScreenList');
-    const noSavedScreensP = document.getElementById('noSavedScreens');
-
-    const scheduleModal = document.getElementById('scheduleModal');
-    const closeScheduleModalBtn = document.getElementById('closeScheduleModalBtn');
-    const scheduleDayCheckboxesContainer = document.getElementById('scheduleDayCheckboxes');
-    const scheduleTimeInput = document.getElementById('scheduleTime');
-    const scheduledContentSelect = document.getElementById('scheduledContentSelect');
-    const deleteSelectedScheduledScreenBtn = document.getElementById('deleteSelectedScheduledScreenBtn');
-    const addScheduleEntryBtn = document.getElementById('addScheduleEntryBtn');
-    const scheduleListUl = document.getElementById('scheduleList');
-
-    const homeBtn = document.getElementById('homeBtn');
-    const toolbarHideBtn = document.getElementById('toolbarHideBtn');
-    const toolbarElement = document.getElementById('toolbar');
-    const toolbarToggleElement = document.getElementById('toolbarToggle');
-    const toolbarWrapper = document.getElementById('toolbarWrapper');
-    const toolbarScaleWrap = document.getElementById('toolbarScaleWrap');
-
-
-    let currentMode = 'select';
-    let isPanning = false;
-    let lastPanPoint = { x: 0, y: 0 };
-    let toolbarVisible = true;
-
-    let currentPenColor = '#000000';
-    let currentPenSize = 5;
-    let currentTextColor = '#000000';
-    let currentTextSize = 48;
-
-    let dataManager;
-
-    function debounce(func, delay) {
-      let timeoutId;
-      return function(...args) {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          func.apply(this, args);
-        }, delay);
-      };
-    }
-
-    const MIN_ZOOM = 0.1;
-    const MAX_ZOOM = 10.0;
-    const DEFAULT_ZOOM = 1.0;
-
-    function setInitialView(zoomLevel = DEFAULT_ZOOM) {
-        const containerWidth = canvasContainer.offsetWidth;
-        const containerHeight = canvasContainer.offsetHeight;
-        const viewportCenterX = containerWidth / 2;
-        const viewportCenterY = containerHeight / 2;
-        const canvasActualCenterX = fabricCanvas.width / 2;
-        const canvasActualCenterY = fabricCanvas.height / 2;
-        const panX = viewportCenterX - (canvasActualCenterX * zoomLevel);
-        const panY = viewportCenterY - (canvasActualCenterY * zoomLevel);
-        fabricCanvas.setViewportTransform([zoomLevel, 0, 0, zoomLevel, panX, panY]);
-        if (typeof updateViewportInfo === 'function') updateViewportInfo();
-        fabricCanvas.renderAll();
-    }
-
-    let viewportInfoDiv = document.getElementById('viewport-info');
-    if (!viewportInfoDiv) {
-        viewportInfoDiv = document.createElement('div');
-        viewportInfoDiv.id = 'viewport-info';
-        document.body.appendChild(viewportInfoDiv);
-    }
-
-    fabricCanvas.freeDrawingBrush.color = currentPenColor;
-    fabricCanvas.freeDrawingBrush.width = currentPenSize;
-    penSizeSelect.value = currentPenSize;
-    const initialPenColorBtn = document.querySelector(`#penSettings .color-btn[data-tool="pen"][data-color="${currentPenColor}"]`);
-    if (initialPenColorBtn) initialPenColorBtn.classList.add('selected');
-
-    freeTextSizeSelect.value = currentTextSize;
-    const initialTextColorBtn = document.querySelector(`#freeTextSettings .color-btn[data-tool="freeText"][data-color="${currentTextColor}"]`);
-    if (initialTextColorBtn) initialTextColorBtn.classList.add('selected');
-
-    window.lastOpenedTipup = null;
-    function closeAllTipups(exceptTipup = null) {
-        document.querySelectorAll('.tip-up-settings').forEach(tipup => {
-            if (tipup !== exceptTipup) tipup.style.display = 'none';
-        });
-        if (exceptTipup === null) window.lastOpenedTipup = null;
-    }
-
-function positionTipup(buttonElement, tipupElement) {
-    // 팁업을 띄울 기준이 되는 요소(앵커)를 찾습니다.
-    // 클릭된 버튼이 .button-group 안에 있으면 그룹 전체를, 아니면 버튼 자체를 기준으로 합니다.
-    const anchorElement = buttonElement.closest('.button-group') || buttonElement;
-    const anchorRect = anchorElement.getBoundingClientRect(); // 기준 요소의 화면 좌표
-
-    // 팁업을 먼저 화면에 표시해야 정확한 높이(offsetHeight)를 알 수 있습니다.
-    // 단, 보이지 않게 처리합니다.
-    tipupElement.style.display = 'flex'; // 또는 'block'
-    tipupElement.style.visibility = 'hidden';
-    tipupElement.style.opacity = '0';
-
-    const tipupHeight = tipupElement.offsetHeight;
-
-    tipupElement.style.position = 'fixed';
-
-    // 1. Y 좌표: 기준 요소의 상단(anchorRect.top)에서 팁업의 높이와 약간의 여백(8px)만큼 위로 올립니다.
-    // 이렇게 하면 팁업이 버튼을 가리지 않습니다.
-    tipupElement.style.top = (anchorRect.top - tipupHeight - 8) + 'px';
-
-    // 2. X 좌표: 기준 요소의 왼쪽(anchorRect.left)에 정확히 맞춥니다.
-    tipupElement.style.left = anchorRect.left + 'px';
-
-    // 화면 경계 처리 (기존과 동일)
-    if (parseFloat(tipupElement.style.left) < 0) {
-        tipupElement.style.left = '5px';
-    }
-    if (parseFloat(tipupElement.style.left) + tipupElement.offsetWidth > window.innerWidth) {
-        tipupElement.style.left = (window.innerWidth - tipupElement.offsetWidth - 5) + 'px';
-    }
-
-    // 토글 로직
-    const isVisible = tipupElement.style.visibility === 'visible';
-
-    if (isVisible && tipupElement === window.lastOpenedTipup) {
-        tipupElement.style.display = 'none';
-        window.lastOpenedTipup = null;
-    } else {
-        closeAllTipups();
-        tipupElement.style.display = 'flex'; // 다시 보이게
-        tipupElement.style.visibility = 'visible'; // 다시 보이게
-        tipupElement.style.opacity = '1'; // 다시 보이게
-        window.lastOpenedTipup = tipupElement;
-    }
-}    
-    //function positionViewportInfo() {
-        //if (!viewportInfoDiv || !selectMoveToggleBtn || viewportInfoDiv.style.display === 'none') return;
-        //const btnRect = selectMoveToggleBtn.getBoundingClientRect();
-        //const infoHeight = viewportInfoDiv.offsetHeight;
-        //const infoWidth = viewportInfoDiv.offsetWidth;
-        //let topPosition = btnRect.top - infoHeight - 8;
-        //let leftPosition = btnRect.left + (btnRect.width / 2) - (infoWidth / 2);
-        //if (topPosition < 5) topPosition = 5;
-        //if (leftPosition < 5) leftPosition = 5;
-        //if (leftPosition + infoWidth > window.innerWidth - 5) leftPosition = window.innerWidth - infoWidth - 5;
-        //viewportInfoDiv.style.top = topPosition + 'px';
-        //viewportInfoDiv.style.left = leftPosition + 'px';
-    //}
-
-
-    function getTargetLayerForDrawing() {
-        if (editLayerCheckbox.checked) return 'editLayer';
-        if (scheduleLayerCheckbox.checked) return 'scheduleLayer';
-        return null;
-    }
-
-
-    if (toolbarHideBtn && toolbarElement && toolbarToggleElement) {
-        toolbarHideBtn.addEventListener('click', () => {
-            toolbarVisible = !toolbarVisible;
-            toolbarElement.style.display = toolbarVisible ? 'flex' : 'none';
-            toolbarToggleElement.style.display = toolbarVisible ? (toolbarWrapper.matches(':hover') ? 'block' : '') : 'block';
-            toolbarHideBtn.innerHTML = toolbarVisible ? '<span class="arrow-down">▼</span>' : '<span class="arrow-up">▲</span>';
-            if (typeof updateButtonActiveState === 'function') updateButtonActiveState();
-        });
-        toolbarWrapper.addEventListener('mouseenter', () => {
-            if (toolbarVisible) toolbarToggleElement.style.display = 'block';
-        });
-        toolbarWrapper.addEventListener('mouseleave', () => {
-            if (toolbarVisible) toolbarToggleElement.style.display = '';
-        });
-    }
-
-    //selectMoveToggleBtn.addEventListener('click', () => {
-        //if (currentMode === 'select') {
-            //currentMode = 'move';
-            //fabricCanvas.isDrawingMode = false;
-            //fabricCanvas.selection = false;
-            //fabricCanvas.defaultCursor = 'grab';
-            //fabricCanvas.forEachObject(obj => obj.selectable = false);
-        //} else {
-            //currentMode = 'select';
-            //fabricCanvas.isDrawingMode = false;
-            //fabricCanvas.selection = true;
-            //fabricCanvas.defaultCursor = 'default';
-            //updateLayerObjectsState();
-        //}
-        //fabricCanvas.off('mouse:down', addTextToCanvas);
-        //updateButtonActiveState();
-    //});
-
-// ================================================================
-    // 🌟 [수정 및 교체] 마우스 및 터치 전자칠판 뷰포트 이동(Pan) 통합 로직
-    // ================================================================
-    
-    // 마우스와 터치 이벤트 객체 양쪽에서 안전하게 화면 좌표를 추출하는 헬퍼 함수
-    function getPointerCoords(e) {
-        if (!e) return null;
-        // 1. 손가락 터치 이벤트 처리
-        if (e.touches && e.touches.length > 0) {
-            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }
-        // 2. 터치가 끝나는 시점의 이벤트 처리
-        if (e.changedTouches && e.changedTouches.length > 0) {
-            return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
-        }
-        // 3. 일반 마우스 또는 포인터 이벤트 처리
-        if (e.clientX !== undefined && e.clientY !== undefined) {
-            return { x: e.clientX, y: e.clientY };
-        }
-        return null;
-    }
-
-    fabricCanvas.on('mouse:down', (opt) => {
-        if (currentMode === 'move' && opt.e) {
-            const coords = getPointerCoords(opt.e);
-            if (coords) {
-                isPanning = true;
-                lastPanPoint = coords;
-                fabricCanvas.setCursor('grabbing');
-            }
-        }
-    });
-
-    fabricCanvas.on('mouse:move', (opt) => {
-        if (isPanning && currentMode === 'move' && opt.e) {
-            const coords = getPointerCoords(opt.e);
-            if (coords && lastPanPoint) {
-                const deltaX = coords.x - lastPanPoint.x;
-                const deltaY = coords.y - lastPanPoint.y;
-                
-                // 🛡️ 중요: NaN(오류 좌표) 방어막 - 연산 결과가 정상적인 숫자일 때만 화면 이동
-                if (!isNaN(deltaX) && !isNaN(deltaY)) {
-                    lastPanPoint = coords;
-                    fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-                    updateViewportInfo();
-                }
-            }
-        }
-    });
-
-    fabricCanvas.on('mouse:up', () => {
-        if (currentMode === 'move') {
-            isPanning = false;
-            fabricCanvas.setCursor('grab');
-            if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-                dataManager.debouncedSaveCanvasState();
-            }
-        }
-    });
-
-    // --- 터치 이벤트 핸들러 시작 ---
-
-    fabricCanvas.on('touch:start', function(opt) {
-        if (currentMode === 'move' && opt.e) {
-            const coords = getPointerCoords(opt.e);
-            if (coords) {
-                if (typeof opt.e.preventDefault === 'function') opt.e.preventDefault(); // 브라우저 스크롤 튕김 방지
-                isPanning = true;
-                lastPanPoint = coords;
-            }
-        }
-    });
-
-    fabricCanvas.on('touch:move', function(opt) {
-        if (isPanning && currentMode === 'move' && opt.e) {
-            const coords = getPointerCoords(opt.e);
-            if (coords && lastPanPoint) {
-                if (typeof opt.e.preventDefault === 'function') opt.e.preventDefault();
-                const deltaX = coords.x - lastPanPoint.x;
-                const deltaY = coords.y - lastPanPoint.y;
-                
-                // 🛡️ 터치 이동 시에도 NaN 방어막 적용
-                if (!isNaN(deltaX) && !isNaN(deltaY)) {
-                    lastPanPoint = coords;
-                    fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-                    updateViewportInfo();
-                }
-            }
-        }
-    });
-
-    fabricCanvas.on('touch:end', function(opt) {
-        if (currentMode === 'move') {
-            isPanning = false;
-            if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-                dataManager.debouncedSaveCanvasState();
-            }
-        }
-    });
-
-    // --- 터치 이벤트 핸들러 끝 ---
-
-
-
-
-    function updateLayerObjectsState() {
-        const editLayerVisible = editLayerCheckbox.checked;
-        const scheduleLayerVisible = scheduleLayerCheckbox.checked;
-
-        fabricCanvas.forEachObject(function(obj) {
-            let isVisible = false;
-            let isSelectable = false;
-            let isEvented = false;
-
-            if (obj.customLayer === 'editLayer' || !obj.customLayer) {
-                isVisible = editLayerVisible;
-                isSelectable = editLayerVisible && (currentMode === 'select');
-                isEvented = editLayerVisible;
-            } else if (obj.customLayer === 'scheduleLayer') {
-                isVisible = scheduleLayerVisible;
-                isSelectable = scheduleLayerVisible && (currentMode === 'select');
-                isEvented = scheduleLayerVisible;
-            }
-            
-            obj.visible = isVisible;
-            obj.selectable = isSelectable;
-            obj.evented = isEvented;
-
-            if (currentMode === 'text' || currentMode === 'pen' || currentMode === 'move') {
-                 obj.selectable = false;
-                 if(currentMode === 'text') obj.evented = false;
-            }
-        });
-
-        const activeObject = fabricCanvas.getActiveObject();
-        if (activeObject) {
-            const layerOfActive = activeObject.customLayer || 'editLayer';
-            if ((layerOfActive === 'editLayer' && !editLayerVisible) ||
-                (layerOfActive === 'scheduleLayer' && !scheduleLayerVisible)) {
-                fabricCanvas.discardActiveObject();
-            }
-        }
-        fabricCanvas.requestRenderAll();
-        
-        console.log('script.js: View reset to home after schedule load.'); // 확인용 로그
-    }
-    editLayerCheckbox.addEventListener('change', updateLayerObjectsState);
-    scheduleLayerCheckbox.addEventListener('change', updateLayerObjectsState);
-
-
-    bgColorBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        positionTipup(bgColorBtn, bgColorTipup);
-    });
-    bgColorOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            fabricCanvas.setBackgroundColor(option.dataset.color, () => {
-                fabricCanvas.renderAll();
-                if (dataManager) dataManager.debouncedSaveCanvasState();
-                debouncedRecordState();
-            });
-            closeAllTipups();
-        });
-    });
-
-    penModeBtn.addEventListener('click', () => {
-        if (currentMode === 'pen') {
-            currentMode = 'select';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.defaultCursor = 'default';
-            updateLayerObjectsState();
-        } else {
-            currentMode = 'pen';
-            fabricCanvas.isDrawingMode = true;
-            fabricCanvas.selection = false;
-            fabricCanvas.defaultCursor = 'crosshair';
-            fabricCanvas.freeDrawingBrush.color = currentPenColor;
-            fabricCanvas.freeDrawingBrush.width = currentPenSize;
-            fabricCanvas.forEachObject(obj => {
-                 obj.selectable = false;
-                 obj.evented = true;
-            });
-            fabricCanvas.off('mouse:down', addTextToCanvas);
-        }
-        updateButtonActiveState();
-    });
-    penTipupBtn.addEventListener('click', (e) => { e.stopPropagation(); positionTipup(penTipupBtn, penSettings); });
-    penColorOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            currentPenColor = option.dataset.color;
-            fabricCanvas.freeDrawingBrush.color = currentPenColor;
-            penColorOptions.forEach(o => o.classList.remove('selected'));
-            const currentActiveBtn = penSettings.querySelector(`.color-btn[data-tool="pen"][data-color="${currentPenColor}"]`);
-            if(currentActiveBtn) currentActiveBtn.classList.add('selected');
-        });
-    });
-    penSizeSelect.addEventListener('change', () => {
-        currentPenSize = parseInt(penSizeSelect.value);
-        fabricCanvas.freeDrawingBrush.width = currentPenSize;
-    });
-    fabricCanvas.on('path:created', function(e) {
-        if (!e.path) return;
-        const targetLayer = getTargetLayerForDrawing();
-        if (targetLayer) {
-            e.path.customLayer = targetLayer;
-            const objects = fabricCanvas.getObjects();
-            objects.sort((a, b) => {
-                if (a.customLayer === 'editLayer' && b.customLayer !== 'editLayer') return 1;
-                if (a.customLayer !== 'editLayer' && b.customLayer === 'editLayer') return -1;
-                return 0;
-            });
-            objects.forEach((obj, index) => fabricCanvas.moveTo(obj, index));
-        } else {
-            alert("그림을 추가할 레이어를 선택해주세요 (편집용 또는 스케줄용).");
-            fabricCanvas.remove(e.path);
-            return;
-        }
-        updateLayerObjectsState();
-        fabricCanvas.renderAll();
-        if (dataManager) dataManager.debouncedSaveCanvasState();
-        debouncedRecordState();
-    });
-
-    freeTextModeBtn.addEventListener('click', () => {
-        if (currentMode === 'text') {
-            currentMode = 'select';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.defaultCursor = 'default';
-            fabricCanvas.off('mouse:down', addTextToCanvas);
-            fabricCanvas.selection = true;
-            updateLayerObjectsState();
-        } else {
-            fabricCanvas.isDrawingMode = false;
-            currentMode = 'text';
-            fabricCanvas.selection = false;
-            fabricCanvas.defaultCursor = 'text';
-            fabricCanvas.forEachObject(obj => {
-                obj.selectable = false;
-                obj.evented = false;
-            });
-            fabricCanvas.discardActiveObject();
-            fabricCanvas.renderAll();
-            fabricCanvas.on('mouse:down', addTextToCanvas);
-        }
-        updateButtonActiveState();
-    });
-
-    freeTextTipupBtn.addEventListener('click', (e) => { e.stopPropagation(); positionTipup(freeTextTipupBtn, freeTextSettings); });
-    freeTextColorOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            currentTextColor = option.dataset.color;
-            const activeObject = fabricCanvas.getActiveObject();
-            if (activeObject && (activeObject.type === 'i-text' || activeObject.type === 'textbox')) {
-                activeObject.set('fill', currentTextColor);
-                fabricCanvas.renderAll();
-                if (dataManager) dataManager.debouncedSaveCanvasState();
-            }
-            freeTextColorOptions.forEach(o => o.classList.remove('selected'));
-            const currentActiveBtn = freeTextSettings.querySelector(`.color-btn[data-tool="freeText"][data-color="${currentTextColor}"]`);
-            if(currentActiveBtn) currentActiveBtn.classList.add('selected');
-        });
-    });
-    freeTextSizeSelect.addEventListener('change', () => {
-        currentTextSize = parseInt(freeTextSizeSelect.value);
-        const activeObject = fabricCanvas.getActiveObject();
-        if (activeObject && (activeObject.type === 'i-text' || activeObject.type === 'textbox')) {
-            activeObject.set('fontSize', currentTextSize);
-            fabricCanvas.renderAll();
-            if (dataManager) dataManager.debouncedSaveCanvasState();
-        }
-    });
-    function addTextToCanvas(options) {
-        if (currentMode !== 'text' || options.target || !options.e) return;
-    
-        const targetLayer = getTargetLayerForDrawing();
-        if (!targetLayer) {
-            alert('텍스트를 배치할 레이어를 선택해주세요 (편집용 또는 스케줄용).');
-            return;
-        }
-    
-        const pointer = fabricCanvas.getPointer(options.e);
-        const text = new fabric.IText('텍스트 입력', {
-            left: pointer.x, top: pointer.y,
-            fontSize: currentTextSize, fill: currentTextColor,
-            customLayer: targetLayer, padding: 5,
-            originX: 'left', originY: 'top'
-        });
-        fabricCanvas.add(text);
-    
-        text.on('editing:exited', function() {
-            if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-                dataManager.debouncedSaveCanvasState();
-                debouncedRecordState();
-            }
-            currentMode = 'select';
-            fabricCanvas.isDrawingMode = false;
-            fabricCanvas.selection = true;
-            fabricCanvas.defaultCursor = 'default';
-            fabricCanvas.off('mouse:down', addTextToCanvas);
-    
-            updateButtonActiveState();
-            updateLayerObjectsState();
-        });
-    
-        const objects = fabricCanvas.getObjects();
-        objects.sort((a, b) => {
-            if (a.customLayer === 'editLayer' && b.customLayer !== 'editLayer') return 1;
-            if (a.customLayer !== 'editLayer' && b.customLayer === 'editLayer') return -1;
-            return 0;
-        });
-        objects.forEach((obj, index) => fabricCanvas.moveTo(obj, index));
-                                  
-        fabricCanvas.setActiveObject(text);
-        text.enterEditing();
-        text.selectAll();
-        fabricCanvas.renderAll();
-    }
-
-
-    eraserModeBtn.addEventListener('click', () => {
-        const activeObjects = fabricCanvas.getActiveObjects();
-        if (activeObjects.length > 0) {
-            activeObjects.forEach(obj => { fabricCanvas.remove(obj) });
-            fabricCanvas.discardActiveObject();
-            fabricCanvas.renderAll();
-            if (dataManager) dataManager.debouncedSaveCanvasState();
-            debouncedRecordState();
-        }
-    });
-    clearAllBtn.addEventListener('click', () => { clearConfirmModal.style.display = 'block'; });
-    confirmClearBtn.addEventListener('click', () => {
-        const objectsToRemove = [];
-        const editLayerChecked = editLayerCheckbox.checked;
-        const scheduleLayerChecked = scheduleLayerCheckbox.checked;
-        fabricCanvas.forEachObject(function(obj) {
-            if (editLayerChecked && (obj.customLayer === 'editLayer' || !obj.customLayer)) {
-                objectsToRemove.push(obj);
-            }
-            if (scheduleLayerChecked && obj.customLayer === 'scheduleLayer') {
-                 objectsToRemove.push(obj);
-            }
-        });
-        objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
-        clearConfirmModal.style.display = 'none';
-        fabricCanvas.renderAll();
-        if (objectsToRemove.length > 0 && dataManager) dataManager.debouncedSaveCanvasState();
-        debouncedRecordState();
-    });
-    cancelClearBtn.addEventListener('click', () => { clearConfirmModal.style.display = 'none'; });
-    if(closeClearConfirmModal) closeClearConfirmModal.onclick = () => clearConfirmModal.style.display = 'none';
-
-    homeBtn.addEventListener('click', () => { setInitialView(DEFAULT_ZOOM); });
-
-
-
-
-    function updateViewportInfo() {
-        if (!viewportInfoDiv) return;
-        const zoom = fabricCanvas.getZoom();
-        const vpt = fabricCanvas.viewportTransform;
-        const canvasActualCenterX = fabricCanvas.width / 2;
-        const canvasActualCenterY = fabricCanvas.height / 2;
-        const canvasCoordAtViewportCenter_X = ( (canvasContainer.offsetWidth / 2) - vpt[4]) / zoom;
-        const canvasCoordAtViewportCenter_Y = ( (canvasContainer.offsetHeight / 2) - vpt[5]) / zoom;
-        const userCoordX = canvasCoordAtViewportCenter_X - canvasActualCenterX;
-        const userCoordY = canvasCoordAtViewportCenter_Y - canvasActualCenterY;
-        viewportInfoDiv.innerHTML = `<div>배율: ${zoom.toFixed(1)},  X: ${userCoordX.toFixed(0)}, Y: ${userCoordY.toFixed(0)}</div>`;
-    }
-
-fabricCanvas.on('mouse:wheel', function(opt) {
-    if (!opt.e) return;
-
-    // --- 1단계: 줌 레벨 계산 및 실행 ---
-    const delta = opt.e.deltaY;
-    let zoom = fabricCanvas.getZoom();
-    
-    zoom *= 0.999 ** delta;
-    if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
-    if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
-
-    // 줌 기준점: 화면 중앙
-    const viewportCenter = new fabric.Point(
-        canvasContainer.offsetWidth / 2,
-        canvasContainer.offsetHeight / 2
-    );
-    fabricCanvas.zoomToPoint(viewportCenter, zoom);
-
-    // --- 2단계 (경계 제한 로직) ---
-    // 이 부분의 모든 로직을 생략합니다.
-
-    // --- 3단계: 최종 적용 및 후속 작업 ---
-    opt.e.preventDefault();
-    opt.e.stopPropagation();
-    
-    // 부가 기능 호출
-    if (typeof updateViewportInfo === 'function') {
-        updateViewportInfo();
-    }
-    if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-        dataManager.debouncedSaveCanvasState();
-    }
-});
-
-    fabricCanvas.on('object:modified', (e) => { 
-        if (dataManager) dataManager.debouncedSaveCanvasState(); 
-        debouncedRecordState();
-    });
-    
-
-    document.addEventListener('click', (e) => {
-        const target = e.target;
-        if (!target.closest('.tip-up-settings') && 
-            !target.closest('.tipup-toggle-btn') && 
-            target !== bgColorBtn && !bgColorBtn.contains(target) ) {
-            closeAllTipups();
-        }
-    });
-    
-
-    if (toolbarElement && toolbarToggleElement && toolbarHideBtn) {
-        toolbarElement.style.display = toolbarVisible ? 'flex' : 'none';
-        toolbarToggleElement.style.display = toolbarVisible ? (toolbarWrapper.matches(':hover') ? 'block' : '') : 'block';
-        toolbarHideBtn.innerHTML = toolbarVisible ? '<span class="arrow-down">▼</span>' : '<span class="arrow-up">▲</span>';
-    }
-    
-    function formatDateForSaveDisplay(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-        return `${year}년 ${month}월 ${day}일 ${hours}시 ${minutes}분 ${seconds}초`;
-    }
-    
-    let currentSaveOperationCallback = null;
-
-    function openSaveConfirmModal(callback) {
-        currentSaveOperationCallback = callback;
-        saveScreenNameInput.value = "제목 없음"; // 기본값 "제목 없음"
-        saveModalTimestamp.textContent = formatDateForSaveDisplay(new Date());
-        saveConfirmModal.style.display = 'block';
-        saveScreenNameInput.focus();
-        saveScreenNameInput.select(); // 입력 필드 내용 전체 선택
-    }
-
-
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            if (!dataManager) { console.error("DataManager 미초기화"); return; }
-    
-            openSaveConfirmModal(async (baseName, timestampString) => {
-                // data.js에서 baseName과 timestampString을 조합하여 screenKey를 생성하고,
-                // baseName은 displayName으로, timestampString은 savedAt으로 저장할 것임.
-                const editChecked = editLayerCheckbox.checked;
-                const scheduleChecked = scheduleLayerCheckbox.checked;
-    
-                if (!editChecked && !scheduleChecked) {
-                    alert("저장할 내용을 포함할 레이어를 하나 이상 선택해주세요 (툴바 체크박스).");
-                    saveConfirmModal.style.display = 'none';
-                    return;
-                }
-                let objectsToSaveCount = 0;
-                fabricCanvas.getObjects().forEach(obj => {
-                    if (editChecked && scheduleChecked) {
-                        objectsToSaveCount++;
-                    } else if (editChecked && (obj.customLayer === 'editLayer' || !obj.customLayer)) {
-                        objectsToSaveCount++;
-                    } else if (scheduleChecked && obj.customLayer === 'scheduleLayer') {
-                        objectsToSaveCount++;
-                    }
-                });
-    
-                if (objectsToSaveCount === 0) {
-                    if (!confirm("선택된 레이어에 저장할 내용이 없습니다. 빈 화면으로 저장하시겠습니까?")) {
-                        saveConfirmModal.style.display = 'none';
-                        return;
-                    }
-                }
-    
-                try {
-                    // dataManager.saveNamedScreen는 이제 baseName과 timestampString을 받음
-                    const savedKey = await dataManager.saveNamedScreen(baseName, timestampString, editChecked, scheduleChecked);
-                    alert(`'${baseName}' 화면 저장 완료 (저장 시각: ${timestampString}).`);
-                    if (scheduleModal.style.display === 'block') populateScheduledContentSelect();
-                    if (loadSavedScreenModal.style.display === 'block') populateSavedScreenList();
-                } catch (error) {
-                    alert(`화면 저장 실패: ${error}`);
-                    console.error("화면 저장 실패:", error);
-                }
-                saveConfirmModal.style.display = 'none';
-            });
-        });
-    }
-    
-    if (confirmSaveBtn) {
-        confirmSaveBtn.addEventListener('click', () => {
-            const baseName = saveScreenNameInput.value.trim();
-            const timestampString = saveModalTimestamp.textContent;
-            if (baseName === "") {
-                alert("화면 제목을 입력해주세요.");
-                return;
-            }
-            if (currentSaveOperationCallback) {
-                currentSaveOperationCallback(baseName, timestampString);
-            }
-        });
-    }
-    
-    if (cancelSaveBtn) cancelSaveBtn.onclick = () => saveConfirmModal.style.display = 'none';
-    if (closeSaveConfirmModalBtn) closeSaveConfirmModalBtn.onclick = () => saveConfirmModal.style.display = 'none';
-
-
-    async function populateSavedScreenList() {
-        if (!savedScreenListUl || !noSavedScreensP || !dataManager) return;
-        try {
-            // dataManager.getSavedScreensList()는 이제 {key, displayName, savedAt} 객체 배열 반환
-            const screens = await dataManager.getSavedScreensList();
-            savedScreenListUl.innerHTML = '';
-            noSavedScreensP.style.display = screens.length === 0 ? 'block' : 'none';
-            savedScreenListUl.style.display = screens.length > 0 ? 'block' : 'none';
-    
-            screens.forEach(screen => {
-                const li = document.createElement('li');
-    
-                li.classList.add('saved-screen-list-item'); // CSS에서 사용할 클래스 추가
-
-                // 화면 정보 (이름 + 타임스탬프)를 담을 div
-                const screenInfoDiv = document.createElement('div');
-                screenInfoDiv.classList.add('screen-info-container'); // CSS 클래스
-
-                const nameSpan = document.createElement('span');
-                nameSpan.classList.add('screen-name-display'); // CSS 클래스
-                nameSpan.textContent = screen.displayName;
-                nameSpan.title = `${screen.displayName} (${screen.savedAt})`; // 툴팁용 전체 텍스트
-                screenInfoDiv.appendChild(nameSpan);
-
-                const timestampSpan = document.createElement('span');
-                timestampSpan.classList.add('screen-timestamp-display'); // CSS 클래스
-                timestampSpan.textContent = `(${screen.savedAt})`;
-                // timestampSpan.title = `${screen.displayName} (${screen.savedAt})`; // 이름에도 이미 있으므로 중복 방지
-                screenInfoDiv.appendChild(timestampSpan);
-                
-                li.appendChild(screenInfoDiv);
-
-                // 버튼들을 담을 div
-                const buttonsDiv = document.createElement('div');
-                buttonsDiv.classList.add('screen-item-actions'); // CSS 클래스
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '삭제';
-                deleteBtn.classList.add('delete-saved-item-btn'); // 기존 클래스 유지
-                deleteBtn.onclick = async (evt) => {
-                    evt.stopPropagation();
-                    if (confirm(`'${screen.displayName}' (${screen.savedAt}) 화면을 정말 삭제하시겠습니까? 관련된 모든 스케줄도 함께 삭제됩니다.`)) {
-                        try {
-                            await dataManager.deleteNamedScreen(screen.key);
-                            populateSavedScreenList();
-                            if (scheduleModal.style.display === 'block') populateScheduledContentSelect();
-                        } catch (delErr) { alert("화면 삭제 오류: " + delErr); }
-                    }
-                };
-                buttonsDiv.appendChild(deleteBtn);
-                // 만약 '수정' 버튼도 있다면 여기에 추가
-                // const editBtn = document.createElement('button');
-                // ...
-                // buttonsDiv.appendChild(editBtn);
-
-                li.appendChild(buttonsDiv);
-                // -- HTML 구조 변경 끝 --
-
-                li.addEventListener('click', async () => {
-                    // ... (기존 클릭 이벤트 리스너 내용은 유지) ...
-                    if (confirm(`'${screen.displayName}' 화면을 불러오시겠습니까? 현재 작업 내용은 덮어씌워집니다.`)) {
-                        try {
-                            await dataManager.loadNamedScreen(screen.key); 
-                            loadSavedScreenModal.style.display = 'none';
-                        } catch (loadErr) { alert("화면 불러오기 오류: " + loadErr); }
-                    }
-                });
-                savedScreenListUl.appendChild(li);
-            });
-
-        } catch (error) {
-            console.error("저장된 화면 목록 표시 오류:", error);
-            noSavedScreensP.textContent = "목록을 불러오는 중 오류 발생";
-            noSavedScreensP.style.display = 'block';
-            savedScreenListUl.style.display = 'none';
-        }
-    }
-
-    if (loadGeneralBtn) {
-        loadGeneralBtn.addEventListener('click', () => {
-            populateSavedScreenList();
-            loadSavedScreenModal.style.display = 'block';
-        });
-    }
-    if (closeLoadSavedScreenModalBtn) closeLoadSavedScreenModalBtn.onclick = () => loadSavedScreenModal.style.display = 'none';
-
-    let currentEditingScheduleId = null;
-    async function populateScheduledContentSelect(currentScreenKeyForEdit = null) {
-        if (!scheduledContentSelect || !dataManager) return;
-        try {
-            // getSavedScreensList는 {key, displayName, savedAt} 객체 배열 반환
-            const screens = await dataManager.getSavedScreensList();
-            const originalValue = scheduledContentSelect.value; // 이전 선택된 screenKey
-            scheduledContentSelect.innerHTML = '<option value="">-- 화면 선택 --</option>';
-            const newSaveOption = document.createElement('option');
-            newSaveOption.value = "current_canvas_new_save";
-            newSaveOption.textContent = "** 현재 캔버스 내용으로 새 화면 저장 **";
-            scheduledContentSelect.appendChild(newSaveOption);
-    
-            screens.forEach(screen => {
-                const option = document.createElement('option');
-                option.value = screen.key; // option의 value는 screenKey
-                option.textContent = `${screen.displayName} (${screen.savedAt})`; // 표시되는 텍스트
-                scheduledContentSelect.appendChild(option);
-            });
-    
-            if (currentScreenKeyForEdit) {
-                 scheduledContentSelect.value = currentScreenKeyForEdit;
-            } else if (originalValue && screens.some(s => s.key === originalValue)) {
-                 scheduledContentSelect.value = originalValue;
-            }
-        } catch (error) { console.error("스케줄 모달 화면 목록 채우기 오류:", error); }
-    }
-
-    if (deleteSelectedScheduledScreenBtn && scheduledContentSelect) {
-        deleteSelectedScheduledScreenBtn.addEventListener('click', async () => {
-            if (!dataManager) { console.error("DataManager 미초기화"); return; }
-            const selectedScreenKey = scheduledContentSelect.value; // 이제 screenKey
-             if (selectedScreenKey && selectedScreenKey !== "current_canvas_new_save" && selectedScreenKey !== "") {
-                const selectedOptionText = scheduledContentSelect.options[scheduledContentSelect.selectedIndex].text;
-                if (confirm(`'${selectedOptionText}' 화면을 정말 삭제하시겠습니까? 이 화면을 사용하는 모든 스케줄도 삭제됩니다.`)) {
-                    try {
-                        await dataManager.deleteNamedScreen(selectedScreenKey); // screenKey로 삭제
-                        alert(`'${selectedOptionText}' 화면 및 관련 스케줄 삭제 완료.`);
-                        populateScheduledContentSelect();
-                        renderScheduleList();
-                        if (loadSavedScreenModal.style.display === 'block') populateSavedScreenList();
-                    } catch (err) { alert("화면 삭제 오류: " + err); }
-                }
-            } else { alert("삭제할 저장된 화면을 선택해주세요."); }
-        });
-    }
-
-    async function renderScheduleList() {
-        if (!scheduleListUl || !dataManager) return;
-        try {
-            const schedules = await dataManager.getAllScheduleEntries();
-            // 스케줄 목록에 있는 screenName (실제로는 screenKey)을 displayName과 savedAt으로 변환하기 위해
-            // 모든 저장된 화면 정보를 가져와 매핑 준비
-            const savedScreens = await dataManager.getSavedScreensList();
-            const screenMap = new Map(savedScreens.map(s => [s.key, s]));
-
-
-            scheduleListUl.innerHTML = '';
-            const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
-            schedules.forEach(schedule => {
-                const li = document.createElement('li');
-                li.classList.add('schedule-list-item'); // CSS용 클래스
-
-                const scheduleInfoDiv = document.createElement('div');
-                scheduleInfoDiv.classList.add('schedule-info-container');
-
-                const daysText = schedule.days.map(d => daysOfWeek[d]).join(', ');
-                const screenDetail = screenMap.get(schedule.screenName);
-                const displayScreenName = screenDetail ? `${screenDetail.displayName} (${screenDetail.savedAt})` : schedule.screenName;
-                
-                const scheduleTextSpan = document.createElement('span');
-                scheduleTextSpan.classList.add('schedule-text-display');
-                scheduleTextSpan.textContent = `[${daysText}] ${schedule.time} - ${displayScreenName}`;
-                scheduleTextSpan.title = scheduleTextSpan.textContent; // 툴팁
-                scheduleInfoDiv.appendChild(scheduleTextSpan);
-
-                li.appendChild(scheduleInfoDiv);
-
-                const btnContainer = document.createElement('div');
-                btnContainer.classList.add('schedule-item-actions'); // CSS용 클래스
-
-                const editBtn = document.createElement('button');
-                editBtn.textContent = '수정';
-                editBtn.onclick = () => {
-                    currentEditingScheduleId = schedule.id;
-                    scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => {
-                        cb.checked = schedule.days.includes(parseInt(cb.value));
-                    });
-                    scheduleTimeInput.value = schedule.time;
-                    populateScheduledContentSelect(schedule.screenName); // screenName은 screenKey
-                    addScheduleEntryBtn.textContent = '스케줄 수정';
-                };
-                btnContainer.appendChild(editBtn);
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '삭제';
-                deleteBtn.classList.add('delete-schedule-btn'); // 기존 클래스 유지
-                deleteBtn.onclick = async () => {
-                    if (confirm("이 스케줄을 삭제하시겠습니까?")) {
-                        try {
-                            await dataManager.deleteScheduleEntryById(schedule.id);
-                            renderScheduleList();
-                            if (currentEditingScheduleId === schedule.id) {
-                                currentEditingScheduleId = null;
-                                addScheduleEntryBtn.textContent = '스케줄 추가';
-                            }
-                        } catch (delErr) { alert("스케줄 삭제 오류: " + delErr); }
-                    }
-                };
-                btnContainer.appendChild(deleteBtn);
-
-                li.appendChild(btnContainer);
-                scheduleListUl.appendChild(li);
-            });
-
-        } catch (error) { console.error("스케줄 목록 렌더링 오류:", error); }
-    }
-
-    if (scheduleBtn) {
-        scheduleBtn.addEventListener('click', () => {
-            if (!dataManager) { console.error("DataManager 미초기화"); return; }
-            currentEditingScheduleId = null;
-            addScheduleEntryBtn.textContent = '스케줄 추가';
-            scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => cb.checked = false);
-            scheduleTimeInput.value = '';
-            populateScheduledContentSelect();
-            renderScheduleList();
-            scheduleModal.style.display = 'block';
-        });
-    }
-    if (closeScheduleModalBtn) closeScheduleModalBtn.onclick = () => scheduleModal.style.display = 'none';
-
-    if (addScheduleEntryBtn) {
-        addScheduleEntryBtn.addEventListener('click', async () => {
-            if (!dataManager) { console.error("DataManager 미초기화"); return; }
-            const selectedDays = Array.from(scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]:checked')).map(cb => parseInt(cb.value));
-            const time = scheduleTimeInput.value;
-            let screenKeyForSchedule = scheduledContentSelect.value; // 이제 screenKey
-    
-            if (selectedDays.length === 0 || !time || !screenKeyForSchedule) {
-                alert("요일, 시간, 로드할 화면을 모두 올바르게 선택 또는 입력하세요."); return;
-            }
-    
-            if (screenKeyForSchedule === "current_canvas_new_save") {
-                openSaveConfirmModal(async (baseName, timestampString) => {
-                    const editChecked = editLayerCheckbox.checked;
-                    const scheduleChecked = scheduleLayerCheckbox.checked;
-    
-                    if (!editChecked && !scheduleChecked) {
-                        alert("스케줄용 화면 저장 시에도 내용을 포함할 레이어를 하나 이상 선택해야 합니다.");
-                        saveConfirmModal.style.display = 'none';
-                        return;
-                    }
-    
-                    try {
-                        const savedKey = await dataManager.saveNamedScreen(baseName, timestampString, editChecked, scheduleChecked);
-                        alert(`'${baseName}' 화면 저장 완료. 이 화면으로 스케줄이 설정됩니다.`);
-                        await populateScheduledContentSelect(savedKey); // 새 화면의 key로 select 업데이트
-                        
-                        const scheduleEntry = { days: selectedDays, time: time, screenName: savedKey }; // screenName에 key 저장
-                        if (currentEditingScheduleId !== null) scheduleEntry.id = currentEditingScheduleId;
-                        await dataManager.addOrUpdateScheduleEntry(scheduleEntry);
-                        renderScheduleList();
-                        currentEditingScheduleId = null;
-                        addScheduleEntryBtn.textContent = '스케줄 추가';
-                        scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => cb.checked = false);
-                        scheduleTimeInput.value = '';
-                        populateScheduledContentSelect();
-
-                    } catch (saveError) {
-                        alert("새 화면 저장 오류: " + saveError);
-                    }
-                    saveConfirmModal.style.display = 'none';
-                });
-                return; 
-            }
-    
-            const scheduleEntry = { days: selectedDays, time: time, screenName: screenKeyForSchedule };
-            if (currentEditingScheduleId !== null) {
-                scheduleEntry.id = currentEditingScheduleId;
-            }
-    
-            try {
-                await dataManager.addOrUpdateScheduleEntry(scheduleEntry);
-                renderScheduleList();
-                currentEditingScheduleId = null;
-                addScheduleEntryBtn.textContent = '스케줄 추가';
-                scheduleDayCheckboxesContainer.querySelectorAll('input[name="scheduleDay"]').forEach(cb => cb.checked = false);
-                scheduleTimeInput.value = '';
-                populateScheduledContentSelect();
-            } catch (error) { alert("스케줄 추가/수정 오류: " + error); }
-        });
-    }
-
-    // --- 모달 외부 클릭 시 닫기 로직 수정 ---
-    let mouseDownTarget = null; // 마우스 다운 시 대상 요소를 저장할 변수
-
-    // 각 모달 요소들을 배열로 관리
-    const modalsToManage = [
-        { element: scheduleModal, id: 'scheduleModal' },
-        { element: loadSavedScreenModal, id: 'loadSavedScreenModal' },
-        { element: clearConfirmModal, id: 'clearConfirmModal' },
-        { element: saveConfirmModal, id: 'saveConfirmModal' }
-    ];
-
-    document.addEventListener('mousedown', function(event) {
-        mouseDownTarget = event.target; // 마우스 다운 시 클릭된 요소를 기록
-    }, true); // 캡처링 단계에서 처리하여 다른 mousedown 이벤트보다 먼저 실행될 수 있도록
-
-    document.addEventListener('mouseup', function(event) {
-        // mouseup 이벤트의 대상이 mousedown 이벤트의 대상과 동일하고,
-        // 그 대상이 모달 배경(오버레이)일 경우에만 모달을 닫습니다.
-        const mouseUpTarget = event.target;
-
-        modalsToManage.forEach(modalInfo => {
-            if (modalInfo.element && modalInfo.element.style.display !== 'none') { // 모달이 열려 있을 때만
-                // mousedown과 mouseup이 동일한 요소에서 발생했고, 그 요소가 모달 배경 자신일 때
-                if (mouseDownTarget === mouseUpTarget && mouseUpTarget === modalInfo.element) {
-                    modalInfo.element.style.display = 'none';
-                    // console.log(`${modalInfo.id} closed by clicking outside (target match).`);
-                }
-            }
-        });
-        mouseDownTarget = null; // 다음 클릭을 위해 초기화
-    }, true); // 캡처링 단계
-
-    // --- 모달 외부 클릭 수정 끝 ---
-
-
-    const debouncedRecordState = debounce(() => recordState(fabricCanvas), 300);
-    
-    initializeClipboard(fabricCanvas, {
-        getTargetLayerForDrawing: getTargetLayerForDrawing,
-        debouncedSaveCanvasState: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
-    }, debouncedRecordState);
-    
-    
-initializeHistory(fabricCanvas);
-    
-    if (typeof initializeDataAndScheduleFunctions === 'function') {
-        dataManager = initializeDataAndScheduleFunctions(
-            fabricCanvas,
-            {
-                debounce: debounce,
-                onLoadSuccess: (loadedFabricInstance, loadedToLayer) => {
-                    setInitialView(loadedFabricInstance.getZoom());
-                    if (loadedToLayer === 'editLayer') {
-                        editLayerCheckbox.checked = true;
-                    }
-                    updateLayerObjectsState();
-                    updateViewportInfo();
-                    console.log(`화면 로드 완료. 대상 레이어: ${loadedToLayer || '기존 레이어 유지(자동복원)'}`);
-                    if (dataManager && dataManager.debouncedSaveCanvasState) {
-                        dataManager.debouncedSaveCanvasState();
-                    }
-                },
-                onScheduleLoadSuccess: (loadedFabricInstance, loadedToLayer) => {
-                    setInitialView(loadedFabricInstance.getZoom());
-                    scheduleLayerCheckbox.checked = true;
-                    editLayerCheckbox.checked = false;
-                    updateLayerObjectsState();
-                    updateViewportInfo();
-                    console.log(`스케줄에 의해 화면이 '${loadedToLayer}' 레이어로 로드됨.`);
-                    if (dataManager && dataManager.debouncedSaveCanvasState) {
-                        dataManager.debouncedSaveCanvasState();
-                    }
-                },
-                onScheduleLoadError: (error, screenName) => {
-                    alert(`스케줄된 화면 '${screenName}' 로드 중 오류가 발생했습니다: ${error}`);
-                },
-                onNoData: () => {
-                    setInitialView(DEFAULT_ZOOM);
-                    updateLayerObjectsState();
-                },
-                onLoadError: (error) => {
-                    console.error("화면 로드 중 일반 오류:", error);
-                    alert(`화면 로드 중 오류가 발생했습니다: ${error}`);
-                    setInitialView(DEFAULT_ZOOM);
-                    updateLayerObjectsState();
-                }
-            },
-            {
-                getTargetLayerForDrawing: getTargetLayerForDrawing,
-                getCurrentTextSize: () => currentTextSize,
-                getCurrentTextColor: () => currentTextColor,
-                debouncedSaveCanvasStateForPaste: () => { if (dataManager) dataManager.debouncedSaveCanvasState(); }
-            }
-        );
-        console.log('data.js 기능 초기화 완료.');
-
-        try {
-            if (dataManager && typeof dataManager.loadInitialCanvas === 'function') {
-                await dataManager.loadInitialCanvas();
-            } else {
-                console.warn("dataManager.loadInitialCanvas를 찾을 수 없어 기본 뷰로 시작합니다.");
-                setInitialView(DEFAULT_ZOOM);
-                updateLayerObjectsState();
-            }
-        } catch (error) {
-            console.error("최초 캔버스 상태 복원 중 오류:", error);
-            setInitialView(DEFAULT_ZOOM);
-            updateLayerObjectsState();
-        }
-    } else {
-        console.error("오류: initializeDataAndScheduleFunctions를 찾을 수 없습니다. data.js가 로드되었는지 확인하세요.");
-        setInitialView(DEFAULT_ZOOM);
-        updateLayerObjectsState();
-    }
-
-
-    // ---  Delete 키로 선택 객체 지우기 ---
-    document.addEventListener('keydown', function(event) {
-        // 입력 필드(input, textarea)나 IText 편집 중에는 작동하지 않도록 함
-        const activeElement = document.activeElement;
-        const isInputFocused = activeElement.tagName === 'INPUT' || 
-                               activeElement.tagName === 'TEXTAREA' ||
-                               (activeElement.isContentEditable && activeElement.tagName !== 'BODY');
-
-        const isITextEditing = fabricCanvas.getActiveObject() instanceof fabric.IText && 
-                               fabricCanvas.getActiveObject().isEditing;
-
-        if (isInputFocused || isITextEditing) {
-            return; // 입력 필드나 IText 편집 중이면 키보드 삭제 기능 무시
-        }
-
-        // event.key === 'Delete' (Delete 키) 또는 event.keyCode === 46 (구형 브라우저 호환성)
-        if (event.key === 'Delete' || event.code === 'Delete' || event.keyCode === 46) { // [7, 9]
-            event.preventDefault(); // 기본 동작 (예: 브라우저 뒤로가기 등) 방지
-
-            const activeObjects = fabricCanvas.getActiveObjects(); // 다중 선택된 객체들도 가져옴 [8, 10]
-            if (activeObjects.length > 0) {
-                activeObjects.forEach(obj => { 
-                    fabricCanvas.remove(obj); // 각 선택된 객체 삭제 [8, 10]
-                });
-                fabricCanvas.discardActiveObject(); // 선택 해제
-                fabricCanvas.renderAll();
-                
-                // 자동 저장 및 히스토리 저장을 위한 로직 (만약 있다면)
-                if (dataManager && typeof dataManager.debouncedSaveCanvasState === 'function') {
-                    dataManager.debouncedSaveCanvasState();
-                }
-                // 만약 Undo/Redo 히스토리 기능이 있다면 여기서 히스토리 저장 호출
-                debouncedRecordState();
-            }
-        }
-    });
-    // --- Delete 키 핸들러 끝 ---
-
-
-
-    updateButtonActiveState();
-    updateLayerObjectsState();
-
-/* === [ADD] 툴바 자동 스케일 === */
-const BASE_WIDTH = 1500;   // 디자인 기준 폭(px)
-
-function applyToolbarScale(){
-  const scale = Math.min(window.innerWidth / BASE_WIDTH, 1); // 1280px보다 클 땐 1
-  toolbarScaleWrap.style.transform = `scale(${scale})`;
-  /* 스케일로 줄어든 실제 픽셀폭을 다시 100%로 맞춤 */
-  toolbarScaleWrap.style.width = `${100 / scale}%`;
+import {VERSION,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js';
+import {PageHistory} from './history.js';
+import {SystemClipboard} from './clipboard.js';
+import {CanvasTools} from './js/canvas-tools.js';
+import {loadCanvas,makeThumbnail} from './js/previews.js';
+import {decodeFiles} from './js/files.js';
+import {validateContent} from './js/validation.js';
+const $=id=>document.getElementById(id);
+let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0;
+let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null;
+const history=new PageHistory(),knownVersions=new Map();
+const MAX_PAGES=10;
+try {session=JSON.parse(sessionStorage.getItem(SESSION_KEY)) || session;} catch {}
+if(!session.views || typeof session.views!=='object')session.views={};
+function notify(message) {$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
+function status(message,state='ok') {$('saveStatus').textContent=message;$('saveStatus').dataset.state=state;}
+function fail(error) {console.error(error);notify(error?.message || String(error));}
+function modalOpen() {return Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
+function isTextEditing() {
+  const e=document.activeElement;return !!(e && (e.matches('input,textarea,select') || e.isContentEditable)) || !!c?.getActiveObject()?.isEditing;
 }
-
-window.addEventListener('resize', applyToolbarScale);
-applyToolbarScale();   
-
-/* =================================================================
-     [새 기능 추가] 형광펜, 마우스 우클릭 이동, 휠 줌, 실시간 안내창
-     ================================================================= */
-  const indicator = document.getElementById('floating-indicator');
-  const highlighterBtn = document.getElementById('highlighterBtn');
-
-  // 1. 실시간 배율 안내창 표시 함수
-  function showIndicator(clientX, clientY, zoomLevel) {
-    if (!indicator) return;
-    const percent = Math.round(zoomLevel * 100);
-    indicator.innerHTML = `🔍 배율: ${percent}%`;
-    indicator.style.left = `${clientX + 20}px`;
-    indicator.style.top = `${clientY + 15}px`;
-    indicator.style.display = 'block';
-  }
-
-  function hideIndicator() {
-    if (indicator) indicator.style.display = 'none';
-  }
-
-  // 2. 형광펜 기능 (기존 펜 두께를 연동하여 3배 두껍고 투명하게 설정)
-  if (highlighterBtn) {
-    highlighterBtn.addEventListener('click', () => {
-      fabricCanvas.isDrawingMode = true;
-      const brush = new fabric.PencilBrush(fabricCanvas);
-      brush.color = 'rgba(255, 255, 0, 0.4)'; // 노란색 반투명 효과
-      
-      // 기존 펜 두께 조절창(penSizeSelect)의 현재 값을 가져옴
-      const sizeInput = document.getElementById('penSizeSelect');
-      const baseSize = sizeInput ? parseInt(sizeInput.value) : 5;
-      brush.width = baseSize * 3; // 형광펜은 기본 펜의 3배 두께
-      
-      fabricCanvas.freeDrawingBrush = brush;
-    });
-  }
-
-  // 3. 우클릭 이동 기능을 위해 브라우저 기본 우클릭 메뉴(Context Menu) 차단
-  canvasElement.addEventListener('contextmenu', e => e.preventDefault());
-
-  // 4. Fabric.js 마우스 이벤트 (언제든 우클릭 드래그로 화면 이동)
-  fabricCanvas.on('mouse:down', function(opt) {
-    var evt = opt.e;
-    if (evt.button === 2) { // 마우스 우클릭 감지
-      this.isDragging = true;
-      this.selection = false; // 드래그 중 요소 다중선택 방지
-      this.lastPosX = evt.clientX;
-      this.lastPosY = evt.clientY;
+function allowed() {return !!current&&!busy&&!modalOpen()&&!tools?.gesture;}
+function rememberView() {
+  if(!current || !c)return;
+  session.activeId=current.id;session.views[current.id]=c.viewportTransform.slice();
+  try {sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));} catch {}
+  $('zoomLabel').textContent=`${Math.round(c.getZoom()*100)}%`;
+}
+function normalizedObjects(objects) {
+  objects.forEach(o=>{o.selectable=true;o.evented=true;o.visible=true;delete o.customLayer;if(o.objects)normalizedObjects(o.objects);});
+}
+function capture() {
+  const json=c.toJSON(SERIAL_PROPS);normalizedObjects(json.objects);
+  return {canvas:json,frame:{...current.content.frame,width:c.width,height:c.height}};
+}
+function changed({recordHistory=true}={}) {
+  if(!current)return;
+  current.content=capture();dirty=true;generation++;
+  if(recordHistory)history.push(current.id,current.content);
+  status('저장 대기 중입니다.');updateHistory();
+  clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>flush().catch(fail),350);
+}
+async function flush() {
+  clearTimeout(autosaveTimer);
+  if(saving)return saving;
+  if(!dirty || !current)return;
+  let succeeded=false;
+  saving=(async()=>{
+    while(dirty) {
+      const local=clone(current),g=generation;
+      status('자동저장 중입니다.');
+      const result=await store.commitPage(local,local.version);
+      const oldId=current.id;
+      if(result.conflict) {
+        current.id=result.page.id;current.name=result.page.name;current.order=result.page.order;
+        current.createdAt=result.page.createdAt;
+        if(history.pages.has(oldId)){history.pages.set(current.id,history.pages.get(oldId));history.pages.delete(oldId);}
+        session.views[current.id]=c.viewportTransform.slice();
+        notify('다른 탭의 변경과 충돌하여 내 작업을 별도의 충돌 복구 페이지에 보존했습니다.');
+      }
+      current.version=result.page.version;current.updatedAt=result.page.updatedAt;
+      knownVersions.set(current.id,current.version);
+      if(g===generation)dirty=false;
+      sync?.notify();rememberView();
     }
+    pages=await store.listPages();renderPages();succeeded=true;if(!dirty)status('자동저장 완료');
+  })().catch(error=>{status('저장 실패 · JSON 백업을 해주세요.','error');throw error;}).finally(()=>{saving=null;if(succeeded&&dirty){clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>flush().catch(fail),100);}});
+  return saving;
+}
+function finishText() {const o=c?.getActiveObject();if(o?.isEditing)o.exitEditing();}
+function restoreInteraction() {
+  if(!c || !tools)return;
+  c.isDrawingMode=tools.mode==='pen'||tools.mode==='marker';c.selection=tools.mode==='select';c.skipTargetFind=tools.mode==='move';
+  c.getObjects().forEach(o=>o.set({selectable:tools.mode==='select',evented:true}));c.requestRenderAll();
+}
+async function run(fn,label='처리 중입니다.') {
+  if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
+  finishText();busy=true;closePopups();$('busyText').textContent=label;$('busyOverlay').hidden=false;
+  c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
+  try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
+  finally {busy=false;importAbort=null;$('cancelImportBtn').hidden=true;$('busyOverlay').hidden=true;restoreInteraction();updateHistory();}
+}
+async function setPage(page,reset=false,keepView=true) {
+  rememberView();const previous=current?clone(current):null;
+  current=clone(page);const pageNumber=Math.min(MAX_PAGES,Math.max(1,pages.findIndex(p=>p.id===page.id)+1));current.name=`페이지 ${pageNumber}`;dirty=false;
+  try {await loadCanvas(c,current.content.canvas);}catch(error){
+    current=previous;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
+  }
+  tools.setMode('select');
+  const view=keepView?session.views[current.id]:null;
+  if(Array.isArray(view)&&view.length===6&&view.every(Number.isFinite)&&view[0]>=0.1&&view[0]<=10) {
+    c.setViewportTransform(view.slice());rememberView();
+  } else tools.home(current.content.frame);
+  if(reset || !history.pages.has(page.id) || knownVersions.get(page.id)!==page.version)history.reset(page.id,current.content);
+  knownVersions.set(page.id,page.version);renderPages();updateHistory();updateSelectionActions();status('자동저장 완료');
+}
+async function activatePage(id) {
+  await flush();const p=await store.getPage(id);if(!p || p.deleted)throw Error('삭제된 페이지입니다.');await setPage(p);
+}
+async function createPage(content) {
+  await flush();
+  if(pages.length>=MAX_PAGES){notify(`페이지는 최대 ${MAX_PAGES}개까지 사용할 수 있습니다.`);return;}
+  const now=Date.now(),number=pages.length+1;
+  const result=await store.commitPage({id:uid(),name:`페이지 ${number}`,content,version:0,order:now,createdAt:now},0);
+  sync.notify();pages=await store.listPages();await setPage(result.page,true,false);
+}
+function renderPages() {
+  pages=pages.slice(0,MAX_PAGES);
+  const index=Math.max(0,pages.findIndex(p=>p.id===current?.id));
+  $('currentPageInput').value=String(index+1);
+  $('prevPageBtn').disabled=index<=0 || pages.length<=1;
+  $('nextPageBtn').disabled=index<0 || index>=pages.length-1 || pages.length<=1;
+  $('addPageBtn').disabled=pages.length>=MAX_PAGES;
+  $('duplicatePageBtn').disabled=pages.length>=MAX_PAGES;
+  $('deletePageBtn').disabled=pages.length<=1;
+}
+function pageIndex() { return Math.max(0,pages.findIndex(p=>p.id===current?.id)); }
+async function goToPageNumber(value) {
+  if(busy||!current)return;
+  const parsed=Number.parseInt(String(value).trim(),10);
+  if(!Number.isFinite(parsed)) {renderPages();return;}
+  const target=Math.min(MAX_PAGES,Math.max(1,parsed));
+  const max=Math.min(MAX_PAGES,pages.length);
+  if(target>max){renderPages();return;}
+  const p=pages[target-1]; if(p && p.id!==current.id) await activatePage(p.id); else renderPages();
+}
+function updateHistory() {
+  $('undoBtn').disabled=busy||!current||!history.canUndo(current.id);
+  $('redoBtn').disabled=busy||!current||!history.canRedo(current.id);
+  const object=c?.getActiveObject();
+  $('deleteSelectionBtn').disabled=busy||!object;
+  updateSelectionActions();
+}
+function updateSelectionActions() {
+  const host=$('selectionActions'); if(!host||!c)return;
+  const object=c.getActiveObject(),multiple=object?.type==='activeSelection',group=object?.type==='group';
+  const visible=!!object && !busy && (multiple || group);
+  host.hidden=!visible;
+  if(!visible)return;
+  $('groupBtn').hidden=!multiple;
+  $('ungroupBtn').hidden=!group;
+  const rect=object.getBoundingRect(true,true);
+  const margin=8, gap=8, w=host.offsetWidth||120, h=host.offsetHeight||40;
+  const candidates=[
+    {left:rect.left+rect.width/2-w/2,top:rect.top-h-gap},
+    {left:rect.left+rect.width/2-w/2,top:rect.top+rect.height+gap},
+    {left:rect.left-w-gap,top:rect.top+rect.height/2-h/2},
+    {left:rect.left+rect.width+gap,top:rect.top+rect.height/2-h/2}
+  ];
+  const fits=p=>p.left>=margin&&p.top>=margin&&p.left+w<=innerWidth-margin&&p.top+h<=innerHeight-margin;
+  const pos=candidates.find(fits)||{
+    left:Math.min(innerWidth-w-margin,Math.max(margin,rect.left+rect.width/2-w/2)),
+    top:Math.min(innerHeight-h-margin,Math.max(margin,rect.top+rect.height+gap))
+  };
+  host.style.left=`${pos.left}px`;host.style.top=`${pos.top}px`;
+}
+async function stepHistory(direction) {
+  const before=history.pages.get(current.id)?.index;
+  const content=history.step(current.id,direction);if(!content)return;
+  try {await loadCanvas(c,content.canvas);} catch(e){history.pages.get(current.id).index=before;await loadCanvas(c,current.content.canvas);throw e;}
+  current.content=content;tools.setMode('select');dirty=true;generation++;await flush();updateHistory();
+}
+function deleteSelected() {
+  if(!allowed() || isTextEditing())return;
+  const objects=c.getActiveObjects();if(!objects.length)return;
+  c.discardActiveObject();objects.forEach(o=>c.remove(o));c.requestRenderAll();changed();
+}
+function groupObjects(ungroup=false) {
+  if(!allowed() || isTextEditing())return;
+  const o=c.getActiveObject();
+  if(ungroup && o?.type==='group')o.toActiveSelection();
+  else if(!ungroup && o?.type==='activeSelection'){const group=o.toGroup();group.id=uid();}
+  else return;
+  c.getObjects().forEach(o=>o.setCoords());c.requestRenderAll();changed();updateHistory();
+}
+function addText(text,point,editing=false) {
+  if(text.length>100000)throw Error('텍스트는 한 번에 10만 글자 이하여야 합니다.');
+  tools.setMode('select');
+  const center=point || fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
+  const object=new fabric.IText(text,{left:center.x,top:center.y,fontFamily:'Arial',fontSize:tools.text.size,fill:tools.text.color,id:uid()});
+  if(!point)object.setPositionByOrigin(center,'center','center');
+  c.add(object);c.setActiveObject(object);object.setCoords();c.requestRenderAll();changed({recordHistory:!editing});
+  if(editing){object.enterEditing();object.selectAll();}
+}
+async function importFiles(files,point) {
+  importAbort=new AbortController();$('cancelImportBtn').hidden=false;
+  const decoded=await decodeFiles(files,{signal:importAbort.signal,onProgress:t=>$('busyText').textContent=t});
+  if(!decoded.length)return;
+  tools.setMode('select');
+  const center=point || fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
+  let y=center.y;const width=Math.min(800,c.width/c.getZoom()*0.75),added=[];
+  decoded.forEach(({image})=>{
+    image.scale(Math.min(1,width/image.width));image.set({left:center.x-image.getScaledWidth()/2,top:y,id:uid()});
+    c.add(image);image.setCoords();added.push(image);y+=image.getScaledHeight()+24;
   });
-
-  fabricCanvas.on('mouse:move', function(opt) {
-    if (this.isDragging) {
-      var e = opt.e;
-      var vpt = this.viewportTransform;
-      vpt[4] += e.clientX - this.lastPosX;
-      vpt[5] += e.clientY - this.lastPosY;
-      this.requestRenderAll();
-      this.lastPosX = e.clientX;
-      this.lastPosY = e.clientY;
-      showIndicator(e.clientX, e.clientY, this.getZoom());
+  c.setActiveObject(added.length===1?added[0]:new fabric.ActiveSelection(added,{canvas:c}));c.requestRenderAll();changed();
+  notify(`${added.length}개 이미지를 배치했습니다.${added.length>1?' 아래쪽으로 이동하면 나머지 내용을 볼 수 있습니다.':''}`);
+}
+function setColor(tool,color) {
+  if(busy || !current)return;
+  if(tool==='bg'){c.setBackgroundColor(color,()=>c.requestRenderAll());changed();}
+  else if(tool==='text') {
+    tools.text.color=color;const o=c.getActiveObject();
+    if(o && ['i-text','text','textbox'].includes(o.type)){o.set('fill',color);c.requestRenderAll();changed();}
+  } else {tools[tool].color=color;tools.updateBrush();}
+  document.querySelectorAll(`.color-btn[data-tool="${tool}"]`).forEach(b=>b.classList.toggle('selected',b.dataset.color===color));
+}
+let openedPopup=null;
+function closePopups() {document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup]').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
+function togglePopup(id,button) {
+  if(busy)return;
+  const was=openedPopup===id;closePopups();if(was)return;
+  const p=$(id);p.style.display='block';openedPopup=id;button.setAttribute('aria-expanded','true');
+  const rect=button.getBoundingClientRect();p.style.left=Math.max(8,Math.min(window.innerWidth-p.offsetWidth-8,rect.left+rect.width/2-p.offsetWidth/2))+'px';
+  p.style.top=Math.max(8,rect.top-p.offsetHeight-8)+'px';
+}
+function openModal(id) {closePopups();finishText();modalFocus=document.activeElement;$(id).style.display='flex';$(id).querySelector('input,button')?.focus();}
+function closeModal(id) {$(id).style.display='none';modalFocus?.focus();}
+async function renderSavedScreens() {
+  const screens=await store.listScreens();const box=$('savedScreenList');box.replaceChildren();$('noSavedScreens').hidden=!!screens.length;
+  for(const screen of screens) {
+    const li=document.createElement('li');li.className='saved-screen-list-item';
+    const img=document.createElement('img');img.className='saved-preview';img.alt=`${screen.name}: 홈 100% 화면 미리보기`;img.loading='lazy';
+    if(screen.thumbnail)img.src=screen.thumbnail;
+    else {try{img.src=await makeThumbnail(screen.content);}catch{img.alt='미리보기를 생성하지 못했습니다.';}}
+    const info=document.createElement('div');info.className='screen-info-container';
+    const name=document.createElement('span');name.className='screen-name-display';name.textContent=screen.name;
+    const time=document.createElement('span');time.className='screen-timestamp-display';time.textContent=new Date(screen.savedAt).toLocaleString('ko-KR');
+    info.append(name,time);
+    const actions=document.createElement('div');actions.className='screen-item-actions';
+    const load=document.createElement('button');load.className='action-btn';load.textContent='새 페이지로 열기';load.onclick=()=>run(async()=>{await createPage(clone(screen.content));closeModal('loadSavedScreenModal');});
+    const del=document.createElement('button');del.className='action-btn delete-saved-item-btn';del.textContent='삭제';del.onclick=()=>{
+      if(confirm(`저장 화면 “${screen.name}”을 삭제할까요? 되돌릴 수 없습니다.`))run(async()=>{await store.deleteScreen(screen.id);sync.notify();await renderSavedScreens();});
+    };
+    actions.append(load,del);li.append(img,info,actions);box.append(li);
+  }
+}
+function downloadJSON(data,name) {
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+async function exportBackup() {
+  let saveError=false;try{await flush();}catch{saveError=true;}
+  const all=await store.listPages();
+  if(current && dirty){const index=all.findIndex(p=>p.id===current.id),local={...clone(current),content:capture()};if(index>=0)all[index]=local;else all.push(local);}
+  downloadJSON({format:'whiteboard-pages',schema:2,appVersion:VERSION,exportedAt:new Date().toISOString(),pages:all,screens:await store.listScreens()},`만능칠판-백업-${new Date().toISOString().slice(0,10)}.json`);
+  if(saveError)notify('자동저장 실패 상태의 현재 작업도 백업 파일에 포함했습니다.');
+}
+function reidentify(json) {json.objects?.forEach(o=>{o.id=uid();reidentify(o);});}
+async function importBackup(file) {
+  if(file.size>MAX_BACKUP_BYTES)throw Error('백업 파일은 100MB 이하여야 합니다.');
+  const input=JSON.parse(await file.text());
+  if(input.format!=='whiteboard-pages'||input.schema!==2||!Array.isArray(input.pages)||!Array.isArray(input.screens))throw Error('만능칠판 2.0 백업 파일이 아닙니다.');
+  if(input.pages.length+input.screens.length>1000)throw Error('백업 항목은 1,000개까지 한 번에 가져올 수 있습니다.');
+  const now=Date.now();
+  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:`페이지 ${Math.min(MAX_PAGES,i+1)}`,content,version:1,order:now+i,createdAt:now,updatedAt:now};});
+  const screens=[];
+  for(const s of input.screens) {
+    const content=validateContent(s.content);
+    screens.push({id:uid(),name:String(s.name||'가져온 화면').slice(0,100),savedAt:now,content,thumbnail:await makeThumbnail(content)});
+  }
+  await flush();await store.appendBackup(imported,screens);sync.notify();pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
+  if(imported.length)await setPage(imported[0],true,false);else renderPages();
+  notify(`페이지 ${imported.length}개와 저장 화면 ${screens.length}개를 추가했습니다. 기존 데이터는 유지했습니다.`);
+}
+async function importLegacy() {
+  if(await store.getMeta('legacyImported') && !confirm('이전 데이터를 이미 가져온 적이 있습니다. 다시 가져오면 중복될 수 있습니다. 계속할까요?'))return;
+  const legacy=await readLegacy();if(!legacy.auto && !legacy.screens.length){notify('이 주소에서 구버전 저장 데이터를 찾지 못했습니다.');return;}
+  const clean=json=>{
+    const content={canvas:typeof json==='string'?JSON.parse(json):clone(json),frame:{width:c.width,height:c.height,cx:2400,cy:1600}};
+    normalizedObjects(content.canvas.objects || []);return validateContent(content);
+  };
+  const now=Date.now(),imported=[],screens=[];
+  if(legacy.auto)imported.push({id:uid(),name:'페이지 1',content:clean(legacy.auto),version:1,order:now,createdAt:now,updatedAt:now});
+  for(const s of legacy.screens) {
+    const content=clean(s.canvasData || s);screens.push({id:uid(),name:String(s.displayName||'이전 저장 화면').slice(0,100),savedAt:now,content,thumbnail:await makeThumbnail(content)});
+  }
+  await flush();await store.appendBackup(imported,screens);await store.setMeta('legacyImported',true);sync.notify();pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
+  if(imported.length)await setPage(imported[0],true,false);else renderPages();
+  notify(`이전 자동저장 ${imported.length}개와 저장 화면 ${screens.length}개를 가져왔습니다. 원본 데이터는 유지했습니다.`);
+}
+async function refreshRemote() {
+  if(syncing || busy || dirty || saving || tools?.gesture || isTextEditing() || modalOpen() || !current)return;
+  syncing=true;
+  try {
+    const all=await store.listPages();
+    if(busy || dirty || saving || tools.gesture || isTextEditing() || modalOpen())return;
+    pages=all;const remote=all.find(p=>p.id===current.id);
+    if(!remote || remote.version!==current.version) {
+      await run(async()=>{
+        const next=remote || all[0] || await store.ensurePage(emptyContent(c.width,c.height));
+        if(!all.length)pages=await store.listPages();
+        await setPage(next,true);status('다른 탭의 변경을 반영했습니다.');
+      },'다른 탭의 변경을 반영하는 중입니다.');
+    } else renderPages();
+  } catch(e){console.error('탭 동기화 오류',e);status('동기화 확인 실패','error');}
+  finally{syncing=false;}
+}
+function wireUI() {
+  document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=()=>togglePopup(b.dataset.popup,b));
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.tip-up-settings,[data-popup]'))closePopups();});
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
+  const modeMap={penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
+  Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
+  $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
+  document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>setColor(b.dataset.tool,b.dataset.color));
+  $('penSizeSelect').onchange=e=>{tools.pen.width=Number(e.target.value);tools.updateBrush();};
+  $('markerSizeSelect').onchange=e=>{tools.marker.width=Number(e.target.value);tools.updateBrush();};
+  $('freeTextSizeSelect').onchange=e=>{
+    tools.text.size=Number(e.target.value);const o=c.getActiveObject();
+    if(o && ['text','i-text','textbox'].includes(o.type)){o.set('fontSize',tools.text.size);o.setCoords();c.requestRenderAll();changed();}
+  };
+  $('eraserTypeSelect').onchange=e=>{tools.eraser=e.target.value;};
+  $('deleteSelectionBtn').onclick=deleteSelected;$('groupBtn').onclick=()=>groupObjects();$('ungroupBtn').onclick=()=>groupObjects(true);
+  $('undoBtn').onclick=()=>run(()=>stepHistory(-1));$('redoBtn').onclick=()=>run(()=>stepHistory(1));
+  $('clearAllBtn').onclick=()=>{if(allowed()&&confirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.')){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
+  $('zoomInBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()*1.25);};$('zoomOutBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()/1.25);};$('homeBtn').onclick=()=>{if(allowed())tools.home(current.content.frame);};
+  $('toolbarHideBtn').onclick=()=>{const hidden=!$('toolbar').hidden;$('toolbar').hidden=hidden;$('toolbarHideBtn').textContent=hidden?'▲':'▼';$('toolbarHideBtn').setAttribute('aria-expanded',String(!hidden));closePopups();};
+  $('prevPageBtn').onclick=()=>{const i=pageIndex();if(i>0)run(()=>activatePage(pages[i-1].id),'이전 페이지를 불러오는 중입니다.');};
+  $('nextPageBtn').onclick=()=>{const i=pageIndex();if(i>=0&&i<pages.length-1)run(()=>activatePage(pages[i+1].id),'다음 페이지를 불러오는 중입니다.');};
+  $('currentPageInput').addEventListener('change',e=>run(()=>goToPageNumber(e.target.value),'페이지를 불러오는 중입니다.'));
+  $('currentPageInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}});
+  $('addPageBtn').onclick=()=>run(()=>createPage(emptyContent(c.width,c.height)));
+  $('duplicatePageBtn').onclick=()=>run(()=>{const content=capture();reidentify(content.canvas);return createPage(content);});
+  $('deletePageBtn').onclick=()=>{if(!allowed()||pages.length<=1)return;if(confirm('현재 페이지를 삭제할까요? 페이지 삭제는 되돌릴 수 없습니다.'))run(async()=>{
+    await flush();const id=current.id;await store.deletePage(id,current.version);history.remove(id);delete session.views[id];sync.notify();pages=await store.listPages();
+    if(!pages.length){await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();}
+    await setPage(pages[0]);
+  });};
+  $('saveBtn').onclick=()=>{if(!allowed())return;$('saveScreenNameInput').value=current.name;openModal('saveConfirmModal');$('saveScreenNameInput').focus();$('saveScreenNameInput').select();};
+  $('confirmSaveBtn').onclick=()=>run(async()=>{
+    const name=$('saveScreenNameInput').value.trim() || '제목 없음';await flush();const content=capture(),thumbnail=await makeThumbnail(content);
+    await store.putScreen({id:uid(),name,savedAt:Date.now(),content,thumbnail});sync.notify();closeModal('saveConfirmModal');notify('현재 페이지를 저장 화면으로 보관했습니다.');
+  },'홈 100% 미리보기를 만드는 중입니다.');
+  $('saveScreenNameInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmSaveBtn').click();}});
+  $('loadGeneralBtn').onclick=()=>run(async()=>{await renderSavedScreens();openModal('loadSavedScreenModal');});
+  $('copyBtn').onclick=()=>clipboard.copy();$('pasteBtn').onclick=()=>clipboard.paste();
+  $('importFileBtn').onclick=()=>{closePopups();$('fileInput').click();};
+  $('fileInput').onchange=e=>{const files=Array.from(e.target.files);e.target.value='';if(files.length)run(()=>importFiles(files),'파일을 가져오는 중입니다.');};
+  $('cancelImportBtn').onclick=()=>{importAbort?.abort();$('busyText').textContent='가져오기를 취소하는 중입니다.';};
+  $('exportBackupBtn').onclick=()=>run(exportBackup,'백업 파일을 만드는 중입니다.');
+  $('importBackupBtn').onclick=()=>{closePopups();$('backupInput').click();};
+  $('backupInput').onchange=e=>{const file=e.target.files[0];e.target.value='';if(file)run(()=>importBackup(file),'백업을 가져오는 중입니다.');};
+  $('importLegacyBtn').onclick=()=>run(importLegacy,'이전 데이터를 읽는 중입니다.');
+  $('helpBtn').onclick=()=>openModal('helpModal');
+  $('colorSettingsBtn').onclick=()=>togglePopup('colorSettings',$('colorSettingsBtn'));
+  let dragDepth=0;
+  document.addEventListener('dragenter',e=>{if(Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();dragDepth++;if(!busy&&!modalOpen())$('dropOverlay').hidden=false;}});
+  document.addEventListener('dragover',e=>{if(Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=busy?'none':'copy';}});
+  document.addEventListener('dragleave',()=>{dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)$('dropOverlay').hidden=true;});
+  document.addEventListener('drop',e=>{
+    e.preventDefault();dragDepth=0;$('dropOverlay').hidden=true;const files=Array.from(e.dataTransfer?.files||[]);
+    if(!files.length || !allowed())return;
+    const point=c.getPointer(e);run(()=>importFiles(files,point),'파일을 가져오는 중입니다.');
+  });
+  let spaceMode=null;
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape') {closePopups();document.querySelectorAll('.modal').forEach(m=>{if(m.style.display==='flex')closeModal(m.id);});if(!busy)finishText();return;}
+    if(modalOpen()) {
+      if(e.key==='Tab') {
+        const m=Array.from(document.querySelectorAll('.modal')).find(m=>m.style.display==='flex');
+        const a=Array.from(m.querySelectorAll('button:not(:disabled),input,select,[tabindex="0"]')).filter(n=>n.offsetParent!==null),first=a[0],last=a[a.length-1];
+        if(e.shiftKey&&document.activeElement===first){last.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first.focus();e.preventDefault();}
+      }return;
     }
+    if(busy || isTextEditing())return;
+    const cmd=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
+    if(cmd && key==='z'){e.preventDefault();run(()=>stepHistory(e.shiftKey?1:-1));}
+    else if(cmd && key==='y'){e.preventDefault();run(()=>stepHistory(1));}
+    else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
+    else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects(),{canvas:c}));c.requestRenderAll();}}
+    else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
+    else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}
+    else if(e.code==='Space'&&!e.repeat&&!tools.gesture){e.preventDefault();spaceMode=tools.mode;tools.setMode('move');}
+    else if(key==='home'){e.preventDefault();if(allowed())tools.home(current.content.frame);}
   });
-
-  fabricCanvas.on('mouse:up', function(opt) {
-    this.isDragging = false;
-    this.selection = true;
-    hideIndicator();
+  const releaseSpace=()=>{if(spaceMode){tools.up();tools.setMode(spaceMode);spaceMode=null;}};
+  document.addEventListener('keyup',e=>{if(e.code==='Space')releaseSpace();});window.addEventListener('blur',()=>{releaseSpace();tools.up();});
+  window.addEventListener('resize',()=>{
+    closePopups();const center=fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform)),z=c.getZoom();
+    c.setDimensions({width:window.innerWidth,height:window.innerHeight});c.setViewportTransform([z,0,0,z,c.width/2-center.x*z,c.height/2-center.y*z]);rememberView();
   });
-
-  
-    // 마우스 휠 조작이 끝나면 1초 뒤 안내창 자동 숨김
-    clearTimeout(window.zoomTimeout);
-    window.zoomTimeout = setTimeout(hideIndicator, 1000);
-  });
-
-
-
-}); // DOMContentLoaded 끝
+  window.addEventListener('beforeunload',e=>{if(dirty||saving){e.preventDefault();e.returnValue='';}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){finishText();flush().catch(fail);}else refreshRemote();});
+  window.addEventListener('focus',refreshRemote);
+}
+async function boot() {
+  if(!window.fabric)throw Error('캔버스 라이브러리를 불러오지 못했습니다. 인터넷 연결 또는 CDN 차단 여부를 확인하고 새로고침해주세요.');
+  c=new fabric.Canvas('whiteboardCanvas',{width:window.innerWidth,height:window.innerHeight,preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true});
+  fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});
+  tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&!busy&&!modalOpen(),onChange:changed,onViewport:rememberView,onText:p=>addText('텍스트',p,true),onMode:mode=>{
+    for(const [id,m] of Object.entries({penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'}))$(id).classList.toggle('active-select',mode===m);
+    $('selectMoveLabel').textContent=mode==='move'?'이동':'선택';$('selectMoveToggleBtn').classList.toggle('active-select',mode==='select');$('selectMoveToggleBtn').classList.toggle('active-move',mode==='move');
+    updateHistory();
+  }});
+  store=new BoardStore();await store.open();await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
+  sync=new TabSync(refreshRemote);
+  await setPage(pages.find(p=>p.id===session.activeId)||pages[0],true);
+  clipboard=new SystemClipboard({canvas:c,allowed,run,onChange:changed,onFiles:files=>importFiles(files),onText:text=>addText(text),notify,isTextEditing});
+  c.on('selection:created',updateHistory);c.on('selection:updated',updateHistory);c.on('selection:cleared',updateHistory);
+  c.on('object:modified',updateSelectionActions);c.on('after:render',()=>{if(!busy)updateSelectionActions();});
+  c.on('text:editing:exited',()=>{changed();flush().catch(fail);});
+  wireUI();busy=false;updateHistory();
+}
+boot().catch(error=>{console.error(error);$('fatalError').textContent=`앱을 시작하지 못했습니다. ${error.message} 파일을 직접 열지 말고 HTTPS 배포 주소 또는 localhost에서 실행해주세요.`;$('fatalError').hidden=false;status('시작 실패','error');});

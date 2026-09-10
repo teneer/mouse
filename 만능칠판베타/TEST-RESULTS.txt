@@ -1,0 +1,14 @@
+만능칠판 3.0 버전업 검사 결과
+
+2026-09-10
+
+- node --check script.js: PASS
+- node --check history.js: PASS
+- node --check data.js: PASS
+- node --check js/canvas-tools.js: PASS
+- node --test tests/*.test.mjs: PASS (22/22)
+- legacy custom color input refs (bgCustom/penCustom/markerCustom/textCustom): NONE
+- legacy page rename/page tab refs (renamePageBtn/pageTabs/pageCount): NONE
+- text:changed history listener: NONE
+
+브라우저 E2E는 이 환경에서 실행하지 않았습니다. 특히 Fabric.js 실제 선택 bounding box 위치 계산, 모바일 터치, IndexedDB 브라우저 동작, CDN 로딩은 배포 전 BROWSER-CHECKLIST.md에 따라 확인해야 합니다.
