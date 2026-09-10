@@ -1,4 +1,4 @@
-export const VERSION = '3.0.0';
+export const VERSION = '3.2.0';
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 10;
 export const DEFAULT_BG = '#D6B588';
