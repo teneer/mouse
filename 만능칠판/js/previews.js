@@ -9,15 +9,21 @@ export function loadCanvas(canvas, json) {
     } catch(e) {reject(e);}
   });
 }
-// Fixed home viewport at 100%, never object bounding-box-fit or current zoom/pan.
-export async function makeThumbnail(content, width=320) {
-  const {frame}=content, ratio=width/frame.width;
-  const c=new fabric.StaticCanvas(document.createElement('canvas'),{
-    width,height:Math.max(1,Math.round(frame.height*ratio)),enableRetinaScaling:false,renderOnAddRemove:false
-  });
+// The thumbnail mirrors the viewport that was visible when the screen was saved.
+// `viewportTransform` is a Fabric transform from canvas/world coordinates to screen pixels.
+export async function makeThumbnail(content,viewportTransform=null,viewportWidth=null,viewportHeight=null,width=320) {
+  const {frame}=content;
+  const sourceWidth=Number.isFinite(viewportWidth)&&viewportWidth>0?viewportWidth:frame.width;
+  const sourceHeight=Number.isFinite(viewportHeight)&&viewportHeight>0?viewportHeight:frame.height;
+  const ratio=width/sourceWidth;
+  const height=Math.max(1,Math.round(sourceHeight*ratio));
+  const c=new fabric.StaticCanvas(document.createElement('canvas'),{width,height,enableRetinaScaling:false,renderOnAddRemove:false});
   try {
     await loadCanvas(c,content.canvas);
-    c.setViewportTransform([ratio,0,0,ratio,width/2-frame.cx*ratio,c.height/2-frame.cy*ratio]);
+    const v=Array.isArray(viewportTransform)&&viewportTransform.length===6&&viewportTransform.every(Number.isFinite)
+      ? viewportTransform
+      : [1,0,0,1,sourceWidth/2-frame.cx,sourceHeight/2-frame.cy];
+    c.setViewportTransform(v.map((n,i)=>i<4?n*ratio:n*ratio));
     c.renderAll();
     return c.toDataURL({format:'png',multiplier:1});
   } finally {c.dispose();}

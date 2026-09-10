@@ -1,131 +1,139 @@
-Static checks (not a browser end-to-end test)
-clipboard.js: PASS
-data.js: PASS
-history.js: PASS
-js/canvas-tools.js: PASS
-js/conflicts.js: PASS
-js/constants.js: PASS
-js/files.js: PASS
-js/previews.js: PASS
-js/validation.js: PASS
-script.js: PASS
-tests/canvas-tools.test.mjs: PASS
-tests/core.test.mjs: PASS
-HTML duplicate IDs: 0
-Missing literal DOM IDs: 0
-Broken local module paths: 0
-Legacy layer/schedule UI residues: 0
+
+> test
+> node --test tests/*.test.mjs
 
 TAP version 13
 # Subtest: zoom clamps to 10% and 1000%
 ok 1 - zoom clamps to 10% and 1000%
   ---
-  duration_ms: 1.552147
+  duration_ms: 1.542801
+  type: 'test'
   ...
 # Subtest: home restores 100% at the fixed document center
 ok 2 - home restores 100% at the fixed document center
   ---
-  duration_ms: 0.685634
+  duration_ms: 0.615492
+  type: 'test'
   ...
 # Subtest: move mode disables selection and enables panning
 ok 3 - move mode disables selection and enables panning
   ---
-  duration_ms: 0.384738
+  duration_ms: 0.242974
+  type: 'test'
   ...
 # Subtest: pen and marker use separate settings and transparent marker
 ok 4 - pen and marker use separate settings and transparent marker
   ---
-  duration_ms: 0.3756
+  duration_ms: 0.251607
+  type: 'test'
   ...
 # Subtest: object erase is one history edit per gesture
 ok 5 - object erase is one history edit per gesture
   ---
-  duration_ms: 0.331897
+  duration_ms: 0.322093
+  type: 'test'
   ...
-# Subtest: area erase deletes intersecting object only and removes helper rectangle
-ok 6 - area erase deletes intersecting object only and removes helper rectangle
+# Subtest: eraser is object-only and repeated hits in one gesture save once
+ok 6 - eraser is object-only and repeated hits in one gesture save once
   ---
-  duration_ms: 0.349654
+  duration_ms: 0.189784
+  type: 'test'
   ...
 # Subtest: locked editor ignores pointer input
 ok 7 - locked editor ignores pointer input
   ---
-  duration_ms: 0.236083
+  duration_ms: 0.173229
+  type: 'test'
   ...
 # Subtest: text mode passes world pointer position to the editor
 ok 8 - text mode passes world pointer position to the editor
   ---
-  duration_ms: 0.205715
+  duration_ms: 0.137215
+  type: 'test'
   ...
 # Subtest: history: undo/redo is page-specific
 ok 9 - history: undo/redo is page-specific
   ---
-  duration_ms: 1.902495
+  duration_ms: 1.512776
+  type: 'test'
   ...
 # Subtest: history: an edit after undo clears redo
 ok 10 - history: an edit after undo clears redo
   ---
-  duration_ms: 0.19383
+  duration_ms: 0.186038
+  type: 'test'
   ...
 # Subtest: history: duplicate snapshots ignored
 ok 11 - history: duplicate snapshots ignored
   ---
-  duration_ms: 0.144925
+  duration_ms: 0.105818
+  type: 'test'
   ...
 # Subtest: history: item and memory bounds
 ok 12 - history: item and memory bounds
   ---
-  duration_ms: 0.171855
+  duration_ms: 0.203735
+  type: 'test'
   ...
 # Subtest: save: matching revision increments version
 ok 13 - save: matching revision increments version
   ---
-  duration_ms: 0.261774
+  duration_ms: 0.153981
+  type: 'test'
   ...
 # Subtest: save: concurrent same-page edit creates recovery page
 ok 14 - save: concurrent same-page edit creates recovery page
   ---
-  duration_ms: 0.299284
+  duration_ms: 0.261622
+  type: 'test'
   ...
 # Subtest: save: identical concurrent content does not create duplicate
 ok 15 - save: identical concurrent content does not create duplicate
   ---
-  duration_ms: 0.13032
+  duration_ms: 0.104126
+  type: 'test'
   ...
 # Subtest: save: remote deletion preserves an unsaved local edit in a recovery page
 ok 16 - save: remote deletion preserves an unsaved local edit in a recovery page
   ---
-  duration_ms: 0.142766
+  duration_ms: 0.088062
+  type: 'test'
   ...
 # Subtest: save: new page starts with version 1
 ok 17 - save: new page starts with version 1
   ---
-  duration_ms: 0.257203
+  duration_ms: 0.229864
+  type: 'test'
   ...
 # Subtest: validation: keeps supported nested groups but removes obsolete metadata
 ok 18 - validation: keeps supported nested groups but removes obsolete metadata
   ---
-  duration_ms: 0.551806
+  duration_ms: 0.692998
+  type: 'test'
   ...
 # Subtest: validation: rejects remote image URL and arbitrary Fabric class
 ok 19 - validation: rejects remote image URL and arbitrary Fabric class
   ---
-  duration_ms: 0.531632
+  duration_ms: 0.991335
+  type: 'test'
   ...
 # Subtest: validation: rejects non-finite frame and malformed path
 ok 20 - validation: rejects non-finite frame and malformed path
   ---
-  duration_ms: 0.290799
+  duration_ms: 0.23386
+  type: 'test'
   ...
 # Subtest: validation: strips method overrides and prototype keys
 ok 21 - validation: strips method overrides and prototype keys
   ---
-  duration_ms: 0.184736
+  duration_ms: 0.192358
+  type: 'test'
   ...
 # Subtest: validation: embedded PNG remains accepted
 ok 22 - validation: embedded PNG remains accepted
   ---
-  duration_ms: 0.320219
+  duration_ms: 0.167971
+  type: 'test'
   ...
 1..22
 # tests 22
@@ -135,4 +143,4 @@ ok 22 - validation: embedded PNG remains accepted
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 182.117432
+# duration_ms 112.014923

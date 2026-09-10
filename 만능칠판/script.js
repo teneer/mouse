@@ -7,13 +7,19 @@ import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {decodeFiles} from './js/files.js';
 import {validateContent} from './js/validation.js';
 const $=id=>document.getElementById(id);
-let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0;
-let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null;
+let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
+let autosaveTimer,toastTimer,saveFadeTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,importLayoutResolver=null;
 const history=new PageHistory(),knownVersions=new Map();
+const MAX_PAGES=10;
 try {session=JSON.parse(sessionStorage.getItem(SESSION_KEY)) || session;} catch {}
 if(!session.views || typeof session.views!=='object')session.views={};
 function notify(message) {$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
-function status(message,state='ok') {$('saveStatus').textContent=message;$('saveStatus').dataset.state=state;}
+function status(message,state='ok') {
+  const el=$('saveStatus');
+  clearTimeout(saveFadeTimer);
+  el.textContent=message;el.dataset.state=state;el.classList.remove('fade-out');
+  if(state==='ok' && message==='자동저장 완료') saveFadeTimer=setTimeout(()=>el.classList.add('fade-out'),1200);
+}
 function fail(error) {console.error(error);notify(error?.message || String(error));}
 function modalOpen() {return Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
 function isTextEditing() {
@@ -33,9 +39,10 @@ function capture() {
   const json=c.toJSON(SERIAL_PROPS);normalizedObjects(json.objects);
   return {canvas:json,frame:{...current.content.frame,width:c.width,height:c.height}};
 }
-function changed() {
+function changed({recordHistory=true}={}) {
   if(!current)return;
-  current.content=capture();dirty=true;generation++;history.push(current.id,current.content);
+  current.content=capture();dirty=true;generation++;
+  if(recordHistory)history.push(current.id,current.content);
   status('저장 대기 중입니다.');updateHistory();
   clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>flush().catch(fail),350);
 }
@@ -74,14 +81,14 @@ function restoreInteraction() {
 }
 async function run(fn,label='처리 중입니다.') {
   if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
-  finishText();busy=true;closePopups();$('busyText').textContent=label;$('busyOverlay').hidden=false;
+  finishText();busy=true;closePopups();
   c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
   try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
-  finally {busy=false;importAbort=null;$('cancelImportBtn').hidden=true;$('busyOverlay').hidden=true;restoreInteraction();updateHistory();}
+  finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
 }
 async function setPage(page,reset=false,keepView=true) {
   rememberView();const previous=current?clone(current):null;
-  current=clone(page);dirty=false;
+  current=clone(page);const pageNumber=Math.min(MAX_PAGES,Math.max(1,pages.findIndex(p=>p.id===page.id)+1));current.name=`페이지 ${pageNumber}`;dirty=false;
   try {await loadCanvas(c,current.content.canvas);}catch(error){
     current=previous;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
   }
@@ -91,39 +98,92 @@ async function setPage(page,reset=false,keepView=true) {
     c.setViewportTransform(view.slice());rememberView();
   } else tools.home(current.content.frame);
   if(reset || !history.pages.has(page.id) || knownVersions.get(page.id)!==page.version)history.reset(page.id,current.content);
-  knownVersions.set(page.id,page.version);if(/^#[0-9a-f]{6}$/i.test(c.backgroundColor))$('bgCustom').value=c.backgroundColor;renderPages();updateHistory();status('자동저장 완료');
+  knownVersions.set(page.id,page.version);renderPages();updateHistory();updateSelectionActions();status('자동저장 완료');
 }
 async function activatePage(id) {
   await flush();const p=await store.getPage(id);if(!p || p.deleted)throw Error('삭제된 페이지입니다.');await setPage(p);
 }
-async function createPage(content,name) {
-  await flush();const now=Date.now();
-  const result=await store.commitPage({id:uid(),name:name.slice(0,100),content,version:0,order:now,createdAt:now},0);
+async function createPage(content) {
+  await flush();
+  if(pages.length>=MAX_PAGES){notify(`페이지는 최대 ${MAX_PAGES}개까지 사용할 수 있습니다.`);return;}
+  const now=Date.now(),number=pages.length+1;
+  const result=await store.commitPage({id:uid(),name:`페이지 ${number}`,content,version:0,order:now,createdAt:now},0);
   sync.notify();pages=await store.listPages();await setPage(result.page,true,false);
 }
 function renderPages() {
-  const box=$('pageTabs');box.replaceChildren();
-  pages.forEach((p,index)=>{
-    const b=document.createElement('button');b.className='mode-btn';b.textContent=p.name;b.title=`${index+1}. ${p.name}`;
-    b.setAttribute('aria-current',String(p.id===current?.id));
-    if(p.id===current?.id)b.classList.add('active-select');
-    b.onclick=()=>{if(p.id!==current?.id)run(()=>activatePage(p.id),'페이지를 불러오는 중입니다.');};box.append(b);
-  });
-  $('pageCount').textContent=`${pages.length}페이지`;
+  pages=pages.slice(0,MAX_PAGES);
+  const index=Math.max(0,pages.findIndex(p=>p.id===current?.id));
+  $('currentPageInput').value=String(index+1);
+  $('prevPageBtn').disabled=index<=0 || pages.length<=1;
+  $('nextPageBtn').disabled=index<0 || index>=pages.length-1 || pages.length<=1;
+  $('addPageBtn').disabled=pages.length>=MAX_PAGES;
+  $('duplicatePageBtn').disabled=pages.length>=MAX_PAGES;
   $('deletePageBtn').disabled=pages.length<=1;
 }
+function pageIndex() { return Math.max(0,pages.findIndex(p=>p.id===current?.id)); }
+async function goToPageNumber(value) {
+  if(busy||!current)return;
+  const parsed=Number.parseInt(String(value).trim(),10);
+  if(!Number.isFinite(parsed)) {renderPages();return;}
+  const target=Math.min(MAX_PAGES,Math.max(1,parsed));
+  const max=Math.min(MAX_PAGES,pages.length);
+  if(target>max){renderPages();return;}
+  const p=pages[target-1]; if(p && p.id!==current.id) await activatePage(p.id); else renderPages();
+}
 function updateHistory() {
-  $('undoBtn').disabled=busy||!current||!history.canUndo(current.id);
-  $('redoBtn').disabled=busy||!current||!history.canRedo(current.id);
-  const object=c?.getActiveObject(),multiple=object?.type==='activeSelection';
-  $('groupBtn').disabled=busy||!multiple;$('ungroupBtn').disabled=busy||object?.type!=='group';
+  // Undo/Redo availability reflects history state only. A save/import operation must not
+  // permanently make the controls appear disabled. historyBusy prevents double execution.
+  $('undoBtn').disabled=!current||historyBusy||!history.canUndo(current.id);
+  $('redoBtn').disabled=!current||historyBusy||!history.canRedo(current.id);
+  const object=c?.getActiveObject();
   $('deleteSelectionBtn').disabled=busy||!object;
+  updateSelectionActions();
+}
+function updateSelectionActions() {
+  const host=$('selectionActions'); if(!host||!c)return;
+  const object=c.getActiveObject(),multiple=object?.type==='activeSelection',group=object?.type==='group';
+  const visible=!!object && !busy && (multiple || group);
+  host.hidden=!visible;
+  if(!visible)return;
+  $('groupBtn').hidden=!multiple;
+  $('ungroupBtn').hidden=!group;
+  const rect=object.getBoundingRect(true,true);
+  const margin=8, gap=8, w=host.offsetWidth||120, h=host.offsetHeight||40;
+  const candidates=[
+    {left:rect.left+rect.width/2-w/2,top:rect.top-h-gap},
+    {left:rect.left+rect.width/2-w/2,top:rect.top+rect.height+gap},
+    {left:rect.left-w-gap,top:rect.top+rect.height/2-h/2},
+    {left:rect.left+rect.width+gap,top:rect.top+rect.height/2-h/2}
+  ];
+  const fits=p=>p.left>=margin&&p.top>=margin&&p.left+w<=innerWidth-margin&&p.top+h<=innerHeight-margin;
+  const pos=candidates.find(fits)||{
+    left:Math.min(innerWidth-w-margin,Math.max(margin,rect.left+rect.width/2-w/2)),
+    top:Math.min(innerHeight-h-margin,Math.max(margin,rect.top+rect.height+gap))
+  };
+  host.style.left=`${pos.left}px`;host.style.top=`${pos.top}px`;
 }
 async function stepHistory(direction) {
+  if(!current || historyBusy || busy || modalOpen() || tools?.gesture || isTextEditing()) return;
   const before=history.pages.get(current.id)?.index;
-  const content=history.step(current.id,direction);if(!content)return;
-  try {await loadCanvas(c,content.canvas);} catch(e){history.pages.get(current.id).index=before;await loadCanvas(c,current.content.canvas);throw e;}
-  current.content=content;tools.setMode('select');dirty=true;generation++;await flush();updateHistory();
+  const content=history.step(current.id,direction);
+  if(!content){updateHistory();return;}
+  historyBusy=true; updateHistory();
+  try {
+    await loadCanvas(c,content.canvas);
+    current.content=content;
+    tools.setMode('select');
+    dirty=true; generation++;
+    // Save the resulting state, but do not create another history entry.
+    await flush();
+  } catch(e) {
+    const h=history.pages.get(current.id);
+    if(h) h.index=before;
+    await loadCanvas(c,current.content.canvas);
+    throw e;
+  } finally {
+    historyBusy=false;
+    updateHistory();
+  }
 }
 function deleteSelected() {
   if(!allowed() || isTextEditing())return;
@@ -144,23 +204,52 @@ function addText(text,point,editing=false) {
   const center=point || fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
   const object=new fabric.IText(text,{left:center.x,top:center.y,fontFamily:'Arial',fontSize:tools.text.size,fill:tools.text.color,id:uid()});
   if(!point)object.setPositionByOrigin(center,'center','center');
-  c.add(object);c.setActiveObject(object);object.setCoords();c.requestRenderAll();changed();
+  c.add(object);c.setActiveObject(object);object.setCoords();c.requestRenderAll();changed({recordHistory:!editing});
   if(editing){object.enterEditing();object.selectAll();}
 }
+function chooseImportColumns(count) {
+  if(count<=1)return Promise.resolve(1);
+  return new Promise(resolve=>{
+    importLayoutResolver=resolve;
+    const modal=$('importLayoutModal');
+    $('importLayoutCount').textContent=`${count}개 항목을 몇 열로 배치할까요?`;
+    const buttons=Array.from(modal.querySelectorAll('[data-columns]'));
+    const finish=value=>{importLayoutResolver=null;$('importLayoutModal').style.display='none';if(modalFocus&&typeof modalFocus.focus==='function')modalFocus.focus();modalFocus=null;resolve(value);};
+    buttons.forEach(b=>b.onclick=()=>finish(Number(b.dataset.columns)));
+    openModal('importLayoutModal');
+    buttons.forEach(b=>b.classList.toggle('selected',Number(b.dataset.columns)===Math.min(4,count)));
+  });
+}
 async function importFiles(files,point) {
-  importAbort=new AbortController();$('cancelImportBtn').hidden=false;
-  const decoded=await decodeFiles(files,{signal:importAbort.signal,onProgress:t=>$('busyText').textContent=t});
+  importAbort=new AbortController();
+  const decoded=await decodeFiles(files,{signal:importAbort.signal});
   if(!decoded.length)return;
+  const columns=await chooseImportColumns(decoded.length);
+  if(!columns)return;
   tools.setMode('select');
   const center=point || fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
-  let y=center.y;const width=Math.min(800,c.width/c.getZoom()*0.75),added=[];
-  decoded.forEach(({image})=>{
-    image.scale(Math.min(1,width/image.width));image.set({left:center.x-image.getScaledWidth()/2,top:y,id:uid()});
-    c.add(image);image.setCoords();added.push(image);y+=image.getScaledHeight()+24;
-  });
+  const gap=24, maxWidth=Math.min(800,c.width/c.getZoom()*0.75), cellWidth=Math.max(40,(maxWidth-gap*(columns-1))/columns);
+  const added=[];
+  for(let i=0;i<decoded.length;i++) {
+    const image=decoded[i].image;
+    image.scale(Math.min(1,cellWidth/image.width));
+    const col=i%columns;
+    const rowStartX=center.x-maxWidth/2;
+    image.set({left:rowStartX+col*(cellWidth+gap)+(cellWidth-image.getScaledWidth())/2,top:center.y,id:uid()});
+    image.setCoords();c.add(image);added.push(image);
+  }
+  // Recompute row positions so each row uses its own height and remains left-aligned.
+  let y=center.y;
+  for(let row=0;row<Math.ceil(added.length/columns);row++) {
+    const items=added.slice(row*columns,(row+1)*columns);
+    const rowH=Math.max(...items.map(o=>o.getScaledHeight()));
+    items.forEach((o,col)=>{o.set({top:y});o.setCoords();});
+    y+=rowH+gap;
+  }
   c.setActiveObject(added.length===1?added[0]:new fabric.ActiveSelection(added,{canvas:c}));c.requestRenderAll();changed();
-  notify(`${added.length}개 이미지를 배치했습니다.${added.length>1?' 아래쪽으로 이동하면 나머지 내용을 볼 수 있습니다.':''}`);
+  notify(`${added.length}개 이미지를 ${columns}열로 배치했습니다.`);
 }
+
 function setColor(tool,color) {
   if(busy || !current)return;
   if(tool==='bg'){c.setBackgroundColor(color,()=>c.requestRenderAll());changed();}
@@ -168,8 +257,8 @@ function setColor(tool,color) {
     tools.text.color=color;const o=c.getActiveObject();
     if(o && ['i-text','text','textbox'].includes(o.type)){o.set('fill',color);c.requestRenderAll();changed();}
   } else {tools[tool].color=color;tools.updateBrush();}
-  const input=$(tool==='bg'?'bgCustom':tool==='text'?'textCustom':`${tool}Custom`);if(input)input.value=color;
-  document.querySelectorAll(`.color-btn[data-tool="${tool}"]`).forEach(b=>b.classList.toggle('selected',b.dataset.color===color));
+  document.querySelectorAll(`.color-btn[data-tool="${tool}"]`).forEach(b=>b.classList.toggle('selected',b.dataset.color.toLowerCase()===String(color).toLowerCase()));
+  document.querySelectorAll(`.custom-color-input[data-tool="${tool}"]`).forEach(input=>input.value=color);
 }
 let openedPopup=null;
 function closePopups() {document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup]').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
@@ -181,12 +270,34 @@ function togglePopup(id,button) {
   p.style.top=Math.max(8,rect.top-p.offsetHeight-8)+'px';
 }
 function openModal(id) {closePopups();finishText();modalFocus=document.activeElement;$(id).style.display='flex';$(id).querySelector('input,button')?.focus();}
-function closeModal(id) {$(id).style.display='none';modalFocus?.focus();}
+function closeModal(id) {
+  $(id).style.display='none';
+  if(id==='confirmModal' && confirmResolver){const resolve=confirmResolver;confirmResolver=null;resolve(false);}
+  if(id==='importLayoutModal' && importLayoutResolver){const resolve=importLayoutResolver;importLayoutResolver=null;resolve(null);}
+  if(modalFocus&&typeof modalFocus.focus==='function')modalFocus.focus();modalFocus=null;
+}
+function askConfirm(message,{title='확인',confirmText='확인',cancelText='취소'}={}) {
+  return new Promise(resolve=>{
+    if(confirmResolver)confirmResolver(false);
+    confirmResolver=resolve;
+    $('confirmModalTitle').textContent=title;
+    $('confirmModalMessage').textContent=message;
+    $('confirmModalOkBtn').textContent=confirmText;
+    $('confirmModalCancelBtn').textContent=cancelText;
+    openModal('confirmModal');
+  });
+}
+function resolveConfirm(value) {
+  const resolve=confirmResolver;confirmResolver=null;
+  $('confirmModal').style.display='none';
+  if(modalFocus&&typeof modalFocus.focus==='function')modalFocus.focus();modalFocus=null;
+  resolve?.(value);
+}
 async function renderSavedScreens() {
   const screens=await store.listScreens();const box=$('savedScreenList');box.replaceChildren();$('noSavedScreens').hidden=!!screens.length;
   for(const screen of screens) {
     const li=document.createElement('li');li.className='saved-screen-list-item';
-    const img=document.createElement('img');img.className='saved-preview';img.alt=`${screen.name}: 홈 100% 화면 미리보기`;img.loading='lazy';
+    const img=document.createElement('img');img.className='saved-preview';img.alt=`${screen.name}: 저장 당시 위치와 배율 미리보기`;img.loading='lazy';
     if(screen.thumbnail)img.src=screen.thumbnail;
     else {try{img.src=await makeThumbnail(screen.content);}catch{img.alt='미리보기를 생성하지 못했습니다.';}}
     const info=document.createElement('div');info.className='screen-info-container';
@@ -194,9 +305,9 @@ async function renderSavedScreens() {
     const time=document.createElement('span');time.className='screen-timestamp-display';time.textContent=new Date(screen.savedAt).toLocaleString('ko-KR');
     info.append(name,time);
     const actions=document.createElement('div');actions.className='screen-item-actions';
-    const load=document.createElement('button');load.className='action-btn';load.textContent='새 페이지로 열기';load.onclick=()=>run(async()=>{await createPage(clone(screen.content),screen.name);closeModal('loadSavedScreenModal');});
+    const load=document.createElement('button');load.className='action-btn';load.textContent='새 페이지로 열기';load.onclick=()=>run(async()=>{await createPage(clone(screen.content));closeModal('loadSavedScreenModal');});
     const del=document.createElement('button');del.className='action-btn delete-saved-item-btn';del.textContent='삭제';del.onclick=()=>{
-      if(confirm(`저장 화면 “${screen.name}”을 삭제할까요? 되돌릴 수 없습니다.`))run(async()=>{await store.deleteScreen(screen.id);sync.notify();await renderSavedScreens();});
+      askConfirm(`저장 화면 “${screen.name}”을 삭제할까요? 되돌릴 수 없습니다.`,{title:'저장 화면 삭제',confirmText:'삭제'}).then(ok=>{if(ok)run(async()=>{await store.deleteScreen(screen.id);sync.notify();await renderSavedScreens();});});
     };
     actions.append(load,del);li.append(img,info,actions);box.append(li);
   }
@@ -219,29 +330,29 @@ async function importBackup(file) {
   if(input.format!=='whiteboard-pages'||input.schema!==2||!Array.isArray(input.pages)||!Array.isArray(input.screens))throw Error('만능칠판 2.0 백업 파일이 아닙니다.');
   if(input.pages.length+input.screens.length>1000)throw Error('백업 항목은 1,000개까지 한 번에 가져올 수 있습니다.');
   const now=Date.now();
-  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:String(p.name || '가져온 페이지').slice(0,100),content,version:1,order:now+i,createdAt:now,updatedAt:now};});
+  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:`페이지 ${Math.min(MAX_PAGES,i+1)}`,content,version:1,order:now+i,createdAt:now,updatedAt:now};});
   const screens=[];
   for(const s of input.screens) {
     const content=validateContent(s.content);
     screens.push({id:uid(),name:String(s.name||'가져온 화면').slice(0,100),savedAt:now,content,thumbnail:await makeThumbnail(content)});
   }
-  await flush();await store.appendBackup(imported,screens);sync.notify();pages=await store.listPages();
+  await flush();await store.appendBackup(imported,screens);sync.notify();pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   if(imported.length)await setPage(imported[0],true,false);else renderPages();
   notify(`페이지 ${imported.length}개와 저장 화면 ${screens.length}개를 추가했습니다. 기존 데이터는 유지했습니다.`);
 }
 async function importLegacy() {
-  if(await store.getMeta('legacyImported') && !confirm('이전 데이터를 이미 가져온 적이 있습니다. 다시 가져오면 중복될 수 있습니다. 계속할까요?'))return;
+  if(await store.getMeta('legacyImported') && !(await askConfirm('이전 데이터를 이미 가져온 적이 있습니다. 다시 가져오면 중복될 수 있습니다. 계속할까요?',{title:'이전 데이터 가져오기',confirmText:'계속'})))return;
   const legacy=await readLegacy();if(!legacy.auto && !legacy.screens.length){notify('이 주소에서 구버전 저장 데이터를 찾지 못했습니다.');return;}
   const clean=json=>{
     const content={canvas:typeof json==='string'?JSON.parse(json):clone(json),frame:{width:c.width,height:c.height,cx:2400,cy:1600}};
     normalizedObjects(content.canvas.objects || []);return validateContent(content);
   };
   const now=Date.now(),imported=[],screens=[];
-  if(legacy.auto)imported.push({id:uid(),name:'이전 자동저장',content:clean(legacy.auto),version:1,order:now,createdAt:now,updatedAt:now});
+  if(legacy.auto)imported.push({id:uid(),name:'페이지 1',content:clean(legacy.auto),version:1,order:now,createdAt:now,updatedAt:now});
   for(const s of legacy.screens) {
     const content=clean(s.canvasData || s);screens.push({id:uid(),name:String(s.displayName||'이전 저장 화면').slice(0,100),savedAt:now,content,thumbnail:await makeThumbnail(content)});
   }
-  await flush();await store.appendBackup(imported,screens);await store.setMeta('legacyImported',true);sync.notify();pages=await store.listPages();
+  await flush();await store.appendBackup(imported,screens);await store.setMeta('legacyImported',true);sync.notify();pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   if(imported.length)await setPage(imported[0],true,false);else renderPages();
   notify(`이전 자동저장 ${imported.length}개와 저장 화면 ${screens.length}개를 가져왔습니다. 원본 데이터는 유지했습니다.`);
 }
@@ -263,46 +374,52 @@ async function refreshRemote() {
   finally{syncing=false;}
 }
 function wireUI() {
-  document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=()=>togglePopup(b.dataset.popup,b));
+  document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=()=>{
+    const mode=b.dataset.toolMode;
+    if(mode && allowed()){finishText();tools.setMode(mode);}
+    togglePopup(b.dataset.popup,b);
+  });
   document.addEventListener('pointerdown',e=>{if(!e.target.closest('.tip-up-settings,[data-popup]'))closePopups();});
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  $('confirmModalOkBtn').onclick=()=>resolveConfirm(true);$('confirmModalCancelBtn').onclick=()=>resolveConfirm(false);
   document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
   const modeMap={penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
   Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
   $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
   document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>setColor(b.dataset.tool,b.dataset.color));
-  for(const tool of ['bg','pen','marker','text'])$(tool==='bg'?'bgCustom':`${tool}Custom`).addEventListener('input',e=>setColor(tool,e.target.value));
+  document.querySelectorAll('.custom-color-input').forEach(input=>input.oninput=e=>setColor(e.target.dataset.tool,e.target.value));
   $('penSizeSelect').onchange=e=>{tools.pen.width=Number(e.target.value);tools.updateBrush();};
   $('markerSizeSelect').onchange=e=>{tools.marker.width=Number(e.target.value);tools.updateBrush();};
   $('freeTextSizeSelect').onchange=e=>{
     tools.text.size=Number(e.target.value);const o=c.getActiveObject();
     if(o && ['text','i-text','textbox'].includes(o.type)){o.set('fontSize',tools.text.size);o.setCoords();c.requestRenderAll();changed();}
   };
-  $('eraserTypeSelect').onchange=e=>{tools.eraser=e.target.value;};
   $('deleteSelectionBtn').onclick=deleteSelected;$('groupBtn').onclick=()=>groupObjects();$('ungroupBtn').onclick=()=>groupObjects(true);
-  $('undoBtn').onclick=()=>run(()=>stepHistory(-1));$('redoBtn').onclick=()=>run(()=>stepHistory(1));
-  $('clearAllBtn').onclick=()=>{if(allowed()&&confirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.')){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
+  $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
+  $('clearAllBtn').onclick=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.',{title:'전체 삭제',confirmText:'전체 삭제'})){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
   $('zoomInBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()*1.25);};$('zoomOutBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()/1.25);};$('homeBtn').onclick=()=>{if(allowed())tools.home(current.content.frame);};
   $('toolbarHideBtn').onclick=()=>{const hidden=!$('toolbar').hidden;$('toolbar').hidden=hidden;$('toolbarHideBtn').textContent=hidden?'▲':'▼';$('toolbarHideBtn').setAttribute('aria-expanded',String(!hidden));closePopups();};
-  $('addPageBtn').onclick=()=>run(()=>createPage(emptyContent(c.width,c.height),`페이지 ${pages.length+1}`));
-  $('duplicatePageBtn').onclick=()=>run(()=>{const content=capture();reidentify(content.canvas);return createPage(content,`${current.name} 복사`);});
-  $('renamePageBtn').onclick=()=>{if(!allowed())return;const name=prompt('페이지 이름을 입력해주세요.',current.name);if(name?.trim())run(async()=>{await flush();current.name=name.trim().slice(0,100);dirty=true;generation++;await flush();});};
-  $('deletePageBtn').onclick=()=>{if(!allowed()||pages.length<=1)return;if(confirm(`“${current.name}” 페이지를 삭제할까요? 페이지 삭제는 되돌릴 수 없습니다.`))run(async()=>{
+  $('prevPageBtn').onclick=()=>{const i=pageIndex();if(i>0)run(()=>activatePage(pages[i-1].id),'이전 페이지를 불러오는 중입니다.');};
+  $('nextPageBtn').onclick=()=>{const i=pageIndex();if(i>=0&&i<pages.length-1)run(()=>activatePage(pages[i+1].id),'다음 페이지를 불러오는 중입니다.');};
+  $('currentPageInput').addEventListener('change',e=>run(()=>goToPageNumber(e.target.value),'페이지를 불러오는 중입니다.'));
+  $('currentPageInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}});
+  $('addPageBtn').onclick=()=>run(()=>createPage(emptyContent(c.width,c.height)));
+  $('duplicatePageBtn').onclick=()=>run(()=>{const content=capture();reidentify(content.canvas);return createPage(content);});
+  $('deletePageBtn').onclick=async()=>{if(!allowed()||pages.length<=1)return;if(await askConfirm('현재 페이지를 삭제할까요? 페이지 삭제는 되돌릴 수 없습니다.',{title:'페이지 삭제',confirmText:'삭제'}))run(async()=>{
     await flush();const id=current.id;await store.deletePage(id,current.version);history.remove(id);delete session.views[id];sync.notify();pages=await store.listPages();
     if(!pages.length){await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();}
     await setPage(pages[0]);
   });};
   $('saveBtn').onclick=()=>{if(!allowed())return;$('saveScreenNameInput').value=current.name;openModal('saveConfirmModal');$('saveScreenNameInput').focus();$('saveScreenNameInput').select();};
   $('confirmSaveBtn').onclick=()=>run(async()=>{
-    const name=$('saveScreenNameInput').value.trim() || '제목 없음';await flush();const content=capture(),thumbnail=await makeThumbnail(content);
+    const name=$('saveScreenNameInput').value.trim() || '제목 없음';await flush();const content=capture(),thumbnail=await makeThumbnail(content,c.viewportTransform,c.width,c.height);
     await store.putScreen({id:uid(),name,savedAt:Date.now(),content,thumbnail});sync.notify();closeModal('saveConfirmModal');notify('현재 페이지를 저장 화면으로 보관했습니다.');
-  },'홈 100% 미리보기를 만드는 중입니다.');
+  },'저장 화면을 만드는 중입니다.');
   $('saveScreenNameInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmSaveBtn').click();}});
   $('loadGeneralBtn').onclick=()=>run(async()=>{await renderSavedScreens();openModal('loadSavedScreenModal');});
   $('copyBtn').onclick=()=>clipboard.copy();$('pasteBtn').onclick=()=>clipboard.paste();
   $('importFileBtn').onclick=()=>{closePopups();$('fileInput').click();};
   $('fileInput').onchange=e=>{const files=Array.from(e.target.files);e.target.value='';if(files.length)run(()=>importFiles(files),'파일을 가져오는 중입니다.');};
-  $('cancelImportBtn').onclick=()=>{importAbort?.abort();$('busyText').textContent='가져오기를 취소하는 중입니다.';};
   $('exportBackupBtn').onclick=()=>run(exportBackup,'백업 파일을 만드는 중입니다.');
   $('importBackupBtn').onclick=()=>{closePopups();$('backupInput').click();};
   $('backupInput').onchange=e=>{const file=e.target.files[0];e.target.value='';if(file)run(()=>importBackup(file),'백업을 가져오는 중입니다.');};
@@ -315,7 +432,7 @@ function wireUI() {
   document.addEventListener('drop',e=>{
     e.preventDefault();dragDepth=0;$('dropOverlay').hidden=true;const files=Array.from(e.dataTransfer?.files||[]);
     if(!files.length || !allowed())return;
-    const point=c.getPointer(e);run(()=>importFiles(files,point),'파일을 가져오는 중입니다.');
+    run(()=>importFiles(files),'파일을 가져오는 중입니다.');
   });
   let spaceMode=null;
   document.addEventListener('keydown',e=>{
@@ -327,10 +444,11 @@ function wireUI() {
         if(e.shiftKey&&document.activeElement===first){last.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first.focus();e.preventDefault();}
       }return;
     }
-    if(busy || isTextEditing())return;
+    if(isTextEditing())return;
     const cmd=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
-    if(cmd && key==='z'){e.preventDefault();run(()=>stepHistory(e.shiftKey?1:-1));}
-    else if(cmd && key==='y'){e.preventDefault();run(()=>stepHistory(1));}
+    if(cmd && key==='z'){e.preventDefault();stepHistory(e.shiftKey?1:-1).catch(fail);return;}
+    else if(cmd && key==='y'){e.preventDefault();stepHistory(1).catch(fail);return;}
+    if(busy)return;
     else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
     else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects(),{canvas:c}));c.requestRenderAll();}}
     else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
@@ -357,12 +475,13 @@ async function boot() {
     $('selectMoveLabel').textContent=mode==='move'?'이동':'선택';$('selectMoveToggleBtn').classList.toggle('active-select',mode==='select');$('selectMoveToggleBtn').classList.toggle('active-move',mode==='move');
     updateHistory();
   }});
-  store=new BoardStore();await store.open();await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();
+  store=new BoardStore();await store.open();await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   sync=new TabSync(refreshRemote);
   await setPage(pages.find(p=>p.id===session.activeId)||pages[0],true);
   clipboard=new SystemClipboard({canvas:c,allowed,run,onChange:changed,onFiles:files=>importFiles(files),onText:text=>addText(text),notify,isTextEditing});
   c.on('selection:created',updateHistory);c.on('selection:updated',updateHistory);c.on('selection:cleared',updateHistory);
-  c.on('text:changed',changed);c.on('text:editing:exited',()=>{changed();flush().catch(fail);});
+  c.on('object:modified',updateSelectionActions);c.on('after:render',()=>{if(!busy)updateSelectionActions();});
+  c.on('text:editing:exited',()=>{changed();flush().catch(fail);});
   wireUI();busy=false;updateHistory();
 }
 boot().catch(error=>{console.error(error);$('fatalError').textContent=`앱을 시작하지 못했습니다. ${error.message} 파일을 직접 열지 말고 HTTPS 배포 주소 또는 localhost에서 실행해주세요.`;$('fatalError').hidden=false;status('시작 실패','error');});
