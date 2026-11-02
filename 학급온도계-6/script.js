@@ -1,8 +1,8 @@
 // 오디오 객체 초기화
 const sounds = {
-  mainIncrease: new Audio('Sound/Egg up.mp3'), mainDecrease: new Audio('Sound/Egg down.mp3'),
-  teamIncrease: new Audio('Sound/Plus.mp3'), teamDecrease: new Audio('Sound/Minus.mp3'),
-  confirm: new Audio('Sound/confirm.mp3'),
+  mainIncrease: new Audio('Sound/Egg up.MP3'), mainDecrease: new Audio('Sound/Egg down.MP3'),
+  teamIncrease: new Audio('Sound/Plus.MP3'), teamDecrease: new Audio('Sound/Minus.MP3'),
+  confirm: new Audio('Sound/confirm.MP3'),
   success: new Audio('Sound/Success small.MP3') // ★ 이 줄을 추가하세요
 };
 function playSound(sound) { sound.cloneNode().play(); }
