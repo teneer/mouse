@@ -1,0 +1,126 @@
+{
+  "app": "만능칠판",
+  "version": "4.1.0",
+  "generated": "2026-09-22",
+  "notes": [
+    "index.html과 만능칠판.html은 의도적으로 함께 유지합니다.",
+    "업데이트로그.txt는 제거했습니다.",
+    "FILE-MANIFEST.json 자체는 자기 해시 문제로 목록에서 제외합니다."
+  ],
+  "files": [
+    {
+      "path": "BROWSER-CHECKLIST.md",
+      "bytes": 6415,
+      "sha256": "66ec3015fe54f60211e5830cabf15a6cb3fb1036135cfcf93d4f7c13eeba44a9",
+      "role": ""
+    },
+    {
+      "path": "README.md",
+      "bytes": 2130,
+      "sha256": "dc1985784887030859e4b02d670005ec7dcb59e9e0f277ab5e1548df6ceca1bd",
+      "role": ""
+    },
+    {
+      "path": "TEST-RESULTS.txt",
+      "bytes": 511,
+      "sha256": "f94ba1522c757db5b3ffa7c81f4dd35d315bb33edc46ae906d1944c0df2e0768",
+      "role": ""
+    },
+    {
+      "path": "assets/css/app.css",
+      "bytes": 17246,
+      "sha256": "20d707b3156a0b9763e3f5e100773d837c8f377cae128ba973c360dbc6927901",
+      "role": "화면 스타일"
+    },
+    {
+      "path": "assets/js/app.js",
+      "bytes": 36718,
+      "sha256": "fbbbb9e860ec451b8aee1a68069cf28f6e74f1f04d3ce572bd311c9a82e9ddb7",
+      "role": "앱 진입 모듈"
+    },
+    {
+      "path": "assets/js/core/clipboard.js",
+      "bytes": 7086,
+      "sha256": "897d6b5bb22577b4613aa1898bdbba446e5964c3c80573e2a32f0f450eba723a",
+      "role": ""
+    },
+    {
+      "path": "assets/js/core/conflicts.js",
+      "bytes": 703,
+      "sha256": "2504c96dbee6f1cea4d2159d32debbb2a865179daae576dded28e167065f5f11",
+      "role": ""
+    },
+    {
+      "path": "assets/js/core/constants.js",
+      "bytes": 590,
+      "sha256": "edf1905d8f7f325a665eacae825bae6cc7b12ce2fe1e73b887cd8712d0f06edb",
+      "role": ""
+    },
+    {
+      "path": "assets/js/core/data.js",
+      "bytes": 5962,
+      "sha256": "c3777e311b3b690bfd7067add4af66ae91ca31a196940a40e071df191f3043a7",
+      "role": ""
+    },
+    {
+      "path": "assets/js/core/history.js",
+      "bytes": 1464,
+      "sha256": "6381caf7cff0e436fd9e9740d0df4498be82dcfaf69446603fd5252086464303",
+      "role": ""
+    },
+    {
+      "path": "assets/js/core/validation.js",
+      "bytes": 3819,
+      "sha256": "451775f5ca0fc07128eb90d8276f38e3d23074ac699b67aa1b83c56a82575622",
+      "role": ""
+    },
+    {
+      "path": "assets/js/features/canvas-tools.js",
+      "bytes": 7706,
+      "sha256": "73cb7543a6dccd2726385a35d6d87c78a4da24faaea07084f86dc10794aad643",
+      "role": ""
+    },
+    {
+      "path": "assets/js/features/files.js",
+      "bytes": 4681,
+      "sha256": "e3b5c13144be2a77ba6de68509ead5914495f46a166c313a77b5959d2dc3ef69",
+      "role": ""
+    },
+    {
+      "path": "assets/js/features/previews.js",
+      "bytes": 1622,
+      "sha256": "52fc535c270fa5e5e5024ab1010687c8ac883bc5404298f9b2adb9bed2ec6a95",
+      "role": ""
+    },
+    {
+      "path": "index.html",
+      "bytes": 19768,
+      "sha256": "66785753ea8502f6aeb3a4d19fdf42591dcc05a96a5f2a4f783cd5e6410251b2",
+      "role": "기본 진입점"
+    },
+    {
+      "path": "package.json",
+      "bytes": 209,
+      "sha256": "ae1f1d5b1a409778d69f54ffd6e5cc0500dbdbff364624c6b8dc6e6040cd17cf",
+      "role": ""
+    },
+    {
+      "path": "tests/canvas-tools.test.mjs",
+      "bytes": 4533,
+      "sha256": "fae7c4409f6288bd858d69f180dc5e75a98857312fa26455f51fd3f4dd8e42f4",
+      "role": ""
+    },
+    {
+      "path": "tests/core.test.mjs",
+      "bytes": 4481,
+      "sha256": "813f9c782fc882e780ad49b8245aa8c8ea09f2ffc564e49b934213839c6c44ae",
+      "role": ""
+    },
+    {
+      "path": "만능칠판.html",
+      "bytes": 19768,
+      "sha256": "66785753ea8502f6aeb3a4d19fdf42591dcc05a96a5f2a4f783cd5e6410251b2",
+      "role": "한글 주소 호환 진입점"
+    }
+  ]
+}
