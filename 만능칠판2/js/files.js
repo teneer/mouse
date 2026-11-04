@@ -1,4 +1,4 @@
-import {MAX_FILE_BYTES, MAX_PDF_PAGES} from '../core/constants.js';
+import {MAX_FILE_BYTES, MAX_PDF_PAGES} from './constants.js';
 let pdfLibrary;
 async function pdfjs() {
   if (!pdfLibrary) {

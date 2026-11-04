@@ -1,11 +1,11 @@
-import {VERSION,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './core/constants.js';
-import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './core/data.js';
-import {PageHistory} from './core/history.js';
-import {SystemClipboard} from './core/clipboard.js';
-import {CanvasTools} from './features/canvas-tools.js';
-import {loadCanvas,makeThumbnail} from './features/previews.js';
-import {decodeFiles} from './features/files.js';
-import {validateContent} from './core/validation.js';
+import {VERSION,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js';
+import {PageHistory} from './history.js';
+import {SystemClipboard} from './clipboard.js';
+import {CanvasTools} from './js/canvas-tools.js';
+import {loadCanvas,makeThumbnail} from './js/previews.js';
+import {decodeFiles} from './js/files.js';
+import {validateContent} from './js/validation.js';
 const $=id=>document.getElementById(id);
 let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
 let autosaveTimer,toastTimer,saveFadeTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,importLayoutResolver=null,passwordResolver=null;
@@ -44,6 +44,7 @@ function capture() {
 }
 function changed({recordHistory=true}={}) {
   if(!current)return;
+  if(groupEdit){status('그룹 내부 편집 중입니다. 편집을 종료하면 저장합니다.');return;}
   current.content=capture();dirty=true;generation++;
   if(recordHistory)history.push(current.id,current.content);
   status('저장 대기 중입니다.');updateHistory();
@@ -84,7 +85,7 @@ function restoreInteraction() {
 }
 async function run(fn,label='처리 중입니다.') {
   if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
-  finishText();busy=true;closePopups();
+  if(groupEdit)endGroupEdit();finishText();busy=true;closePopups();
   c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
   try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
   finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
@@ -142,28 +143,61 @@ function updateHistory() {
   $('deleteSelectionBtn').disabled=busy||!object;
   updateSelectionActions();
 }
-function updateSelectionActions() {
-  const host=$('selectionActions'); if(!host||!c)return;
-  const object=c.getActiveObject(),multiple=object?.type==='activeSelection',group=object?.type==='group';
-  const visible=!!object && !busy && (multiple || group);
-  host.hidden=!visible;
-  if(!visible)return;
-  $('groupBtn').hidden=!multiple;
-  $('ungroupBtn').hidden=!group;
-  const rect=object.getBoundingRect(true,true);
-  const margin=8, gap=8, w=host.offsetWidth||120, h=host.offsetHeight||40;
-  const candidates=[
-    {left:rect.left+rect.width/2-w/2,top:rect.top-h-gap},
-    {left:rect.left+rect.width/2-w/2,top:rect.top+rect.height+gap},
-    {left:rect.left-w-gap,top:rect.top+rect.height/2-h/2},
-    {left:rect.left+rect.width+gap,top:rect.top+rect.height/2-h/2}
-  ];
-  const fits=p=>p.left>=margin&&p.top>=margin&&p.left+w<=innerWidth-margin&&p.top+h<=innerHeight-margin;
-  const pos=candidates.find(fits)||{
-    left:Math.min(innerWidth-w-margin,Math.max(margin,rect.left+rect.width/2-w/2)),
-    top:Math.min(innerHeight-h-margin,Math.max(margin,rect.top+rect.height+gap))
-  };
-  host.style.left=`${pos.left}px`;host.style.top=`${pos.top}px`;
+let groupEdit=null,propertyTargets=[];
+function hideObjectMenu(){const el=$('objectMenu');el.hidden=true;}
+function selectedTexts(){return c.getActiveObjects().filter(o=>['i-text','text','textbox'].includes(o.type));}
+function showObjectMenu(x,y){
+  if(!allowed()||tools.mode!=='select')return;
+  const active=c.getActiveObject(),texts=selectedTexts();
+  if(!active&&!groupEdit)return;
+  const states={menuGroup:active?.type==='activeSelection'&&!groupEdit,menuUngroup:active?.type==='group'&&!groupEdit,menuGroupEdit:active?.type==='group'&&!groupEdit,menuGroupDone:!!groupEdit,menuFront:!!active,menuBack:!!active,menuProperties:texts.length>0};
+  const menu=$('objectMenu');for(const [id,visible] of Object.entries(states))$(id).hidden=!visible;
+  if(!Object.values(states).some(Boolean))return;
+  menu.hidden=false;menu.style.left=Math.min(Math.max(8,x),innerWidth-menu.offsetWidth-8)+'px';menu.style.top=Math.min(Math.max(8,y),innerHeight-menu.offsetHeight-8)+'px';
+  menu.querySelector('button:not([hidden])')?.focus();
+}
+function updateSelectionActions(){ /* Commands live in the object menu. */ }
+function moveLayer(front){
+  if(!allowed()||isTextEditing())return;
+  const objects=c.getActiveObjects();if(!objects.length)return;
+  const stack=c.getObjects(),selected=new Set(objects),rest=stack.filter(o=>!selected.has(o)),moving=stack.filter(o=>selected.has(o));
+  if(!moving.length)return;
+  const ordered=front?[...rest,...moving]:[...moving,...rest];
+  if(ordered.every((o,i)=>stack[i]===o))return;
+  ordered.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();hideObjectMenu();changed();
+}
+function startGroupEdit(group,child=null){
+  if(!allowed()||groupEdit||group?.type!=='group')return;
+  const index=c.getObjects().indexOf(group),id=group.id||uid(),members=group.getObjects().slice();
+  group.toActiveSelection();groupEdit={members,id,index};
+  c.discardActiveObject();if(child&&members.includes(child))c.setActiveObject(child);
+  c.requestRenderAll();hideObjectMenu();notify('그룹 내부 편집 중입니다. Esc 또는 객체 메뉴에서 그룹 편집 종료를 선택하세요.');
+}
+function endGroupEdit(){
+  if(!groupEdit)return false;
+  finishText();const {members,id,index}=groupEdit;groupEdit=null;
+  const present=members.filter(o=>c.getObjects().includes(o));
+  c.discardActiveObject();
+  if(present.length>1){
+    const selection=new fabric.ActiveSelection(present,{canvas:c});c.setActiveObject(selection);
+    const group=selection.toGroup();group.id=id;group.subTargetCheck=true;
+    c.moveTo(group,Math.min(index,c.getObjects().length-1));c.setActiveObject(group);
+  } else if(present.length===1)c.setActiveObject(present[0]);
+  c.requestRenderAll();hideObjectMenu();changed();return true;
+}
+function openTextProperties(){
+  propertyTargets=selectedTexts();if(!propertyTargets.length)return;
+  const o=propertyTargets[0];$('textBackgroundMode').value=o.textBoxFill?'color':'transparent';$('textBackgroundColor').value=o.textBoxFill||'#ffffff';
+  $('textBorderMode').value=o.textBoxBorder?'color':'none';$('textBorderColor').value=o.textBoxBorder||'#000000';$('textBorderWidth').value=o.textBoxBorderWidth||1;
+  $('textBackgroundMode').onchange();$('textBorderMode').onchange();hideObjectMenu();closePopups();openModal('textPropertiesModal');
+}
+function applyTextProperties(){
+  const fill=$('textBackgroundMode').value==='color'?$('textBackgroundColor').value:null;
+  const border=$('textBorderMode').value==='color'?$('textBorderColor').value:null;
+  const width=Math.max(1,Math.min(30,Number($('textBorderWidth').value)||1));
+  const targets=propertyTargets.filter(o=>c.getObjects().includes(o)||groupEdit?.members.includes(o));
+  targets.forEach(o=>{o.set({textBoxFill:fill,textBoxBorder:border,textBoxBorderWidth:width});o.dirty=true;});
+  propertyTargets=[];closeModal('textPropertiesModal');c.requestRenderAll();if(targets.length)changed();
 }
 async function stepHistory(direction) {
   if(!current || historyBusy || busy || modalOpen() || tools?.gesture || isTextEditing()) return;
@@ -194,10 +228,10 @@ function deleteSelected() {
   c.discardActiveObject();objects.forEach(o=>c.remove(o));c.requestRenderAll();changed();
 }
 function groupObjects(ungroup=false) {
-  if(!allowed() || isTextEditing())return;
-  const o=c.getActiveObject();
+  if(!allowed() || isTextEditing()||groupEdit)return;
+  hideObjectMenu();const o=c.getActiveObject();
   if(ungroup && o?.type==='group')o.toActiveSelection();
-  else if(!ungroup && o?.type==='activeSelection'){const group=o.toGroup();group.id=uid();}
+  else if(!ungroup && o?.type==='activeSelection'){const group=o.toGroup();group.id=uid();group.subTargetCheck=true;}
   else return;
   c.getObjects().forEach(o=>o.setCoords());c.requestRenderAll();changed();updateHistory();
 }
@@ -422,8 +456,8 @@ function wireUI() {
   $('pdfPasswordInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('passwordModalOkBtn').click();}});
   document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
   const modeMap={penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
-  Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
-  $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
+  Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;if(groupEdit)endGroupEdit();finishText();tools.setMode(tools.mode===mode?'select':mode);});
+  $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;if(isTextEditing()){finishText();return;}if(groupEdit){endGroupEdit();return;}if(tools.mode==='select'&&c.getActiveObject()){c.discardActiveObject();c.requestRenderAll();return;}tools.setMode(tools.mode==='select'?'move':'select');};
   document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>setColor(b.dataset.tool,b.dataset.color));
   document.querySelectorAll('#colorSettingsModal [data-tool-custom]').forEach(input=>input.oninput=e=>setColor(e.target.dataset.toolCustom,e.target.value));
   $('penSizeSelect').onchange=e=>{tools.pen.width=Number(e.target.value);tools.updateBrush();};
@@ -432,7 +466,14 @@ function wireUI() {
     tools.text.size=Number(e.target.value);const o=c.getActiveObject();
     if(o && ['text','i-text','textbox'].includes(o.type)){o.set('fontSize',tools.text.size);o.setCoords();c.requestRenderAll();changed();}
   };
-  $('deleteSelectionBtn').onclick=deleteSelected;$('groupBtn').onclick=()=>groupObjects();$('ungroupBtn').onclick=()=>groupObjects(true);
+  $('deleteSelectionBtn').onclick=deleteSelected;
+  $('menuGroup').onclick=()=>groupObjects();$('menuUngroup').onclick=()=>groupObjects(true);
+  $('menuGroupEdit').onclick=()=>startGroupEdit(c.getActiveObject());$('menuGroupDone').onclick=endGroupEdit;
+  $('menuFront').onclick=()=>moveLayer(true);$('menuBack').onclick=()=>moveLayer(false);
+  $('menuProperties').onclick=openTextProperties;$('moreTextProperties').onclick=openTextProperties;
+  $('applyTextProperties').onclick=applyTextProperties;
+  $('textBackgroundMode').onchange=()=>{$('textBackgroundColor').disabled=$('textBackgroundMode').value==='transparent';};
+  $('textBorderMode').onchange=()=>{const disabled=$('textBorderMode').value==='none';$('textBorderColor').disabled=disabled;$('textBorderWidth').disabled=disabled;};
   $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
   $('clearAllBtn').onclick=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.',{title:'전체 삭제',confirmText:'전체 삭제'})){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
   $('zoomInBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()*1.25);};$('zoomOutBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()/1.25);};$('homeBtn').onclick=()=>{if(allowed())tools.home(current.content.frame);};
@@ -475,7 +516,7 @@ function wireUI() {
   });
   let spaceMode=null;
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape') {closePopups();document.querySelectorAll('.modal').forEach(m=>{if(m.style.display==='flex')closeModal(m.id);});if(!busy)finishText();return;}
+    if(e.key==='Escape') {e.preventDefault();if(!$('objectMenu').hidden){hideObjectMenu();return;}if(modalOpen()){document.querySelectorAll('.modal').forEach(m=>{if(m.style.display==='flex')closeModal(m.id);});return;}if(isTextEditing()){finishText();return;}if(endGroupEdit())return;closePopups();c.discardActiveObject();c.requestRenderAll();return;}
     if(modalOpen()) {
       if(e.key==='Tab') {
         const m=Array.from(document.querySelectorAll('.modal')).find(m=>m.style.display==='flex');
@@ -486,8 +527,9 @@ function wireUI() {
     const cmd=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
     if(cmd && key==='z'){e.preventDefault();stepHistory(e.shiftKey?1:-1).catch(fail);return;}
     else if(cmd && key==='y'){e.preventDefault();stepHistory(1).catch(fail);return;}
-    if(isFormEditing())return;
+    if(isFormEditing()||isTextEditing())return;
     if(busy)return;
+    if((e.key==='F10'&&e.shiftKey)||e.key==='ContextMenu'){e.preventDefault();const o=c.getActiveObject();if(o){const r=o.getBoundingRect(true,true),pt=fabric.util.transformPoint(new fabric.Point(r.left+r.width/2,r.top),c.viewportTransform);showObjectMenu(pt.x,pt.y);}return;}
     else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
     else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects(),{canvas:c}));c.requestRenderAll();}}
     else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
@@ -502,11 +544,20 @@ function wireUI() {
     c.setDimensions({width:window.innerWidth,height:window.innerHeight});c.setViewportTransform([z,0,0,z,c.width/2-center.x*z,c.height/2-center.y*z]);rememberView();
   });
   window.addEventListener('beforeunload',e=>{if(dirty||saving){e.preventDefault();e.returnValue='';}});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){finishText();flush().catch(fail);}else refreshRemote();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(groupEdit)endGroupEdit();finishText();flush().catch(fail);}else refreshRemote();});
   window.addEventListener('focus',refreshRemote);
 }
 async function boot() {
   if(!window.fabric)throw Error('캔버스 라이브러리를 불러오지 못했습니다. 인터넷 연결 또는 CDN 차단 여부를 확인하고 새로고침해주세요.');
+  const originalRender=fabric.IText.prototype._render,originalBg=fabric.IText.prototype._renderBackground;
+  fabric.IText.prototype._renderBackground=function(ctx){
+    if(this.textBoxFill){ctx.fillStyle=this.textBoxFill;ctx.fillRect(-this.width/2,-this.height/2,this.width,this.height);}
+    else originalBg.call(this,ctx);
+  };
+  fabric.IText.prototype._render=function(ctx){
+    originalRender.call(this,ctx);
+    if(this.textBoxBorder){ctx.save();ctx.strokeStyle=this.textBoxBorder;ctx.lineWidth=this.textBoxBorderWidth||1;ctx.strokeRect(-this.width/2,-this.height/2,this.width,this.height);ctx.restore();}
+  };
   c=new fabric.Canvas('whiteboardCanvas',{width:window.innerWidth,height:window.innerHeight,preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true});
   fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});
   tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&!busy&&!modalOpen(),onChange:changed,onViewport:rememberView,onText:p=>addText('텍스트',p,true),onMode:mode=>{
@@ -519,6 +570,41 @@ async function boot() {
   sync=new TabSync(refreshRemote);
   await setPage(pages.find(p=>p.id===session.activeId)||pages[0],true);
   clipboard=new SystemClipboard({canvas:c,allowed,run,onChange:changed,onFiles:files=>importFiles(files),onText:text=>addText(text),notify,isTextEditing});
+  c.findTarget=(function(original){return function(e,skipGroup){
+    const found=original.call(this,e,skipGroup),active=this.getActiveObject();
+    if(found||!active||tools?.mode!=='select'||active.isEditing)return found;
+    const p=this.getPointer(e),r=active.getBoundingRect(true,true);
+    return p.x>=r.left&&p.x<=r.left+r.width&&p.y>=r.top&&p.y<=r.top+r.height?active:found;
+  };})(c.findTarget);
+  let longTimer=null,longStart=null,suppressContext=false;
+  const upper=c.upperCanvasEl;
+  let rightClickSelection=null;
+  upper.addEventListener('pointerdown',e=>{if(e.button===2)rightClickSelection=c.getActiveObject();});
+  upper.addEventListener('contextmenu',e=>{
+    if(!allowed()||tools.mode!=='select')return;
+    e.preventDefault();if(suppressContext){suppressContext=false;return;}
+    const target=c.findTarget(e);
+    if(rightClickSelection?.type==='activeSelection' && (!target || target===rightClickSelection || rightClickSelection.getObjects().includes(target))){c.setActiveObject(rightClickSelection);}
+    else if(target&&target!==c.getActiveObject()){c.setActiveObject(target);}
+    rightClickSelection=null;c.requestRenderAll();
+    showObjectMenu(e.clientX,e.clientY);
+  });
+  upper.addEventListener('pointerdown',e=>{hideObjectMenu();if(e.pointerType!=='touch'||!allowed()||tools.mode!=='select')return;
+    const target=c.findTarget(e);if(!target)return;longStart={x:e.clientX,y:e.clientY};
+    longTimer=setTimeout(()=>{longTimer=null;suppressContext=true;tools.up();if(target!==c.getActiveObject())c.setActiveObject(target);c.requestRenderAll();showObjectMenu(e.clientX,e.clientY);},550);
+  });
+  upper.addEventListener('pointermove',e=>{if(longStart&&Math.hypot(e.clientX-longStart.x,e.clientY-longStart.y)>10){clearTimeout(longTimer);longTimer=null;longStart=null;}});
+  for(const event of ['pointerup','pointercancel'])upper.addEventListener(event,()=>{clearTimeout(longTimer);longTimer=null;longStart=null;});
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#objectMenu'))hideObjectMenu();});
+  c.on('mouse:dblclick',opt=>{
+    if(!allowed()||tools.mode!=='select')return;
+    const target=opt.target,child=opt.subTargets?.find(o=>o.type==='i-text');
+    if(target?.type==='group'){
+      if(child){startGroupEdit(target,child);child.enterEditing();child.selectAll();}
+      else startGroupEdit(target);
+    }else if(target?.type==='i-text'&&!target.isEditing){c.setActiveObject(target);target.enterEditing();target.selectAll();}
+    else if(!target||target.type==='activeSelection'){c.discardActiveObject();c.requestRenderAll();}
+  });
   c.on('selection:created',updateHistory);c.on('selection:updated',updateHistory);c.on('selection:cleared',updateHistory);
   c.on('object:modified',updateSelectionActions);c.on('after:render',()=>{if(!busy)updateSelectionActions();});
   c.on('text:editing:exited',()=>{changed();flush().catch(fail);});

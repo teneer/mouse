@@ -1,5 +1,5 @@
-import {uid, clone} from './constants.js';
-import {resolvePageWrite} from './conflicts.js';
+import {uid, clone} from './js/constants.js';
+import {resolvePageWrite} from './js/conflicts.js';
 const SCOPE = new URL('.', location.href).pathname;
 const DB_NAME = `WhiteboardPagesDB:${SCOPE}`;
 export const SIGNAL_KEY = `whiteboard-pages-signal:${SCOPE}`;

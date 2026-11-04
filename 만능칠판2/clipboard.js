@@ -1,5 +1,5 @@
-import {SERIAL_PROPS,uid} from './constants.js';
-import {validateContent} from './validation.js';
+import {SERIAL_PROPS,uid} from './js/constants.js';
+import {validateContent} from './js/validation.js';
 const utf8To64=s=>{const bytes=new TextEncoder().encode(s);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(raw);};
 const from64=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 const escapeHTML=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

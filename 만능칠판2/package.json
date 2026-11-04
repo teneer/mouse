@@ -1,10 +1,1 @@
-{
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test tests/*.test.mjs"
-  },
-  "name": "mannung-blackboard",
-  "version": "4.1.0",
-  "description": "수업용 만능칠판 웹앱"
-}
+{"private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs"}}

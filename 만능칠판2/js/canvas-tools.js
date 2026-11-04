@@ -1,4 +1,4 @@
-import {MIN_ZOOM,MAX_ZOOM,uid} from '../core/constants.js';
+import {MIN_ZOOM,MAX_ZOOM,uid} from './constants.js';
 export class CanvasTools {
   constructor({canvas,canEdit,onChange,onViewport,onMode,onText}) {
     Object.assign(this,{canvas,canEdit,onChange,onViewport,onMode,onText});
@@ -92,15 +92,6 @@ export class CanvasTools {
     if(hit.length){hit.forEach(o=>c.remove(o));this.erased=true;c.requestRenderAll();}
   }
   up() {
-    if(this.selectTarget && !this.selectMoved && this.mode==='select') {
-      const objects=this.canvas.getObjects(),before=objects.indexOf(this.selectTarget);
-      if(before>=0 && !this.selectTarget.excludeFromExport && before!==objects.length-1){
-        if(typeof this.canvas.moveTo==='function') this.canvas.moveTo(this.selectTarget,objects.length-1);
-        else if(typeof this.canvas.bringToFront==='function') this.canvas.bringToFront(this.selectTarget);
-        else { this.canvas.objects=objects.filter(o=>o!==this.selectTarget); this.canvas.objects.push(this.selectTarget); }
-        this.selectTarget.setCoords();this.canvas.requestRenderAll();this.onChange();
-      }
-    }
     this.pendingZChange=false;
     this.selectTarget=null;this.selectStart=null;this.selectMoved=false;
     if(this.erased){this.erased=false;this.onChange();}
