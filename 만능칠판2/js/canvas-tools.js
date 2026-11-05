@@ -2,8 +2,8 @@ import {MIN_ZOOM,MAX_ZOOM,uid} from './constants.js';
 export class CanvasTools {
   constructor({canvas,canEdit,onChange,onViewport,onMode,onText}) {
     Object.assign(this,{canvas,canEdit,onChange,onViewport,onMode,onText});
-    this.mode='select';this.pen={color:'#000000',width:5};this.marker={color:'#ffff00',width:30};
-    this.text={color:'#000000',size:48};this.gesture=false;this.pan=null;this.erased=false;this.selectTarget=null;this.selectStart=null;this.selectMoved=false;this.pendingZChange=false;
+    this.mode='select';this.pen={color:'#000000',width:5};this.marker={color:'#000000',width:30};
+    this.text={color:'#000000',size:48};this.gesture=false;this.pan=null;this.erased=false;this.laserTrail=[];this.laserTimer=null;
     const c=canvas;
     c.on('mouse:down:before',opt=>{
       if(!canEdit())return;
@@ -25,7 +25,7 @@ export class CanvasTools {
   }
   pointer(e) {const p=e.touches?.[0] || e.changedTouches?.[0] || e;return {x:p.clientX,y:p.clientY};}
   setMode(mode) {
-    this.mode=mode;const c=this.canvas;
+    this.mode=mode;const c=this.canvas;this.clearLaser();
     c.discardActiveObject();c.isDrawingMode=mode==='pen'||mode==='marker';c.selection=mode==='select';c.skipTargetFind=mode==='move';
     c.getObjects().forEach(o=>o.set({selectable:mode==='select',evented:true}));
     const cursors={
@@ -33,11 +33,11 @@ export class CanvasTools {
       marker:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2732%27 height=%2732%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M3 26L20 9l5 5L8 31 3 26z%27 fill=%27%23ffd92f%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M20 9l3-3 5 5-3 3z%27 fill=%27%23ffef85%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M3 26l-1 5 6-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 2 31, crosshair',
       eraser:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2734%27 height=%2728%27 viewBox=%270 0 34 28%27%3E%3Cpath d=%27M5 18L17 6l12 12-6 6H11z%27 fill=%27%23f2a7bd%27 stroke=%27%23555555%27 stroke-width=%271.5%27/%3E%3Cpath d=%27M17 6l5 5-12 12H5z%27 fill=%27%23ffd3df%27/%3E%3Cpath d=%27M17 6l12 12-6 6-12-12z%27 fill=%27%23e888a6%27/%3E%3C/svg%3E") 17 14, crosshair'
     };
-    const cursor=mode==='move'?'grab':mode==='text'?'text':mode==='pen'?cursors.pen:mode==='marker'?cursors.marker:mode==='eraser'?cursors.eraser:'default';
+    const cursor=mode==='move'?'grab':mode==='text'?'text':mode==='pen'?cursors.pen:mode==='marker'?cursors.marker:mode==='eraser'?cursors.eraser:mode==='laser'?'crosshair':'default';
     c.defaultCursor=cursor;c.hoverCursor=cursor;c.freeDrawingCursor=cursor;
     if(c.upperCanvasEl)c.upperCanvasEl.style.cursor=cursor;
     if(c.lowerCanvasEl)c.lowerCanvasEl.style.cursor=cursor;
-    c.perPixelTargetFind=mode==='eraser';c.targetFindTolerance=mode==='eraser'?6:0;
+    c.perPixelTargetFind=mode==='eraser';c.targetFindTolerance=mode==='eraser'?12:0;
     if(c.isDrawingMode) {
       const settings=mode==='pen'?this.pen:this.marker;
       c.freeDrawingBrush=new fabric.PencilBrush(c);c.freeDrawingBrush.width=settings.width;
@@ -52,48 +52,44 @@ export class CanvasTools {
       this.canvas.freeDrawingBrush.color=mode==='marker'?new fabric.Color(s.color).setAlpha(0.32).toRgba():s.color;
     }
   }
-  down({e,target}) {
-    if(!this.canEdit())return;
+  clearLaser() {clearTimeout(this.laserTimer);this.laserTrail=[];if(this.canvas.contextTop)this.canvas.clearContext?.(this.canvas.contextTop);}
+  laserAt(e) {
+    const c=this.canvas,p=c.getPointer(e),now=Date.now();this.laserTrail.push({x:p.x,y:p.y,t:now});
+    const draw=()=>{
+      const ctx=c.contextTop;if(!ctx)return;c.clearContext(ctx);
+      this.laserTrail=this.laserTrail.filter(q=>Date.now()-q.t<900);if(!this.laserTrail.length)return;
+      ctx.save();ctx.transform(...c.viewportTransform);ctx.beginPath();this.laserTrail.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));
+      ctx.strokeStyle='#ff3030';ctx.lineWidth=4/Math.max(c.getZoom(),0.1);ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
+      const last=this.laserTrail.at(-1);ctx.beginPath();ctx.arc(last.x,last.y,6/Math.max(c.getZoom(),0.1),0,Math.PI*2);ctx.fillStyle='#ff3030';ctx.fill();ctx.restore();
+      clearTimeout(this.laserTimer);this.laserTimer=setTimeout(draw,55);
+    };draw();
+  }
+  down({e}) {
+    if(!this.canEdit()||e.button===2)return;
     this.gesture=true;const c=this.canvas;
-    this.selectTarget=null;this.selectStart=null;this.selectMoved=false;
-    if(this.mode==='select' && e.button===0 && target){
-      this.selectTarget=target;this.selectStart=this.pointer(e);
-      const objects=c.getObjects(),idx=objects.indexOf(target);
-      this.pendingZChange=false;
-    }
-    if(this.mode==='move' || e.button===1) {this.pan=this.pointer(e);c.setCursor('grabbing');return;}
-    if(e.button && e.button!==0)return;
-    if(this.mode==='text') {this.onText(c.getPointer(e));return;}
-    if(this.mode==='eraser') {
-      this.erased=false;
-      this.eraseAt(e);
-    }
+    if(this.mode==='move'||e.button===1){this.pan=this.pointer(e);c.setCursor('grabbing');return;}
+    if(e.button&&e.button!==0){this.gesture=false;return;}
+    if(this.mode==='text'){this.gesture=false;this.onText(c.getPointer(e));return;}
+    if(this.mode==='eraser'){this.erased=false;this.eraseAt(e);}
+    if(this.mode==='laser')this.laserAt(e);
   }
   move({e}) {
-    if(!this.gesture || !this.canEdit())return;
-    const c=this.canvas;
-    if(this.selectStart){const p=this.pointer(e);this.selectMoved=Math.hypot(p.x-this.selectStart.x,p.y-this.selectStart.y)>8;}
-    if(this.pan) {
-      const p=this.pointer(e),v=c.viewportTransform.slice();v[4]+=p.x-this.pan.x;v[5]+=p.y-this.pan.y;
-      c.setViewportTransform(v);this.pan=p;this.onViewport();return;
-    }
-    if(this.mode==='eraser') this.eraseAt(e);
+    if(!this.gesture||!this.canEdit())return;const c=this.canvas;
+    if(this.pan){const p=this.pointer(e),v=c.viewportTransform.slice();v[4]+=p.x-this.pan.x;v[5]+=p.y-this.pan.y;c.setViewportTransform(v);this.pan=p;this.onViewport();return;}
+    if(this.mode==='eraser')this.eraseAt(e);
+    if(this.mode==='laser')this.laserAt(e);
   }
   eraseAt(e) {
-    const c=this.canvas;
-    const zoom=Math.max(c.getZoom(),0.0001),size={w:30/zoom,h:22/zoom};
-    const world=c.getPointer(e,true);
-    const eraserRect={left:world.x-size.w/2,top:world.y-size.h/2,width:size.w,height:size.h};
-    const targets=c.getObjects().slice().filter(o=>!o.excludeFromExport && o.visible!==false);
-    const hit=targets.filter(o=>{
-      const r=o.getBoundingRect(true,true);
-      return r.left < eraserRect.left+eraserRect.width && r.left+r.width > eraserRect.left && r.top < eraserRect.top+eraserRect.height && r.top+r.height > eraserRect.top;
+    const c=this.canvas,half=12/Math.max(c.getZoom(),0.0001),p=c.getPointer(e);
+    const rect={left:p.x-half,top:p.y-half,width:half*2,height:half*2};
+    const hits=c.getObjects().slice().filter(o=>{
+      if(o.excludeFromExport||o.visible===false)return false;
+      const bounds=o.getBoundingRect(true,true);
+      return bounds.left<rect.left+rect.width&&bounds.left+bounds.width>rect.left&&bounds.top<rect.top+rect.height&&bounds.top+bounds.height>rect.top;
     });
-    if(hit.length){hit.forEach(o=>c.remove(o));this.erased=true;c.requestRenderAll();}
+    if(hits.length){hits.forEach(o=>c.remove(o));this.erased=true;c.requestRenderAll();}
   }
   up() {
-    this.pendingZChange=false;
-    this.selectTarget=null;this.selectStart=null;this.selectMoved=false;
     if(this.erased){this.erased=false;this.onChange();}
     if(this.pan){this.pan=null;this.canvas.setViewportTransform(this.canvas.viewportTransform.slice());this.canvas.selection=this.mode==='select';this.canvas.skipTargetFind=this.mode==='move';this.canvas.setCursor(this.mode==='move'?'grab':'default');this.onViewport();}
     this.gesture=false;

@@ -3,6 +3,7 @@ import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js';
 import {CanvasTools} from './js/canvas-tools.js';
+import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {decodeFiles} from './js/files.js';
 import {validateContent} from './js/validation.js';
@@ -11,6 +12,8 @@ let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,sav
 let autosaveTimer,toastTimer,saveFadeTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,importLayoutResolver=null,passwordResolver=null;
 const history=new PageHistory(),knownVersions=new Map();
 const MAX_PAGES=10;
+const shared={color:'#000000',level:3,sizes:structuredClone(SIZE_DEFAULTS),quick:QUICK_DEFAULTS.slice()};
+let contextTarget=null,groupSession=null,suppressSelection=false;
 try {session=JSON.parse(sessionStorage.getItem(SESSION_KEY)) || session;} catch {}
 if(!session.views || typeof session.views!=='object')session.views={};
 function notify(message) {$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
@@ -44,7 +47,6 @@ function capture() {
 }
 function changed({recordHistory=true}={}) {
   if(!current)return;
-  if(groupEdit){status('그룹 내부 편집 중입니다. 편집을 종료하면 저장합니다.');return;}
   current.content=capture();dirty=true;generation++;
   if(recordHistory)history.push(current.id,current.content);
   status('저장 대기 중입니다.');updateHistory();
@@ -77,7 +79,7 @@ async function flush() {
   })().catch(error=>{status('저장 실패 · JSON 백업을 해주세요.','error');throw error;}).finally(()=>{saving=null;if(succeeded&&dirty){clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>flush().catch(fail),100);}});
   return saving;
 }
-function finishText() {const o=c?.getActiveObject();if(o?.isEditing)o.exitEditing();}
+function finishText() {const o=c?.getActiveObject();if(o?.isEditing)o.exitEditing();if(groupSession && !o?.isEditing)closeGroupSession();}
 function restoreInteraction() {
   if(!c || !tools)return;
   c.isDrawingMode=tools.mode==='pen'||tools.mode==='marker';c.selection=tools.mode==='select';c.skipTargetFind=tools.mode==='move';
@@ -85,7 +87,7 @@ function restoreInteraction() {
 }
 async function run(fn,label='처리 중입니다.') {
   if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
-  if(groupEdit)endGroupEdit();finishText();busy=true;closePopups();
+  finishText();busy=true;closePopups();
   c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
   try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
   finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
@@ -140,65 +142,10 @@ function updateHistory() {
   $('undoBtn').disabled=!current||historyBusy||!history.canUndo(current.id);
   $('redoBtn').disabled=!current||historyBusy||!history.canRedo(current.id);
   const object=c?.getActiveObject();
-  $('deleteSelectionBtn').disabled=busy||!object;
+  $('deleteSelectionBtn').disabled=busy||!current;
   updateSelectionActions();
 }
-let groupEdit=null,propertyTargets=[];
-function hideObjectMenu(){const el=$('objectMenu');el.hidden=true;}
-function selectedTexts(){return c.getActiveObjects().filter(o=>['i-text','text','textbox'].includes(o.type));}
-function showObjectMenu(x,y){
-  if(!allowed()||tools.mode!=='select')return;
-  const active=c.getActiveObject(),texts=selectedTexts();
-  if(!active&&!groupEdit)return;
-  const states={menuGroup:active?.type==='activeSelection'&&!groupEdit,menuUngroup:active?.type==='group'&&!groupEdit,menuGroupEdit:active?.type==='group'&&!groupEdit,menuGroupDone:!!groupEdit,menuFront:!!active,menuBack:!!active,menuProperties:texts.length>0};
-  const menu=$('objectMenu');for(const [id,visible] of Object.entries(states))$(id).hidden=!visible;
-  if(!Object.values(states).some(Boolean))return;
-  menu.hidden=false;menu.style.left=Math.min(Math.max(8,x),innerWidth-menu.offsetWidth-8)+'px';menu.style.top=Math.min(Math.max(8,y),innerHeight-menu.offsetHeight-8)+'px';
-  menu.querySelector('button:not([hidden])')?.focus();
-}
-function updateSelectionActions(){ /* Commands live in the object menu. */ }
-function moveLayer(front){
-  if(!allowed()||isTextEditing())return;
-  const objects=c.getActiveObjects();if(!objects.length)return;
-  const stack=c.getObjects(),selected=new Set(objects),rest=stack.filter(o=>!selected.has(o)),moving=stack.filter(o=>selected.has(o));
-  if(!moving.length)return;
-  const ordered=front?[...rest,...moving]:[...moving,...rest];
-  if(ordered.every((o,i)=>stack[i]===o))return;
-  ordered.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();hideObjectMenu();changed();
-}
-function startGroupEdit(group,child=null){
-  if(!allowed()||groupEdit||group?.type!=='group')return;
-  const index=c.getObjects().indexOf(group),id=group.id||uid(),members=group.getObjects().slice();
-  group.toActiveSelection();groupEdit={members,id,index};
-  c.discardActiveObject();if(child&&members.includes(child))c.setActiveObject(child);
-  c.requestRenderAll();hideObjectMenu();notify('그룹 내부 편집 중입니다. Esc 또는 객체 메뉴에서 그룹 편집 종료를 선택하세요.');
-}
-function endGroupEdit(){
-  if(!groupEdit)return false;
-  finishText();const {members,id,index}=groupEdit;groupEdit=null;
-  const present=members.filter(o=>c.getObjects().includes(o));
-  c.discardActiveObject();
-  if(present.length>1){
-    const selection=new fabric.ActiveSelection(present,{canvas:c});c.setActiveObject(selection);
-    const group=selection.toGroup();group.id=id;group.subTargetCheck=true;
-    c.moveTo(group,Math.min(index,c.getObjects().length-1));c.setActiveObject(group);
-  } else if(present.length===1)c.setActiveObject(present[0]);
-  c.requestRenderAll();hideObjectMenu();changed();return true;
-}
-function openTextProperties(){
-  propertyTargets=selectedTexts();if(!propertyTargets.length)return;
-  const o=propertyTargets[0];$('textBackgroundMode').value=o.textBoxFill?'color':'transparent';$('textBackgroundColor').value=o.textBoxFill||'#ffffff';
-  $('textBorderMode').value=o.textBoxBorder?'color':'none';$('textBorderColor').value=o.textBoxBorder||'#000000';$('textBorderWidth').value=o.textBoxBorderWidth||1;
-  $('textBackgroundMode').onchange();$('textBorderMode').onchange();hideObjectMenu();closePopups();openModal('textPropertiesModal');
-}
-function applyTextProperties(){
-  const fill=$('textBackgroundMode').value==='color'?$('textBackgroundColor').value:null;
-  const border=$('textBorderMode').value==='color'?$('textBorderColor').value:null;
-  const width=Math.max(1,Math.min(30,Number($('textBorderWidth').value)||1));
-  const targets=propertyTargets.filter(o=>c.getObjects().includes(o)||groupEdit?.members.includes(o));
-  targets.forEach(o=>{o.set({textBoxFill:fill,textBoxBorder:border,textBoxBorderWidth:width});o.dirty=true;});
-  propertyTargets=[];closeModal('textPropertiesModal');c.requestRenderAll();if(targets.length)changed();
-}
+function updateSelectionActions() { if(!c)return; $('moreTextPropsBtn').disabled=!targets(c.getActiveObject()).some(o=>TEXT_TYPES.has(o.type)); }
 async function stepHistory(direction) {
   if(!current || historyBusy || busy || modalOpen() || tools?.gesture || isTextEditing()) return;
   const before=history.pages.get(current.id)?.index;
@@ -228,10 +175,10 @@ function deleteSelected() {
   c.discardActiveObject();objects.forEach(o=>c.remove(o));c.requestRenderAll();changed();
 }
 function groupObjects(ungroup=false) {
-  if(!allowed() || isTextEditing()||groupEdit)return;
-  hideObjectMenu();const o=c.getActiveObject();
+  if(!allowed() || isTextEditing())return;
+  const o=c.getActiveObject();
   if(ungroup && o?.type==='group')o.toActiveSelection();
-  else if(!ungroup && o?.type==='activeSelection'){const group=o.toGroup();group.id=uid();group.subTargetCheck=true;}
+  else if(!ungroup && o?.type==='activeSelection'){const group=o.toGroup();group.id=uid();}
   else return;
   c.getObjects().forEach(o=>o.setCoords());c.requestRenderAll();changed();updateHistory();
 }
@@ -239,7 +186,7 @@ function addText(text,point,editing=false) {
   if(text.length>100000)throw Error('텍스트는 한 번에 10만 글자 이하여야 합니다.');
   tools.setMode('select');
   const center=point || fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
-  const object=new fabric.IText(text,{left:center.x,top:center.y,fontFamily:'Arial',fontSize:tools.text.size,fill:tools.text.color,id:uid()});
+  const object=new fabric.IText(text,{left:center.x,top:center.y,fontFamily:'Arial',fontSize:tools.text.size,fill:tools.text.color,backgroundColor:'',stroke:null,strokeWidth:0,id:uid()});
   if(!point)object.setPositionByOrigin(center,'center','center');
   c.add(object);c.setActiveObject(object);object.setCoords();c.requestRenderAll();changed({recordHistory:!editing});
   if(editing){object.enterEditing();object.selectAll();}
@@ -297,25 +244,57 @@ async function importFiles(files,point) {
   }
 }
 
-function setColor(tool,color) {
-  if(busy || !current)return;
-  if(!/^#[0-9a-f]{6}$/i.test(String(color)))return;
-  const normalized=String(color).toLowerCase();
-  if(tool==='bg'){c.setBackgroundColor(color,()=>c.requestRenderAll());changed();}
-  else if(tool==='text') {
-    tools.text.color=normalized;const o=c.getActiveObject();
-    if(o && ['i-text','text','textbox'].includes(o.type)){o.set('fill',color);c.requestRenderAll();changed();}
-  } else {tools[tool].color=normalized;tools.updateBrush();}
-  document.querySelectorAll(`.color-btn[data-tool="${tool}"]`).forEach(b=>b.classList.toggle('selected',b.dataset.color.toLowerCase()===normalized));
-  const custom=$(`customColor_${tool}`);if(custom)custom.value=normalized;
-  const label=$(`customColorValue_${tool}`);if(label)label.textContent=normalized;
+function syncSharedUI(){
+  for(const key of ['pen','marker','text']){tools[key][key==='text'?'size':'width']=shared.sizes[key][shared.level-1];tools[key].color=shared.color;}
+  tools.updateBrush();$('sharedColorInput').value=shared.color;$('sharedLevelSelect').value=String(shared.level);
+  const colors=$('quickColors');colors.replaceChildren();
+  shared.quick.forEach(color=>{const button=document.createElement('button');button.type='button';button.style.backgroundColor=color;button.title=color;button.setAttribute('aria-label',`빠른 색상 ${color}`);button.classList.toggle('selected',color===shared.color);button.onclick=()=>setShared({color});colors.append(button);});
+  const sizes=$('quickSizes');sizes.replaceChildren();
+  for(let level=1;level<=5;level++){const button=document.createElement('button');button.type='button';button.textContent=String(level);button.title=`크기 ${level}단계`;button.classList.toggle('selected',level===shared.level);button.onclick=()=>setShared({level});sizes.append(button);}
+  renderQuickSlots();
 }
+function renderQuickSlots(){
+  const box=$('quickColorSlots');box.replaceChildren();
+  for(const color of shared.quick){const b=document.createElement('button');b.type='button';b.textContent=`${color} 해제`;b.title='빠른 색상에서 해제';b.onclick=()=>{shared.quick=shared.quick.filter(x=>x!==color);saveQuick();syncSharedUI();};box.append(b);}
+  const add=document.createElement('button');add.type='button';add.textContent=`현재 색상 ${shared.color} 등록`;add.disabled=shared.quick.length>=5||shared.quick.includes(shared.color);
+  add.onclick=()=>{shared.quick.push(shared.color);saveQuick();syncSharedUI();};box.append(add);
+  const note=document.createElement('small');note.textContent='빠른 슬롯을 해제해도 현재 색상은 유지됩니다.';box.append(note);
+}
+function saveQuick(){try{localStorage.setItem('wb42.quickColors',JSON.stringify(shared.quick));}catch{}}
+function setShared({color,level}={}){
+  if(!current||busy)return;
+  if(color && !/^#[0-9a-f]{6}$/i.test(color))return;
+  if(color)shared.color=color.toLowerCase();
+  if(level && Number.isInteger(Number(level)) && +level>=1 && +level<=5)shared.level=+level;
+  const active=c.getActiveObject(),n=applyAppearance(active,{color:color?shared.color:null,level:level?shared.level:null,sizes:shared.sizes});
+  if(n){if(active?.type==='group')active.dirty=true;active?.setCoords?.();c.requestRenderAll();changed();}
+  syncSharedUI();
+}
+function sizeMappingUI(){const box=$('sizeMapping');box.replaceChildren();for(const [key,label] of [['pen','펜 굵기(px)'],['marker','형광펜 굵기(px)'],['text','텍스트 크기(px)']]){
+  const row=document.createElement('div');row.textContent=label+'  ';
+  for(let i=0;i<5;i++){const lab=document.createElement('label');lab.textContent=String(i+1);const input=document.createElement('input');input.type='number';input.min='1';input.max=key==='text'?'300':'120';input.value=String(shared.sizes[key][i]);input.setAttribute('aria-label',`${label} ${i+1}단계`);
+    input.onchange=()=>{const n=Number(input.value);if(!Number.isFinite(n)||n<1||n>Number(input.max)){input.value=String(shared.sizes[key][i]);return;}shared.sizes[key][i]=n;if(i===shared.level-1){const selection=c.getActiveObject(),items=targets(selection).filter(o=>key==='text'?TEXT_TYPES.has(o.type):key==='marker'?o.type==='path'&&o.isHighlighter:o.type==='path'&&!o.isHighlighter);for(const o of items){o.set(key==='text'?'fontSize':'strokeWidth',n);o.setCoords();}if(items.length){selection?.setCoords?.();c.requestRenderAll();changed();}}syncSharedUI();};lab.append(input);row.append(lab);
+  }box.append(row);
+}}
+function selectedText(){return targets(c.getActiveObject()).filter(o=>TEXT_TYPES.has(o.type));}
+function openTextProps(){if(!selectedText().length){notify('먼저 텍스트박스를 선택해주세요.');return;}const o=selectedText()[0];$('textBgEnabled').checked=!!o.backgroundColor;$('textBgColor').value=/^#[0-9a-f]{6}$/i.test(o.backgroundColor||'')?o.backgroundColor:'#ffffff';$('textBorderEnabled').checked=!!(o.stroke&&o.strokeWidth);$('textBorderColor').value=/^#[0-9a-f]{6}$/i.test(o.stroke||'')?o.stroke:'#000000';$('textBorderWidth').value=String(o.strokeWidth||2);openModal('textPropsModal');}
+function updateTextProps(){const list=selectedText();if(!list.length)return;for(const o of list){o.set({backgroundColor:$('textBgEnabled').checked?$('textBgColor').value:'',stroke:$('textBorderEnabled').checked?$('textBorderColor').value:null,strokeWidth:$('textBorderEnabled').checked?Math.max(1,Math.min(30,Number($('textBorderWidth').value)||2)):0});o.setCoords();}c.getActiveObject()?.setCoords?.();c.requestRenderAll();changed();}
+function layerToEdge(front){if(!allowed()||isTextEditing())return;const selection=c.getActiveObjects();if(!selection.length)return;const all=c.getObjects(),next=orderedToEdge(all,selection,front);if(next.every((o,i)=>o===all[i]))return;next.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();changed();}
+function closeContext(){const menu=$('objectContextMenu');if(menu)menu.hidden=true;contextTarget=null;}
+function openContext(x,y,target=null){if(!allowed()||tools.mode!=='select')return;closePopups();if(target && !c.getActiveObjects().includes(target)){c.setActiveObject(target);c.requestRenderAll();}
+ const active=c.getActiveObject();if(!active)return;contextTarget=active;const menu=$('objectContextMenu');$('contextGroup').hidden=active.type!=='activeSelection';$('contextUngroup').hidden=active.type!=='group';$('contextTextProps').hidden=!selectedText().length;
+ menu.hidden=false;menu.style.left=Math.max(8,Math.min(innerWidth-menu.offsetWidth-8,x))+'px';menu.style.top=Math.max(8,Math.min(innerHeight-menu.offsetHeight-8,y))+'px';menu.querySelector('button:not([hidden])')?.focus();
+}
+function beginGroupSession(group,child){if(!group ||group.type!=='group')return;const id=group.id,index=c.getObjects().indexOf(group),all=group.getObjects().slice();
+ suppressSelection=true;try{const selection=group.toActiveSelection();groupSession={id,index,all};c.discardActiveObject();c.setActiveObject(child||all[0]);c.requestRenderAll();}finally{suppressSelection=false;}}
+function closeGroupSession(){if(!groupSession||!c)return;const state=groupSession;groupSession=null;const live=state.all.filter(o=>c.getObjects().includes(o));if(live.length<2)return;
+ suppressSelection=true;try{c.discardActiveObject();const selection=new fabric.ActiveSelection(live,{canvas:c});c.setActiveObject(selection);const group=selection.toGroup();group.id=state.id;c.moveTo(group,Math.min(state.index,c.getObjects().length-1));group.setCoords();c.requestRenderAll();changed();}finally{suppressSelection=false;}}
 async function makeCurrentViewportThumbnail(width=320) {
   const ratio=width/Math.max(1,c.getWidth());
   return c.toDataURL({format:'png',multiplier:ratio});
 }
 let openedPopup=null;
-function closePopups() {document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup]').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
+function closePopups() {closeContext();document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup]').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
 function togglePopup(id,button) {
   if(busy)return;
   const was=openedPopup===id;closePopups();if(was)return;
@@ -456,26 +435,55 @@ function wireUI() {
   $('pdfPasswordInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('passwordModalOkBtn').click();}});
   document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
   const modeMap={penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
-  Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;if(groupEdit)endGroupEdit();finishText();tools.setMode(tools.mode===mode?'select':mode);});
-  $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;if(isTextEditing()){finishText();return;}if(groupEdit){endGroupEdit();return;}if(tools.mode==='select'&&c.getActiveObject()){c.discardActiveObject();c.requestRenderAll();return;}tools.setMode(tools.mode==='select'?'move':'select');};
-  document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>setColor(b.dataset.tool,b.dataset.color));
-  document.querySelectorAll('#colorSettingsModal [data-tool-custom]').forEach(input=>input.oninput=e=>setColor(e.target.dataset.toolCustom,e.target.value));
-  $('penSizeSelect').onchange=e=>{tools.pen.width=Number(e.target.value);tools.updateBrush();};
-  $('markerSizeSelect').onchange=e=>{tools.marker.width=Number(e.target.value);tools.updateBrush();};
-  $('freeTextSizeSelect').onchange=e=>{
-    tools.text.size=Number(e.target.value);const o=c.getActiveObject();
-    if(o && ['text','i-text','textbox'].includes(o.type)){o.set('fontSize',tools.text.size);o.setCoords();c.requestRenderAll();changed();}
-  };
+  Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
+  $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
   $('deleteSelectionBtn').onclick=deleteSelected;
-  $('menuGroup').onclick=()=>groupObjects();$('menuUngroup').onclick=()=>groupObjects(true);
-  $('menuGroupEdit').onclick=()=>startGroupEdit(c.getActiveObject());$('menuGroupDone').onclick=endGroupEdit;
-  $('menuFront').onclick=()=>moveLayer(true);$('menuBack').onclick=()=>moveLayer(false);
-  $('menuProperties').onclick=openTextProperties;$('moreTextProperties').onclick=openTextProperties;
-  $('applyTextProperties').onclick=applyTextProperties;
-  $('textBackgroundMode').onchange=()=>{$('textBackgroundColor').disabled=$('textBackgroundMode').value==='transparent';};
-  $('textBorderMode').onchange=()=>{const disabled=$('textBorderMode').value==='none';$('textBorderColor').disabled=disabled;$('textBorderWidth').disabled=disabled;};
+  $('laserModeBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='laser'?'select':'laser');};
+  $('sharedColorInput').oninput=e=>setShared({color:e.target.value});$('sharedLevelSelect').onchange=e=>setShared({level:e.target.value});
+  $('pageBgInput').oninput=e=>{if(!allowed())return;c.setBackgroundColor(e.target.value,()=>c.requestRenderAll());changed();};
+  for(const id of ['textBgEnabled','textBgColor','textBorderEnabled','textBorderColor','textBorderWidth'])$(id).onchange=updateTextProps;
+  $('moreTextPropsBtn').onclick=openTextProps;
+  $('contextGroup').onclick=()=>{closeContext();groupObjects();};$('contextUngroup').onclick=()=>{closeContext();groupObjects(true);};
+  $('contextFront').onclick=()=>{closeContext();layerToEdge(true);};$('contextBack').onclick=()=>{closeContext();layerToEdge(false);};
+  $('contextTextProps').onclick=()=>{closeContext();openTextProps();};
+  // A stationary 600ms touch press opens the object menu; movement cancels it.
+  let pressTimer=null,pressStart=null,suppressNextClick=false;
+  const surface=c.upperCanvasEl;
+  surface.addEventListener('contextmenu',e=>{if(tools.mode!=='select')return;e.preventDefault();const target=c.findTarget(e);openContext(e.clientX,e.clientY,target);});
+  surface.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||tools.mode!=='select')return;const target=c.findTarget(e);if(!target)return;pressStart={x:e.clientX,y:e.clientY};pressTimer=setTimeout(()=>{pressTimer=null;suppressNextClick=true;tools.up();openContext(e.clientX,e.clientY,target);},600);});
+  surface.addEventListener('pointermove',e=>{if(pressStart&&Math.hypot(e.clientX-pressStart.x,e.clientY-pressStart.y)>9){clearTimeout(pressTimer);pressTimer=null;pressStart=null;}});
+  for(const type of ['pointerup','pointercancel'])surface.addEventListener(type,()=>{clearTimeout(pressTimer);pressTimer=null;pressStart=null;});
+  surface.addEventListener('click',e=>{if(suppressNextClick){e.stopImmediatePropagation();suppressNextClick=false;}},true);
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#objectContextMenu'))closeContext();});
+  let blankClick=null;
+  c.on('mouse:down:before',opt=>{
+    if(tools.mode!=='select'||!opt.e||opt.e.button!==0)return;
+    const active=c.getActiveObject(),target=c.findTarget(opt.e);
+    if(!active||target || active.type!=='activeSelection')return;
+    const p=c.getPointer(opt.e),b=active.getBoundingRect(true,true);
+    if(p.x>=b.left&&p.x<=b.left+b.width&&p.y>=b.top&&p.y<=b.top+b.height){
+      blankClick={active,at:Date.now()};
+    }else blankClick=null;
+  });
+  c.on('mouse:up',()=>{
+    if(!blankClick)return;const {active,at}=blankClick;blankClick=null;
+    if(Date.now()-at<450&&!c.getActiveObject()&&active.getObjects?.().every(o=>c.getObjects().includes(o))){c.setActiveObject(active);c.requestRenderAll();}
+  });
+  c.on('mouse:dblclick',opt=>{
+    if(tools.mode!=='select'||!current||busy||modalOpen())return;
+    const o=opt.target;
+    if(o?.type==='group'){const child=opt.subTargets?.find(x=>TEXT_TYPES.has(x.type))||opt.subTargets?.[0]||o.getObjects()[0];beginGroupSession(o,child);if(child && TEXT_TYPES.has(child.type)){child.enterEditing();child.selectAll();}}
+    else if(o&&TEXT_TYPES.has(o.type)){c.setActiveObject(o);o.enterEditing();o.selectAll();}
+    else if(!o&&c.getActiveObject()) {c.discardActiveObject();c.requestRenderAll();}
+  });
+  c.on('selection:cleared',()=>{if(!suppressSelection&&groupSession&&!isTextEditing())closeGroupSession();});
+  surface.addEventListener('pointerdown',e=>{if(isTextEditing() && !c.findTarget(e)?.isEditing)finishText();},true);
   $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
-  $('clearAllBtn').onclick=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.',{title:'전체 삭제',confirmText:'전체 삭제'})){finishText();c.discardActiveObject();c.getObjects().slice().forEach(o=>c.remove(o));c.requestRenderAll();changed();}};
+  const clearPage=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지의 모든 객체를 지울까요? 언두로 되돌릴 수 있습니다.',{title:'현재 페이지 전체 지우기',confirmText:'전체 지우기'})){finishText();c.discardActiveObject();const list=c.getObjects().slice();if(list.length){list.forEach(o=>c.remove(o));c.requestRenderAll();changed();}}};
+  let deleteTimer=null,deleteLong=false;
+  $('deleteSelectionBtn').addEventListener('pointerdown',e=>{if(e.button!==0)return;deleteLong=false;deleteTimer=setTimeout(()=>{deleteLong=true;clearPage().catch(fail);},600);});
+  for(const type of ['pointerup','pointercancel','pointerleave'])$('deleteSelectionBtn').addEventListener(type,()=>{clearTimeout(deleteTimer);deleteTimer=null;});
+  $('deleteSelectionBtn').onclick=e=>{if(deleteLong){e.preventDefault();deleteLong=false;return;}deleteSelected();};
   $('zoomInBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()*1.25);};$('zoomOutBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()/1.25);};$('homeBtn').onclick=()=>{if(allowed())tools.home(current.content.frame);};
   $('toolbarHideBtn').onclick=()=>{const hidden=!$('toolbar').hidden;$('toolbar').hidden=hidden;$('toolbarHideBtn').textContent=hidden?'▲':'▼';$('toolbarHideBtn').setAttribute('aria-expanded',String(!hidden));closePopups();};
   $('prevPageBtn').onclick=()=>{const i=pageIndex();if(i>0)run(()=>activatePage(pages[i-1].id),'이전 페이지를 불러오는 중입니다.');};
@@ -498,7 +506,7 @@ function wireUI() {
   $('loadGeneralBtn').onclick=()=>run(async()=>{await renderSavedScreens();openModal('loadSavedScreenModal');});
   $('copyBtn').onclick=()=>clipboard.copy();$('pasteBtn').onclick=()=>clipboard.paste();
   $('importFileBtn').onclick=()=>{closePopups();$('fileInput').click();};
-  $('colorSettingsBtn').onclick=()=>{if(busy)return;for(const tool of ['bg','pen','marker','text']){const value=tool==='bg'?(c.backgroundColor||'#D6B588'):tool==='pen'?tools.pen.color:tool==='marker'?tools.marker.color:tools.text.color;const input=$(`customColor_${tool}`);if(input)input.value=value;const label=$(`customColorValue_${tool}`);if(label)label.textContent=value;}openModal('colorSettingsModal');};
+  $('colorSettingsBtn').onclick=()=>{if(busy)return;$('pageBgInput').value=/^#[0-9a-f]{6}$/i.test(c.backgroundColor||'')?c.backgroundColor:'#D6B588';sizeMappingUI();syncSharedUI();openModal('sharedSettingsModal');};
   $('fileInput').onchange=e=>{const files=Array.from(e.target.files);e.target.value='';if(files.length)run(()=>importFiles(files),'파일을 가져오는 중입니다.');};
   $('exportBackupBtn').onclick=()=>run(exportBackup,'백업 파일을 만드는 중입니다.');
   $('importBackupBtn').onclick=()=>{closePopups();$('backupInput').click();};
@@ -516,7 +524,7 @@ function wireUI() {
   });
   let spaceMode=null;
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape') {e.preventDefault();if(!$('objectMenu').hidden){hideObjectMenu();return;}if(modalOpen()){document.querySelectorAll('.modal').forEach(m=>{if(m.style.display==='flex')closeModal(m.id);});return;}if(isTextEditing()){finishText();return;}if(endGroupEdit())return;closePopups();c.discardActiveObject();c.requestRenderAll();return;}
+    if(e.key==='Escape') {closeContext();closePopups();document.querySelectorAll('.modal').forEach(m=>{if(m.style.display==='flex')closeModal(m.id);});if(!busy)finishText();return;}
     if(modalOpen()) {
       if(e.key==='Tab') {
         const m=Array.from(document.querySelectorAll('.modal')).find(m=>m.style.display==='flex');
@@ -527,9 +535,9 @@ function wireUI() {
     const cmd=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
     if(cmd && key==='z'){e.preventDefault();stepHistory(e.shiftKey?1:-1).catch(fail);return;}
     else if(cmd && key==='y'){e.preventDefault();stepHistory(1).catch(fail);return;}
-    if(isFormEditing()||isTextEditing())return;
+    if(isFormEditing())return;
+    if(e.key==='F10'&&e.shiftKey&&c.getActiveObject()){e.preventDefault();const o=c.getActiveObject(),rect=o.getBoundingRect(true,true);openContext(rect.left+16,rect.top+16);return;}
     if(busy)return;
-    if((e.key==='F10'&&e.shiftKey)||e.key==='ContextMenu'){e.preventDefault();const o=c.getActiveObject();if(o){const r=o.getBoundingRect(true,true),pt=fabric.util.transformPoint(new fabric.Point(r.left+r.width/2,r.top),c.viewportTransform);showObjectMenu(pt.x,pt.y);}return;}
     else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
     else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects(),{canvas:c}));c.requestRenderAll();}}
     else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
@@ -544,24 +552,16 @@ function wireUI() {
     c.setDimensions({width:window.innerWidth,height:window.innerHeight});c.setViewportTransform([z,0,0,z,c.width/2-center.x*z,c.height/2-center.y*z]);rememberView();
   });
   window.addEventListener('beforeunload',e=>{if(dirty||saving){e.preventDefault();e.returnValue='';}});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(groupEdit)endGroupEdit();finishText();flush().catch(fail);}else refreshRemote();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){finishText();flush().catch(fail);}else refreshRemote();});
   window.addEventListener('focus',refreshRemote);
+  window.addEventListener('blur',()=>finishText());
 }
 async function boot() {
   if(!window.fabric)throw Error('캔버스 라이브러리를 불러오지 못했습니다. 인터넷 연결 또는 CDN 차단 여부를 확인하고 새로고침해주세요.');
-  const originalRender=fabric.IText.prototype._render,originalBg=fabric.IText.prototype._renderBackground;
-  fabric.IText.prototype._renderBackground=function(ctx){
-    if(this.textBoxFill){ctx.fillStyle=this.textBoxFill;ctx.fillRect(-this.width/2,-this.height/2,this.width,this.height);}
-    else originalBg.call(this,ctx);
-  };
-  fabric.IText.prototype._render=function(ctx){
-    originalRender.call(this,ctx);
-    if(this.textBoxBorder){ctx.save();ctx.strokeStyle=this.textBoxBorder;ctx.lineWidth=this.textBoxBorderWidth||1;ctx.strokeRect(-this.width/2,-this.height/2,this.width,this.height);ctx.restore();}
-  };
-  c=new fabric.Canvas('whiteboardCanvas',{width:window.innerWidth,height:window.innerHeight,preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true});
+  c=new fabric.Canvas('whiteboardCanvas',{width:window.innerWidth,height:window.innerHeight,preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true,enablePointerEvents:true});
   fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});
   tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&!busy&&!modalOpen(),onChange:changed,onViewport:rememberView,onText:p=>addText('텍스트',p,true),onMode:mode=>{
-    const map={selectMoveToggleBtn:'select',penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
+    const map={selectMoveToggleBtn:'select',penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser',laserModeBtn:'laser'};
     for(const [id,m] of Object.entries(map))$(id).classList.toggle('active-select',mode===m);
     $('selectMoveLabel').textContent=mode==='move'?'이동':'선택';$('selectMoveToggleBtn').classList.toggle('active-move',mode==='move');
     updateHistory();
@@ -570,44 +570,10 @@ async function boot() {
   sync=new TabSync(refreshRemote);
   await setPage(pages.find(p=>p.id===session.activeId)||pages[0],true);
   clipboard=new SystemClipboard({canvas:c,allowed,run,onChange:changed,onFiles:files=>importFiles(files),onText:text=>addText(text),notify,isTextEditing});
-  c.findTarget=(function(original){return function(e,skipGroup){
-    const found=original.call(this,e,skipGroup),active=this.getActiveObject();
-    if(found||!active||tools?.mode!=='select'||active.isEditing)return found;
-    const p=this.getPointer(e),r=active.getBoundingRect(true,true);
-    return p.x>=r.left&&p.x<=r.left+r.width&&p.y>=r.top&&p.y<=r.top+r.height?active:found;
-  };})(c.findTarget);
-  let longTimer=null,longStart=null,suppressContext=false;
-  const upper=c.upperCanvasEl;
-  let rightClickSelection=null;
-  upper.addEventListener('pointerdown',e=>{if(e.button===2)rightClickSelection=c.getActiveObject();});
-  upper.addEventListener('contextmenu',e=>{
-    if(!allowed()||tools.mode!=='select')return;
-    e.preventDefault();if(suppressContext){suppressContext=false;return;}
-    const target=c.findTarget(e);
-    if(rightClickSelection?.type==='activeSelection' && (!target || target===rightClickSelection || rightClickSelection.getObjects().includes(target))){c.setActiveObject(rightClickSelection);}
-    else if(target&&target!==c.getActiveObject()){c.setActiveObject(target);}
-    rightClickSelection=null;c.requestRenderAll();
-    showObjectMenu(e.clientX,e.clientY);
-  });
-  upper.addEventListener('pointerdown',e=>{hideObjectMenu();if(e.pointerType!=='touch'||!allowed()||tools.mode!=='select')return;
-    const target=c.findTarget(e);if(!target)return;longStart={x:e.clientX,y:e.clientY};
-    longTimer=setTimeout(()=>{longTimer=null;suppressContext=true;tools.up();if(target!==c.getActiveObject())c.setActiveObject(target);c.requestRenderAll();showObjectMenu(e.clientX,e.clientY);},550);
-  });
-  upper.addEventListener('pointermove',e=>{if(longStart&&Math.hypot(e.clientX-longStart.x,e.clientY-longStart.y)>10){clearTimeout(longTimer);longTimer=null;longStart=null;}});
-  for(const event of ['pointerup','pointercancel'])upper.addEventListener(event,()=>{clearTimeout(longTimer);longTimer=null;longStart=null;});
-  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#objectMenu'))hideObjectMenu();});
-  c.on('mouse:dblclick',opt=>{
-    if(!allowed()||tools.mode!=='select')return;
-    const target=opt.target,child=opt.subTargets?.find(o=>o.type==='i-text');
-    if(target?.type==='group'){
-      if(child){startGroupEdit(target,child);child.enterEditing();child.selectAll();}
-      else startGroupEdit(target);
-    }else if(target?.type==='i-text'&&!target.isEditing){c.setActiveObject(target);target.enterEditing();target.selectAll();}
-    else if(!target||target.type==='activeSelection'){c.discardActiveObject();c.requestRenderAll();}
-  });
   c.on('selection:created',updateHistory);c.on('selection:updated',updateHistory);c.on('selection:cleared',updateHistory);
   c.on('object:modified',updateSelectionActions);c.on('after:render',()=>{if(!busy)updateSelectionActions();});
-  c.on('text:editing:exited',()=>{changed();flush().catch(fail);});
-  wireUI();busy=false;updateHistory();
+  c.on('text:editing:exited',()=>{if(groupSession)closeGroupSession();else changed();flush().catch(fail);});
+  try{shared.quick=parseQuickColors(localStorage.getItem('wb42.quickColors'));}catch{}
+  wireUI();busy=false;syncSharedUI();updateHistory();
 }
 boot().catch(error=>{console.error(error);$('fatalError').textContent=`앱을 시작하지 못했습니다. ${error.message} 파일을 직접 열지 말고 HTTPS 배포 주소 또는 localhost에서 실행해주세요.`;$('fatalError').hidden=false;status('시작 실패','error');});
