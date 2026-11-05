@@ -10,9 +10,13 @@ export class PageHistory {
     if (h.items[h.index] === value) return;
     h.items.splice(h.index + 1); h.items.push(value); h.index++;
     let bytes = h.items.reduce((n, s) => n + s.length * 2, 0);
-    while (h.items.length > 1 && (h.items.length > this.limit || bytes > this.byteLimit)) {
+    const currentOversize=value.length * 2 > this.byteLimit;
+    const minItems=currentOversize ? 2 : 1;
+    while (h.items.length > minItems && (h.items.length > this.limit || bytes > this.byteLimit)) {
       bytes -= h.items.shift().length * 2; h.index--;
     }
+    // A single oversized operation must still be undoable once.
+    if(currentOversize && h.items.length===2) h.oversize=true;
   }
   canUndo(id) { return (this.pages.get(id)?.index ?? 0) > 0; }
   canRedo(id) { const h = this.pages.get(id); return !!h && h.index < h.items.length - 1; }

@@ -18,7 +18,7 @@ test('history: duplicate snapshots ignored',()=>{
 });
 test('history: item and memory bounds',()=>{
  const h=new PageHistory(3);h.reset('a',content(1));for(let n=2;n<=6;n++)h.push('a',content(n));assert.equal(h.pages.get('a').items.length,3);
- const m=new PageHistory(40,10);m.reset('a',content(1));m.push('a',content(2));assert.equal(m.pages.get('a').items.length,1);
+ const m=new PageHistory(40,10);m.reset('a',content(1));m.push('a',content(2));assert.equal(m.pages.get('a').items.length,2);
 });
 test('save: matching revision increments version',()=>{
  const r=resolvePageWrite(page,{...page,content:content(2)},2,'new',100);
@@ -55,4 +55,12 @@ test('validation: strips method overrides and prototype keys',()=>{
 });
 test('validation: embedded PNG remains accepted',()=>{
  const c=emptyContent();c.canvas.objects=[{type:'image',src:'data:image/png;base64,aGVsbG8='}];assert.equal(validateContent(c).canvas.objects[0].type,'image');
+});
+
+test('history: oversized single import keeps one-step undo',()=>{
+  const h=new PageHistory(40, 100);
+  h.reset('p',{n:0});
+  h.push('p',{n:'x'.repeat(200)});
+  assert.equal(h.canUndo('p'),true);
+  assert.deepEqual(h.step('p',-1),{n:0});
 });
