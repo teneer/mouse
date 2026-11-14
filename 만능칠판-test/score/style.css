@@ -304,28 +304,40 @@ html, body {width:100%;max-width:100%;overflow-x:hidden}
 .main-scoreboard {
   --card-accent:var(--primary-color);
   width:var(--class-width, 100%);
-  aspect-ratio:var(--class-ratio, 16 / 9);
+  aspect-ratio:var(--score-card-ratio, 4 / 3);
   margin:12px auto 8px;
   display:grid;
   place-content:center;
   grid-template-columns:minmax(0, 1fr);
 }
-.main-controls {gap:4cqw;margin:0;min-width:0}
+.main-controls {gap:2cqw;margin:0;min-width:0}
 .main-btn {
   width:min(42px, 20cqw);
   height:min(40px, 19cqw);
   padding:0;
   line-height:1;
-  font-size:clamp(13px, 11cqw, 24px);
+  font-size:min(20px, 10cqw);
   border-radius:3cqw;
+  background:#edf2f6;
+  color:#3f5669;
 }
-#number {font-size:min(42px, 15cqw);min-width:0;margin:0;line-height:1.1;font-variant-numeric:tabular-nums}
+#number {
+  font-size:min(52px, 22cqw);
+  font-weight:750;
+  min-width:0;
+  margin:0;
+  line-height:1;
+  color:#182f48;
+  font-variant-numeric:tabular-nums;
+}
+#number[data-long-score] {font-size:min(44px, 17cqw)}
+.main-controls:has(#number[data-long-score]) .main-btn {width:min(42px, 14cqw)}
 #change {font-size:8cqw}
 .score-progress-group {
   display:grid;
-  gap:clamp(2px, 2.5cqw, 6px);
+  gap:clamp(4px, 2.5cqw, 6px);
   width:88%;
-  margin:clamp(3px, 8cqw, 16px) auto 0;
+  margin:clamp(8px, 11cqw, 20px) auto 0;
   text-align:center;
 }
 #score-progress {
@@ -364,7 +376,7 @@ html, body {width:100%;max-width:100%;overflow-x:hidden}
 .team-card {
   --card-accent:var(--secondary-color);
   width:100%;
-  aspect-ratio:var(--team-ratio, 4 / 3);
+  aspect-ratio:var(--score-card-ratio, 4 / 3);
   margin:0;
   display:grid;
   align-content:center;
@@ -486,30 +498,39 @@ html, body {width:100%;max-width:100%;overflow-x:hidden}
 #settings-toggle-btn {width:min(34px, 88vw);height:34px;padding:0;font-size:18px}
 .settings-panel {
   top:40px;
-  width:min(250px, 100%);
-  max-height:calc(100dvh - 40px - var(--toolbar-clearance, 0px));
+  width:min(292px, 100%);
+  max-height:max(0px, calc(100dvh - 40px - var(--toolbar-clearance, 0px)));
   padding:clamp(4px, 5vw, 16px);
   overflow:auto;
   overflow-wrap:anywhere;
 }
-.settings-panel button {padding-inline:4px}
-.score-card-ratio {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;font-size:13px}
-.score-card-ratio select {max-width:100%;min-width:0;font:inherit}
-.score-size-controls {display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;text-align:center}
-.score-size-controls > span {width:100%;font-size:12px;font-weight:600}
-.settings-panel .score-size-controls > button {
+.settings-panel h3 {margin:0;padding:0;text-align:left;border:0;font-size:17px}
+.score-settings-section {display:grid;min-width:0;gap:8px;padding-top:10px;border-top:1px solid #dce7ed}
+.score-settings-section h4 {margin:0;font-size:13px;color:#3f5669}
+.score-setting-row {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;font-size:13px}
+.score-setting-row select {max-width:100%;min-width:0;font:inherit}
+.score-setting-row input[type="checkbox"] {width:18px;height:18px;margin:0;accent-color:#185ba8}
+.score-link-rule {justify-content:flex-start;gap:4px}
+.score-size-controls, .score-settings-actions, .score-management-reset {display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.score-size-controls {text-align:center}
+.score-size-controls output {min-width:4ch;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.settings-panel .score-size-controls > button, .settings-panel .score-settings-actions > button,
+.score-management-reset button {
   width:auto;
   max-width:100%;
-  min-height:30px;
-  padding:3px 6px;
-  background:#fff;
+  min-height:32px;
+  padding:4px 7px;
+  background:#edf2f6;
   color:#213b55;
-  border:1px solid #b6c8e8;
+  border:1px solid #dce7ed;
   border-radius:6px;
   font-size:13px;
+  cursor:pointer;
 }
-.settings-panel .score-size-controls > button:hover {background:#e7f1fc}
-.score-size-controls output {font-size:13px;font-weight:700}
+.settings-panel .score-size-controls > button:hover, .settings-panel .score-settings-actions > button:hover,
+.score-management-reset button:hover {background:#e1edf6}
+.score-management-reset {margin-top:16px;gap:6px}
+#management-modal .management-content {width:min(600px, 100%);min-height:0;overflow:auto}
 .modal-box {width:min(500px, calc(100vw - 16px));max-width:100%;max-height:calc(100dvh - var(--toolbar-clearance, 0px) - 8px)}
 .modal-content, .modal-box h3, .modal-buttons {padding:12px}
 .fullscreen-view {max-width:100vw;overflow-x:hidden;padding-bottom:var(--toolbar-clearance, 0px)}

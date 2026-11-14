@@ -5,14 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=test-6">
+    <link rel="stylesheet" href="style.css?v=test-7">
 </head>
 
 <body>
     <div class="container">
         <h1>학급 점수</h1>
         <div class="settings-panel-toggle">
-            <button id="settings-toggle-btn" type="button" aria-label="점수판 설정">⚙️</button>
+            <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙️</button>
         </div>
 
         <div id="display-area">
@@ -76,26 +76,44 @@
             </div>
         </form>
 
-        <div id="settings-panel" class="settings-panel">
-            <h3>설정</h3>
-            <div class="score-size-controls" aria-label="점수판 표시 크기"><span>표시 배율</span><button type="button" id="scoreSizeDown" title="점수판 축소">−</button><output id="scoreSizeValue">100%</output><button type="button" id="scoreSizeUp" title="점수판 확대">＋</button><button type="button" id="scoreSizeReset" title="배율 초기화">100%</button></div>
-            <label class="score-card-ratio">학급 카드 비율
-                <select id="classCardRatio"><option value="16:9">16:9</option><option value="4:3">4:3</option></select>
-            </label>
-            <label class="score-card-ratio">모둠 카드 비율
-                <select id="teamCardRatio"><option value="16:9">16:9</option><option value="4:3">4:3</option></select>
-            </label>
-            <label class="score-card-ratio">점수 연동
-                <select id="score-link-mode">
-                    <option value="on">모둠 점수 연동</option>
-                    <option value="off">연동 안 함</option>
-                </select>
-            </label>
-            <label class="score-card-ratio" id="score-link-rule">모둠 <input id="score-link-points" type="number" min="1" step="1" value="3" aria-label="학급 1점에 필요한 모둠 점수">점 = 학급 1점</label>
-            <button id="open-goal-modal-btn">목표 관리</button>
-            <button id="open-management-modal-btn">점수판 관리</button>
-            <button id="reset-main-btn">학급 점수 초기화</button>
-            <button id="reset-teams-btn">모둠 점수 초기화</button>
+        <div id="settings-panel" class="settings-panel" aria-labelledby="score-settings-title" inert>
+            <h3 id="score-settings-title">점수판 설정</h3>
+            <section class="score-settings-section" aria-labelledby="display-settings-title">
+                <h4 id="display-settings-title">화면 표시</h4>
+                <label class="score-setting-row">카드 비율
+                    <select id="score-card-ratio">
+                        <option value="4:3">4:3</option>
+                        <option value="16:9">16:9</option>
+                    </select>
+                </label>
+                <div class="score-setting-row">
+                    <span id="scale-label">표시 배율</span>
+                    <div class="score-size-controls" role="group" aria-labelledby="scale-label">
+                        <button type="button" id="scoreSizeDown" aria-label="점수판 축소">−</button>
+                        <output id="scoreSizeValue">100%</output>
+                        <button type="button" id="scoreSizeUp" aria-label="점수판 확대">+</button>
+                        <button type="button" id="scoreSizeReset" aria-label="배율을 100%로 초기화">초기화</button>
+                    </div>
+                </div>
+            </section>
+            <section class="score-settings-section" aria-labelledby="link-settings-title">
+                <h4 id="link-settings-title">점수 연동</h4>
+                <label class="score-setting-row">모둠 점수 연동
+                    <input type="checkbox" id="score-link-mode" checked>
+                </label>
+                <label class="score-setting-row score-link-rule" id="score-link-rule">
+                    <span>모둠</span>
+                    <input id="score-link-points" type="number" min="1" step="1" value="3" aria-label="학급 1점에 필요한 모둠 점수">
+                    <span>점 = 학급 1점</span>
+                </label>
+            </section>
+            <section class="score-settings-section" aria-labelledby="manage-settings-title">
+                <h4 id="manage-settings-title">관리</h4>
+                <div class="score-settings-actions">
+                    <button type="button" id="open-goal-modal-btn">목표 관리</button>
+                    <button type="button" id="open-management-modal-btn">점수판 관리</button>
+                </div>
+            </section>
         </div>
 
     </div>
@@ -130,6 +148,11 @@
                 <div id="team-management-list"></div>
                 <button id="add-team-btn" class="add-row-btn" style="margin-top:10px;">+ 모둠 추가</button>
             </div>
+
+            <section class="score-management-reset" aria-label="점수 초기화">
+                <button type="button" id="reset-main-btn">학급 점수 초기화</button>
+                <button type="button" id="reset-teams-btn">모둠 점수 초기화</button>
+            </section>
 
             <div style="margin-top:20px; text-align:right;">
                 <button id="close-management-btn" style="background:#ccc; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">취소</button>
@@ -166,6 +189,6 @@
 
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script src="script.js?v=test-6"></script><script src="panel-ui.js?v=test-6"></script>
+    <script src="script.js?v=test-7"></script><script src="panel-ui.js?v=test-7"></script>
 </body>
 </html>

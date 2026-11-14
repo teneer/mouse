@@ -156,7 +156,7 @@ window.addEventListener('storage', event => {
 });
 
 function renderCurrentState() {
-  numberElement.textContent = count;
+  renderClassNumber(count);
   renderLinkSettings();
   renderTeams();
   renderActiveGoal();
@@ -172,8 +172,13 @@ function displayFloatingNumber(element, amount, topStart, topEnd) {
   element.style.opacity = 1;
   setTimeout(() => { element.style.opacity = 0; element.style.top = topEnd; }, 600);
 }
+function renderClassNumber(score) {
+  const text = String(score);
+  numberElement.textContent = text;
+  numberElement.toggleAttribute('data-long-score', text.length >= 5);
+}
 function updateNumber(className = '', oldScore, newScore) {
-  numberElement.textContent = newScore;
+  renderClassNumber(newScore);
   if (className) {
     numberElement.className = className;
     setTimeout(() => { numberElement.className = ''; }, 200);
@@ -220,17 +225,6 @@ function decrement() { changeClassScore(-step); }
 function syncAllTeamsScore(amount) { // 이전 호출과의 호환을 위해 유지합니다.
   syncFromStorage();
   changeTeamScores(teams.map((_, index) => index), amount);
-}
-function resetScore() {
-  syncFromStorage();
-  const old = count;
-  if (old) recordScoreChange();
-  count = 0;
-  updateNumber('', old, count);
-  displayFloatingNumber(changeElement, '리셋', '0px', '-20px');
-  renderBatchControls();
-  playSound(sounds.confirm);
-  saveToStorage();
 }
 function updateMainScoreFromTeams(oldTotalTeamScore) { return; } // 과거 코드와의 호환용
 
@@ -362,22 +356,6 @@ function changeTeamScores(indices, amount, undoKey = null) {
   if (classDiff) playSound(classDiff > 0 ? sounds.mainIncrease : sounds.mainDecrease);
   playScoreEffect(effect);
 }
-function resetAllTeams() {
-  syncFromStorage();
-  if (!teams.length) return;
-  const oldTotal = totalTeamScore();
-  if (teams.some(team => team.score !== 0)) recordScoreChange();
-  teams.forEach(team => { team.score = 0; });
-  checkForGoalAchievement('team', oldTotal, 0);
-  renderTeams();
-  setTimeout(() => {
-    teams.forEach((team, idx) => displayFloatingNumber(
-      document.getElementById(`team-change-${idx}`), '리셋', '20px', '10px'));
-  }, 10);
-  saveToStorage();
-  playSound(sounds.confirm);
-}
-
 // 모든 효과는 JS에서 만들어서 기존 CSS 파일을 수정할 필요가 없습니다.
 function installEffectStyle() {
   const style = document.createElement('style');
@@ -432,6 +410,7 @@ function playScoreEffect(effect) {
 }
 
 function openManagementModal() {
+  setSettingsOpen(false);
   syncFromStorage();
   document.getElementById('manage-main-score').value = count;
   const list = document.getElementById('team-management-list'); list.innerHTML = '';
@@ -447,8 +426,9 @@ function openManagementModal() {
 function closeAndSaveManagement() {
   syncFromStorage();
   const oldCount = count;
-  let newMain = parseInt(document.getElementById('manage-main-score').value, 10);
-  if (!isNaN(newMain)) count = Math.max(minScore, Math.min(newMain, maxScore));
+  const oldTotal = totalTeamScore();
+  const newMain = parseInt(document.getElementById('manage-main-score').value, 10);
+  const nextCount = Number.isNaN(newMain) ? count : Math.max(minScore, Math.min(newMain, maxScore));
   const newTeams = [];
   document.querySelectorAll('#team-management-list .team-manage-item').forEach(item => {
     let score = parseInt(item.querySelector('.manage-score').value, 10) || 0;
@@ -457,10 +437,17 @@ function closeAndSaveManagement() {
       score: Math.max(minScore, Math.min(score, maxScore))
     });
   });
-  lastScoreChange = null;
-  selectedTeams.clear();
+  const sameTeams = newTeams.length === teams.length && newTeams.every((team, index) => team.name === teams[index].name);
+  if (!sameTeams) {
+    lastScoreChange = null;
+    selectedTeams.clear();
+  } else if (nextCount !== count || newTeams.some((team, index) => team.score !== teams[index].score)) {
+    recordScoreChange();
+  }
+  count = nextCount;
   teams = newTeams;
   updateNumber('', oldCount, count);
+  checkForGoalAchievement('team', oldTotal, totalTeamScore());
   renderTeams(); saveToStorage();
   managementModal.style.display = 'none'; playSound(sounds.confirm);
 }
@@ -477,6 +464,7 @@ document.getElementById('add-team-btn').addEventListener('click', () => {
 });
 
 function openGoalManagementView() {
+  setSettingsOpen(false);
   syncFromStorage(); renderGoalLists(); goalManagementView.style.display = 'flex';
 }
 function closeAndSaveGoalManagementView() {
@@ -566,7 +554,7 @@ function showGoalAlert(message) {
 }
 function validLinkPoints(value) { return Number.isSafeInteger(value) && value >= 1; }
 function renderLinkSettings() {
-  linkMode.value = linkEnabled ? 'on' : 'off';
+  linkMode.checked = linkEnabled;
   linkInput.value = linkPoints;
   linkRule.hidden = !linkEnabled;
 }
@@ -596,7 +584,7 @@ function setScoreLink(enabled, points) {
   updateScoreProgress();
   saveToStorage();
 }
-linkMode.onchange = () => setScoreLink(linkMode.value === 'on', linkPoints);
+linkMode.onchange = () => setScoreLink(linkMode.checked, linkPoints);
 linkInput.onchange = () => setScoreLink(linkEnabled, linkInput.valueAsNumber);
 selectAllButton.onclick = () => {
   syncFromStorage();
@@ -615,20 +603,35 @@ batchForm.onsubmit = event => {
 
 document.getElementById('main-increase-btn').onclick = increment;
 document.getElementById('main-decrease-btn').onclick = decrement;
-document.getElementById('reset-main-btn').onclick = resetScore;
-document.getElementById('reset-teams-btn').onclick = resetAllTeams;
+document.getElementById('reset-main-btn').onclick = () => {
+  document.getElementById('manage-main-score').value = 0;
+};
+document.getElementById('reset-teams-btn').onclick = () => {
+  managementModal.querySelectorAll('.manage-score').forEach(input => { input.value = 0; });
+};
 document.getElementById('open-management-modal-btn').onclick = openManagementModal;
 document.getElementById('save-management-btn').onclick = closeAndSaveManagement;
 document.getElementById('close-management-btn').onclick = closeManagementModal;
 document.getElementById('open-goal-modal-btn').onclick = openGoalManagementView;
 document.getElementById('close-goal-view-btn').onclick = closeAndSaveGoalManagementView;
-let settingsOpen = false;
-settingsToggleBtn.onclick = () => {
-  settingsOpen = !settingsOpen;
-  settingsPanel.classList.toggle('open', settingsOpen);
-};
+function setSettingsOpen(open) {
+  settingsPanel.classList.toggle('open', open);
+  settingsPanel.inert = !open;
+  settingsToggleBtn.setAttribute('aria-expanded', String(open));
+}
+settingsToggleBtn.onclick = () => setSettingsOpen(settingsPanel.inert);
+document.addEventListener('pointerdown', event => {
+  if (!settingsPanel.inert && !settingsPanel.contains(event.target) && !settingsToggleBtn.contains(event.target)) {
+    setSettingsOpen(false);
+  }
+});
 // 활성 탭 단축키: 1~9, 0은 모둠 1~10; Shift+숫자는 -1; 위/아래는 학급 ±1.
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !settingsPanel.inert) {
+    setSettingsOpen(false);
+    settingsToggleBtn.focus();
+    return;
+  }
   if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing || e.repeat) return;
 
   // 입력란과 관리 화면에서는 점수가 의도치 않게 바뀌지 않도록 합니다.

@@ -1,7 +1,6 @@
 (() => {
   const scaleKey = 'whiteboard.test.score-scale.v1';
-  const classRatioKey = 'whiteboard.test.class-card-ratio.v1';
-  const teamRatioKey = 'whiteboard.test.team-card-ratio.v1';
+  const ratioKey = 'whiteboard.test.score-card-ratio.v1';
   const root = document.body;
   const container = document.querySelector('.container');
   const frame = window.frameElement;
@@ -43,23 +42,25 @@
     updateLayout();
   }
 
-  function setupRatio(id, key, cssVariable, defaultRatio) {
-    const select = document.getElementById(id);
-    const saved = readSetting(key);
-    select.value = saved === '16:9' || saved === '4:3' ? saved : defaultRatio;
-    const apply = () => root.style.setProperty(cssVariable, select.value.replace(':', ' / '));
-    select.addEventListener('change', () => {
-      apply();
-      writeSetting(key, select.value);
-    });
-    apply();
+  const ratioSelect = document.getElementById('score-card-ratio');
+  const ratio = [
+    readSetting(ratioKey),
+    readSetting('whiteboard.test.team-card-ratio.v1'),
+    readSetting('whiteboard.test.class-card-ratio.v1'),
+  ].find(value => value === '16:9' || value === '4:3') ?? '4:3';
+  ratioSelect.value = ratio;
+  function applyRatio() {
+    root.style.setProperty('--score-card-ratio', ratioSelect.value.replace(':', ' / '));
   }
+  ratioSelect.addEventListener('change', () => {
+    applyRatio();
+    writeSetting(ratioKey, ratioSelect.value);
+  });
+  applyRatio();
 
   document.getElementById('scoreSizeDown').addEventListener('click', () => setScale(scale - 10));
   document.getElementById('scoreSizeUp').addEventListener('click', () => setScale(scale + 10));
   document.getElementById('scoreSizeReset').addEventListener('click', () => setScale(100));
-  setupRatio('classCardRatio', classRatioKey, '--class-ratio', '16:9');
-  setupRatio('teamCardRatio', teamRatioKey, '--team-ratio', '4:3');
   if (frame) {
     new MutationObserver(updateLayout).observe(frame, {
       attributeFilter: ['data-panel-percent', 'data-toolbar-height'],
