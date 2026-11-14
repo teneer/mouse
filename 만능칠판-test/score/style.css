@@ -350,3 +350,11 @@ body{padding-bottom:85px}
 /* 배율 버튼은 상단 표시줄이 아니라 기존 설정 메뉴 안에 배치 */
 .score-size-controls{position:static;z-index:auto;background:transparent;border:0;padding:6px 0;flex-wrap:wrap;justify-content:center}
 .score-size-controls output{min-width:40px}
+
+/* 설정 안의 배율 조절 버튼은 일반 전체 너비 설정 버튼과 구별 */
+.settings-panel .score-size-controls{display:grid;grid-template-columns:auto 32px 42px 32px;gap:5px;justify-content:center;align-items:center}
+.settings-panel .score-size-controls>span{grid-column:1/-1;text-align:center;font-size:12px;font-weight:600}
+.settings-panel .score-size-controls>button{width:auto;min-width:0;height:30px;padding:3px 5px;background:#fff;color:#213b55;border:1px solid #b6c8e8;border-radius:6px;font-size:13px}
+.settings-panel .score-size-controls>button:hover{background:#e7f1fc}
+.settings-panel .score-size-controls>button#scoreSizeReset{grid-column:1/-1;justify-self:stretch}
+.settings-panel .score-size-controls output{min-width:0;text-align:center}
