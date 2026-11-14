@@ -274,17 +274,19 @@ body.goal-active #goal-panel {
   --score-gold-edge:#b77e13;
 }
 html, body {width:100%;max-width:100%;overflow-x:hidden}
-body {height:100%;min-height:0;overflow-y:auto;background:var(--light-bg)}
+body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
 .container {
   display:flex;
   flex-direction:column;
   width:100%;
-  min-height:100dvh;
+  height:100%;
+  min-height:0;
   max-width:none;
   padding:0 0 var(--toolbar-clearance, 0px);
 }
-#display-area {flex:1;gap:0;max-width:none;padding-bottom:0}
+#display-area {flex:1;min-height:0;gap:0;max-width:none;padding-bottom:0}
 #top-row, #bottom-row, #class-area {min-width:0;max-width:100%}
+#top-row {flex:none}
 #class-area {max-width:none}
 .main-scoreboard {
   container-type:inline-size;
@@ -368,23 +370,36 @@ body {height:100%;min-height:0;overflow-y:auto;background:var(--light-bg)}
 }
 #conversion-rule {margin:0;padding:0;background:none;color:inherit;font:inherit}
 #bottom-row {
+  flex:1;
+  min-height:0;
   width:100%;
   align-items:stretch;
+  gap:10px;
   padding:16px clamp(4px, 3vw, 18px) 18px;
 }
 #selected-team-count {color:var(--muted-text);font-size:12px;text-align:right}
+#team-viewport {
+  flex:1;
+  min-height:0;
+  min-width:0;
+  overflow:auto;
+  scrollbar-width:thin;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable both-edges;
+}
 .scoreboard {
-  width:100%;
+  width:max-content;
   max-width:none;
-  margin:10px auto 0;
+  margin:0 auto;
   display:grid;
-  grid-template-columns:repeat(var(--team-columns, 3), minmax(0, 1fr));
+  grid-template-columns:repeat(var(--team-columns, 1), var(--team-card-width, 96px));
   gap:var(--team-gap, 8px);
 }
 .team-card {
-  container-type:inline-size;
+  container-type:size;
   display:grid;
-  grid-template-rows:1fr auto;
+  grid-template-rows:minmax(0, 1fr) auto;
+  min-height:0;
   position:relative;
   width:100%;
   min-width:0;
@@ -406,10 +421,10 @@ body {height:100%;min-height:0;overflow-y:auto;background:var(--light-bg)}
 }
 .team-select-btn {
   display:grid;
-  grid-template-rows:auto 1fr;
-  gap:4px;
+  grid-template-rows:auto minmax(0, 1fr);
+  gap:min(4px, 3cqh);
   min-width:0;
-  padding:10px min(8px, 10cqw) 3px;
+  padding:min(10px, 7cqh) min(8px, 10cqw) 0;
   border:0;
   border-radius:inherit;
   background:transparent;
@@ -423,19 +438,20 @@ body {height:100%;min-height:0;overflow-y:auto;background:var(--light-bg)}
   max-width:100%;
   margin:0;
   padding:0;
-  font-size:clamp(10px, 17cqw, 15px);
+  font-size:clamp(9px, 15cqh, 15px);
   font-weight:650;
   line-height:1.2;
 }
-.team-controls {margin:0;min-width:0}
+.team-controls {margin:0;min-width:0;min-height:0}
 .team-number {
   min-width:0;
-  font-size:clamp(13px, calc(25cqw * var(--score-scale, 1)), 50px);
+  font-size:min(var(--team-score-max, 32px), 41cqh, max(10px, calc(25cqw * var(--score-scale, 1))));
   font-weight:700;
   line-height:1.05;
-  overflow-wrap:anywhere;
+  white-space:nowrap;
   font-variant-numeric:tabular-nums;
 }
+.team-number[data-long-score] {font-size:min(var(--team-score-max, 32px), 41cqh, 24cqw)}
 .team-change {font-size:min(20px, 17cqw)}
 .team-steps {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));padding:0 3px 3px}
 .team-steps button {
@@ -444,23 +460,19 @@ body {height:100%;min-height:0;overflow-y:auto;background:var(--light-bg)}
   position:static;
   width:100%;
   min-width:0;
-  min-height:clamp(27px, 34cqw, 44px);
+  min-height:min(44px, 38cqh);
   padding:0;
   border:0;
   border-radius:8px;
   background:transparent;
   color:var(--text-color);
   font:inherit;
-  font-size:clamp(16px, 25cqw, 23px);
+  font-size:min(23px, 33cqh);
   font-weight:700;
   line-height:1;
   cursor:pointer;
 }
 .team-steps .team-plus-btn {color:var(--primary-dark)}
-body[data-card-ratio="16:9"] .team-select-btn {padding-top:5px;gap:1px}
-body[data-card-ratio="16:9"] .team-name {font-size:clamp(10px, 12cqw, 14px)}
-body[data-card-ratio="16:9"] .team-number {font-size:clamp(13px, calc(19cqw * var(--score-scale, 1)), 42px)}
-body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 44px)}
 .team-steps button:hover {background:color-mix(in srgb, var(--card-bg) 52%, transparent)}
 [hidden] {display:none !important}
 #batch-score {
@@ -469,8 +481,8 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
   justify-content:space-between;
   align-items:center;
   gap:6px;
-  position:sticky;
-  bottom:var(--toolbar-clearance, 0px);
+  flex:none;
+  position:relative;
   z-index:5;
   margin:0;
   padding:10px clamp(4px, 3vw, 18px);
@@ -479,13 +491,18 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
 }
 .batch-actions {
   display:flex;
-  justify-content:flex-end;
+  flex:0 0 auto;
+  width:max-content;
+  justify-content:safe flex-end;
   align-items:center;
-  flex-wrap:wrap;
+  overflow-x:auto;
+  scrollbar-width:thin;
   gap:4px;
   max-width:100%;
   margin-left:auto;
+  padding:2px;
 }
+.batch-actions > * {flex:none}
 #batch-score button {
   min-height:42px;
   padding:0 6px;
@@ -497,7 +514,7 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
   font-weight:700;
   cursor:pointer;
 }
-#batch-score #apply-batch {background:var(--primary-color);color:#fff}
+#batch-score #apply-batch {min-width:min(60px, 100%);background:var(--primary-color);color:#fff}
 #batch-score button:disabled {opacity:.55;cursor:default}
 .batch-amount {display:flex;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
 #batch-delta {
@@ -514,7 +531,7 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
 .batch-stepper {display:grid;border-left:1px solid var(--panel-line)}
 #batch-score .batch-stepper button {min-height:21px;width:26px;padding:0;border-radius:0}
 #batch-score .batch-stepper button + button {border-top:1px solid var(--panel-line)}
-#score-link-points {width:min(76px, 100%);font:inherit}
+#score-link-points, #score-fixed-columns {width:min(76px, 100%);font:inherit}
 .settings-panel {
   display:grid;
   position:fixed;
@@ -566,7 +583,7 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
 .goal-header .close-btn, .management-footer button {font:inherit;min-height:36px;padding:5px 9px;border-radius:9px;cursor:pointer}
 .management-footer {margin-top:14px;text-align:right}
 .management-footer button {background:var(--control-bg);color:inherit;border:1px solid var(--panel-line)}
-#manage-main-score, .manage-input, .goal-row input, .score-setting-row select, #score-link-points {
+#manage-main-score, .manage-input, .goal-row input, .score-setting-row select, #score-link-points, #score-fixed-columns {
   border:1px solid var(--panel-line);
   border-radius:8px;
   background:var(--light-bg);
@@ -582,13 +599,8 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
 .goal-list-header {font-size:12px;overflow-wrap:anywhere}
 .goal-row input {min-width:0;font-size:12px;padding:5px}
 .add-row-btn {margin-top:8px;background:var(--control-bg);color:var(--text-color)}
-@media (max-width:380px) {
-  #batch-score {flex-direction:column;align-items:stretch}
-  #select-all-teams {align-self:flex-start}
-}
 @media (pointer:coarse) {
-  #settings-toggle-btn, .main-btn, .team-steps button, #batch-score button {min-height:44px}
-  body[data-card-ratio="16:9"] .team-steps button {min-height:44px}
+  #settings-toggle-btn, .main-btn, #batch-score button {min-height:44px}
   #batch-score .batch-stepper button {min-height:22px}
 }
 .modal-box {width:min(500px, calc(100vw - 16px));max-width:100%;max-height:calc(100dvh - var(--toolbar-clearance, 0px) - 8px)}
@@ -598,4 +610,9 @@ body[data-card-ratio="16:9"] .team-steps button {min-height:clamp(23px, 20cqw, 4
 #goal-panel {max-width:100%}
 body.goal-active #top-row {flex-direction:column;align-items:stretch;gap:10px}
 body.goal-active #class-area {width:100%;max-width:100%;margin:0}
-body.goal-active #goal-panel {position:relative;inset:auto;width:100%;height:auto;min-height:135px;transform:none;opacity:1;pointer-events:auto}
+body.goal-active #goal-panel {
+  position:relative;inset:auto;width:100%;height:auto;min-height:0;
+  max-height:min(200px, 25dvh);overflow:auto;
+  transform:none;opacity:1;pointer-events:auto;
+}
+.score-setting-hint {margin:0;font-size:12px;line-height:1.4;color:var(--muted-text)}

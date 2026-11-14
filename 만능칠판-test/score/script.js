@@ -249,6 +249,7 @@ function createTeams() {
 function renderTeams() {
   const hasTeams = teams.length > 0;
   createTeamsBtnWrap.style.display = hasTeams ? 'none' : 'flex';
+  document.getElementById('team-viewport').hidden = !hasTeams;
   scoreboard.innerHTML = '';
   teams.forEach((team, idx) => {
     const card = document.createElement('div');
@@ -270,7 +271,8 @@ function renderTeams() {
     const controls = document.createElement('span'); controls.className = 'team-controls';
     const numberSpan = document.createElement('span');
     numberSpan.id = `team-number-${idx}`;
-    numberSpan.className = 'team-number'; numberSpan.textContent = team.score;
+    numberSpan.className = 'team-number';
+    renderTeamNumber(numberSpan, team.score);
     controls.appendChild(numberSpan); selectButton.appendChild(controls);
     const changeEl = document.createElement('div');
     changeEl.id = `team-change-${idx}`; changeEl.className = 'team-change';
@@ -292,6 +294,12 @@ function renderTeams() {
   renderBatchControls();
   updateScoreProgress();
 }
+function renderTeamNumber(element, score) {
+  const text = String(score);
+  element.textContent = text;
+  element.toggleAttribute('data-long-score', text.length >= 4);
+}
+
 function renderBatchControls() {
   Array.from(scoreboard.children).forEach((card, index) => {
     const selected = selectedTeams.has(index);
@@ -303,7 +311,7 @@ function renderBatchControls() {
   selectAllButton.disabled = !teams.length;
   const targetCount = selectedTeams.size;
   selectedTeamCount.textContent = targetCount ? `${targetCount}모둠 선택` : '';
-  applyBatchButton.textContent = targetCount ? `${targetCount}모둠에 반영` : '반영';
+  applyBatchButton.setAttribute('aria-label', targetCount ? `${targetCount}모둠에 반영` : '반영');
   updateBatchButton();
   undoButton.disabled = !lastScoreChange;
 }
@@ -338,7 +346,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
     teams[index].score = next;
     const numberEl = document.getElementById(`team-number-${index}`);
     if (numberEl) {
-      numberEl.textContent = next;
+      renderTeamNumber(numberEl, next);
       numberEl.className = 'team-number ' + (amount > 0 ? 'team-increase' : 'team-decrease');
       setTimeout(() => { numberEl.className = 'team-number'; }, 200);
     }
@@ -595,6 +603,12 @@ selectAllButton.onclick = () => {
   else teams.forEach((_, index) => selectedTeams.add(index));
   renderBatchControls();
 };
+const scoreBackground = '.container, #display-area, #top-row, #class-area, .main-scoreboard, #bottom-row, #team-viewport, #scoreboard, #batch-score';
+document.querySelector('.container').addEventListener('click', event => {
+  if (!selectedTeams.size || !event.target.matches(scoreBackground)) return;
+  selectedTeams.clear();
+  renderBatchControls();
+});
 undoButton.onclick = undoScore;
 batchDelta.oninput = updateBatchButton;
 for (const [id, delta] of [['batch-up', 1], ['batch-down', -1]]) {
