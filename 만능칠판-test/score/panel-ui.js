@@ -4,6 +4,7 @@
   const root = document.body;
   const container = document.querySelector('.container');
   const frame = window.frameElement;
+  const classCardMultiplier = 1.25;
   const scaleOutput = document.getElementById('scoreSizeValue');
 
   function readSetting(key) {
@@ -24,13 +25,18 @@
     const panelPercent = Number(frame?.dataset.panelPercent ?? 30);
     const gap = Math.min(8, Math.floor(available / 12));
     const minimumCardWidth = 150;
-    const fittedColumns = Math.max(1, Math.floor((available + gap) / (minimumCardWidth + gap)));
-    const columns = panelPercent <= 10 ? 1 : Math.min(panelPercent <= 30 ? 3 : 12, fittedColumns);
+    let columns = 3;
+    if (panelPercent <= 10) columns = 1;
+    else if (panelPercent < 30) columns = 2;
+    else if (panelPercent > 30) {
+      columns = Math.max(3, Math.min(12, Math.floor((available + gap) / (minimumCardWidth + gap))));
+    }
     const slotWidth = (available - gap * (columns - 1)) / columns;
-    const cardWidth = Math.floor(4 * Math.min(slotWidth, Math.min(slotWidth, 220) * scale / 100)) / 4;
-    root.style.setProperty('--class-width', `${cardWidth}px`);
+    const scaledWidth = Math.min(slotWidth, 220) * scale / 100;
+    const teamCardWidth = Math.floor(4 * Math.min(slotWidth, scaledWidth, available / classCardMultiplier)) / 4;
+    root.style.setProperty('--class-width', `${teamCardWidth * classCardMultiplier}px`);
     root.style.setProperty('--team-columns', String(columns));
-    root.style.setProperty('--team-row-width', `${(cardWidth * columns + gap * (columns - 1)).toFixed(3)}px`);
+    root.style.setProperty('--team-row-width', `${(teamCardWidth * columns + gap * (columns - 1)).toFixed(3)}px`);
     root.style.setProperty('--team-gap', `${gap}px`);
     root.style.setProperty('--toolbar-clearance', `${Number(frame?.dataset.toolbarHeight ?? 0)}px`);
   }
