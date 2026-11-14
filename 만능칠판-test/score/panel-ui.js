@@ -4,7 +4,6 @@
   const root = document.body;
   const container = document.querySelector('.container');
   const frame = window.frameElement;
-  const classCardMultiplier = 1.25;
   const scaleOutput = document.getElementById('scoreSizeValue');
 
   function readSetting(key) {
@@ -31,12 +30,7 @@
     else if (panelPercent > 30) {
       columns = Math.max(3, Math.min(12, Math.floor((available + gap) / (minimumCardWidth + gap))));
     }
-    const slotWidth = (available - gap * (columns - 1)) / columns;
-    const scaledWidth = Math.min(slotWidth, 220) * scale / 100;
-    const teamCardWidth = Math.floor(4 * Math.min(slotWidth, scaledWidth, available / classCardMultiplier)) / 4;
-    root.style.setProperty('--class-width', `${teamCardWidth * classCardMultiplier}px`);
     root.style.setProperty('--team-columns', String(columns));
-    root.style.setProperty('--team-row-width', `${(teamCardWidth * columns + gap * (columns - 1)).toFixed(3)}px`);
     root.style.setProperty('--team-gap', `${gap}px`);
     root.style.setProperty('--toolbar-clearance', `${Number(frame?.dataset.toolbarHeight ?? 0)}px`);
   }
@@ -44,8 +38,8 @@
   function setScale(next) {
     scale = Math.max(60, Math.min(150, next));
     scaleOutput.textContent = `${scale}%`;
+    root.style.setProperty('--score-scale', String(scale / 100));
     writeSetting(scaleKey, scale);
-    updateLayout();
   }
 
   const ratioSelect = document.getElementById('score-card-ratio');
@@ -56,6 +50,7 @@
   ].find(value => value === '16:9' || value === '4:3') ?? '4:3';
   ratioSelect.value = ratio;
   function applyRatio() {
+    root.dataset.cardRatio = ratioSelect.value;
     root.style.setProperty('--score-card-ratio', ratioSelect.value.replace(':', ' / '));
   }
   ratioSelect.addEventListener('change', () => {
@@ -74,4 +69,5 @@
   }
   new ResizeObserver(updateLayout).observe(container);
   setScale(scale);
+  updateLayout();
 })();

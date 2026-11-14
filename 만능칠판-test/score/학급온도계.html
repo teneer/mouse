@@ -5,21 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=test-7">
+    <link rel="stylesheet" href="style.css?v=classroom-1">
 </head>
 
 <body>
     <div class="container">
-        <h1>학급 점수</h1>
-        <div class="settings-panel-toggle">
-            <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙️</button>
-        </div>
-
         <div id="display-area">
-            
             <div id="top-row">
-                <div id="class-area">
+                <section id="class-area" aria-labelledby="class-score-title">
                     <div class="main-scoreboard">
+                        <header class="class-heading">
+                            <h1 id="class-score-title">학급 점수</h1>
+                            <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
+                        </header>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
                             <span id="number">0</span>
@@ -30,10 +28,13 @@
                             <div id="score-progress" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
                                 <div class="score-progress-fill"></div>
                             </div>
-                            <span id="conversion-rule">모둠 3점 = 학급 1점</span>
+                            <div class="conversion-line">
+                                <span id="conversion-rule">모둠 3점 = 학급 1점</span>
+                                <span id="conversion-progress" aria-hidden="true"></span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <div id="goal-panel">
                     <div class="goal-header-row">
@@ -51,14 +52,17 @@
                 </div>
             </div>
 
-            <div id="bottom-row">
-                <h2 id="scoreboard-title" style="display: none;">모둠 점수</h2>
+            <section id="bottom-row" aria-labelledby="scoreboard-title">
+                <header class="team-heading">
+                    <h2 id="scoreboard-title">모둠 점수</h2>
+                    <span id="selected-team-count" role="status"></span>
+                </header>
                 <div id="scoreboard" class="scoreboard"></div>
                 
                 <div id="create-teams-btn-wrap">
                     <button id="create-teams-btn" onclick="showTeamSetupModal()">모둠 점수판 생성</button>
                 </div>
-            </div>
+            </section>
         </div>
 
         <form id="batch-score" hidden>
@@ -80,7 +84,7 @@
             <h3 id="score-settings-title">점수판 설정</h3>
             <section class="score-settings-section" aria-labelledby="display-settings-title">
                 <h4 id="display-settings-title">화면 표시</h4>
-                <label class="score-setting-row">카드 비율
+                <label class="score-setting-row">모둠 카드 비율
                     <select id="score-card-ratio">
                         <option value="4:3">4:3</option>
                         <option value="16:9">16:9</option>
@@ -126,27 +130,27 @@
                 <input type="number" id="team-count" min="1" max="12" value="6">
             </div>
             <div class="modal-footer" style="padding: 20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="closeTeamSetupModal()" style="padding:8px 16px;">취소</button>
+                <button onclick="hideTeamSetupModal()" style="padding:8px 16px;">취소</button>
                 <button onclick="createTeams()" style="padding:8px 16px; background:#3498db; color:white; border:none; border-radius:4px;">확인</button>
             </div>
         </div>
     </div>
 
-    <div id="management-modal" class="fullscreen-view">
+    <div id="management-modal" class="fullscreen-view" role="dialog" aria-modal="true" aria-labelledby="manage-title">
         <div class="goal-header">
-            <h2>점수판 관리</h2>
+            <h2 id="manage-title">점수판 관리</h2>
             <button id="save-management-btn" class="close-btn">저장 및 닫기</button>
         </div>
-        <div class="management-content" style="padding:20px; max-width:600px; margin:0 auto;">
+        <div class="management-content">
              <div class="setting-item" style="margin-bottom:20px;">
-                <label style="display:block; font-weight:bold; margin-bottom:5px;">학급 점수 수정:</label>
-                <input type="number" id="manage-main-score" style="width:100%; padding:8px; font-size:16px;">
+                <label for="manage-main-score">학급 점수</label>
+                <input type="number" id="manage-main-score">
             </div>
              
              <div class="setting-item">
-                <label style="display:block; font-weight:bold; margin-bottom:5px;">모둠 점수 관리:</label>
+                <h3>모둠 점수</h3>
                 <div id="team-management-list"></div>
-                <button id="add-team-btn" class="add-row-btn" style="margin-top:10px;">+ 모둠 추가</button>
+                <button id="add-team-btn" class="add-row-btn">+ 모둠 추가</button>
             </div>
 
             <section class="score-management-reset" aria-label="점수 초기화">
@@ -154,15 +158,15 @@
                 <button type="button" id="reset-teams-btn">모둠 점수 초기화</button>
             </section>
 
-            <div style="margin-top:20px; text-align:right;">
-                <button id="close-management-btn" style="background:#ccc; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">취소</button>
+            <div class="management-footer">
+                <button id="close-management-btn">취소</button>
             </div>
         </div>
     </div>
 
-    <div id="goal-management-view" class="fullscreen-view">
+    <div id="goal-management-view" class="fullscreen-view" role="dialog" aria-modal="true" aria-labelledby="goal-manage-title">
         <div class="goal-header">
-            <h2>목표 관리</h2>
+            <h2 id="goal-manage-title">목표 관리</h2>
             <button id="close-goal-view-btn" class="close-btn">완료</button>
         </div>
         <div class="goal-container">
@@ -189,6 +193,6 @@
 
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script src="script.js?v=test-7"></script><script src="panel-ui.js?v=test-8"></script>
+    <script src="script.js?v=classroom-1"></script><script src="panel-ui.js?v=classroom-1"></script>
 </body>
 </html>

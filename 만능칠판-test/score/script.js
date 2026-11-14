@@ -31,7 +31,7 @@ const selectedTeams = new Set();
 const numberElement = document.getElementById('number');
 const changeElement = document.getElementById('change');
 const scoreboard = document.getElementById('scoreboard');
-const scoreboardTitle = document.getElementById('scoreboard-title');
+const selectedTeamCount = document.getElementById('selected-team-count');
 const createTeamsBtnWrap = document.getElementById('create-teams-btn-wrap');
 const teamSetupModal = document.getElementById('team-setup-modal');
 const managementModal = document.getElementById('management-modal');
@@ -41,6 +41,7 @@ const goalManagementView = document.getElementById('goal-management-view');
 const goalAlert = document.getElementById('goal-alert');
 const progress = document.getElementById('score-progress');
 const conversionRule = document.getElementById('conversion-rule');
+const conversionProgress = document.getElementById('conversion-progress');
 const linkMode = document.getElementById('score-link-mode');
 const linkRule = document.getElementById('score-link-rule');
 const linkInput = document.getElementById('score-link-points');
@@ -247,7 +248,6 @@ function createTeams() {
 }
 function renderTeams() {
   const hasTeams = teams.length > 0;
-  scoreboardTitle.style.display = hasTeams ? '' : 'none';
   createTeamsBtnWrap.style.display = hasTeams ? 'none' : 'flex';
   scoreboard.innerHTML = '';
   teams.forEach((team, idx) => {
@@ -262,19 +262,10 @@ function renderTeams() {
       renderBatchControls();
     };
     card.appendChild(selectButton);
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'team-remove-btn';
-    removeBtn.type = 'button';
-    removeBtn.setAttribute('aria-label', `${team.name} 삭제 메뉴`);
-    removeBtn.textContent = '×';
-    removeBtn.onclick = e => { e.stopPropagation(); openManagementModal(); };
-    card.appendChild(removeBtn);
     const nameSpan = document.createElement('span');
     nameSpan.className = 'team-name';
     nameSpan.textContent = team.name;
     nameSpan.title = team.name;
-    const halfLength = Math.ceil(Array.from(nameSpan.textContent).length / 2);
-    nameSpan.style.setProperty('--team-name-half-length', Math.max(7, halfLength));
     selectButton.appendChild(nameSpan);
     const controls = document.createElement('span'); controls.className = 'team-controls';
     const numberSpan = document.createElement('span');
@@ -284,6 +275,8 @@ function renderTeams() {
     const changeEl = document.createElement('div');
     changeEl.id = `team-change-${idx}`; changeEl.className = 'team-change';
     card.appendChild(changeEl);
+    const steps = document.createElement('div');
+    steps.className = 'team-steps';
     for (const delta of [-step, step]) {
       const button = document.createElement('button');
       button.type = 'button';
@@ -291,8 +284,9 @@ function renderTeams() {
       button.textContent = delta < 0 ? '−' : '+';
       button.setAttribute('aria-label', `${team.name} 1점 ${delta < 0 ? '차감' : '추가'}`);
       button.onclick = () => changeTeamScore(idx, delta);
-      card.appendChild(button);
+      steps.appendChild(button);
     }
+    card.appendChild(steps);
     scoreboard.appendChild(card);
   });
   renderBatchControls();
@@ -307,8 +301,16 @@ function renderBatchControls() {
   batchForm.hidden = teams.length === 0 && !lastScoreChange;
   selectAllButton.textContent = selectedTeams.size ? '전체해제' : '전체선택';
   selectAllButton.disabled = !teams.length;
-  applyBatchButton.disabled = !selectedTeams.size;
+  const targetCount = selectedTeams.size;
+  selectedTeamCount.textContent = targetCount ? `${targetCount}모둠 선택` : '';
+  applyBatchButton.textContent = targetCount ? `${targetCount}모둠에 반영` : '반영';
+  updateBatchButton();
   undoButton.disabled = !lastScoreChange;
+}
+
+function updateBatchButton() {
+  const delta = batchDelta.valueAsNumber;
+  applyBatchButton.disabled = !selectedTeams.size || !Number.isSafeInteger(delta) || delta === 0;
 }
 
 function totalTeamScore() {
@@ -416,7 +418,7 @@ function openManagementModal() {
   const list = document.getElementById('team-management-list'); list.innerHTML = '';
   teams.forEach(team => {
     const item = document.createElement('div'); item.className = 'team-manage-item';
-    item.innerHTML = '<input type="text" class="manage-input manage-name" maxlength="20"> <input type="number" class="manage-input manage-score"> <button class="delete-team-btn">×</button>';
+    item.innerHTML = '<input type="text" class="manage-input manage-name" maxlength="20"> <input type="number" class="manage-input manage-score"> <button type="button" class="delete-team-btn" aria-label="모둠 삭제">삭제</button>';
     item.querySelector('.manage-name').value = team.name;
     item.querySelector('.manage-score').value = team.score;
     list.appendChild(item);
@@ -458,7 +460,7 @@ document.getElementById('team-management-list').addEventListener('click', e => {
 document.getElementById('add-team-btn').addEventListener('click', () => {
   const list = document.getElementById('team-management-list');
   const item = document.createElement('div'); item.className = 'team-manage-item';
-  item.innerHTML = '<input type="text" class="manage-input manage-name" maxlength="20"> <input type="number" class="manage-input manage-score" value="0"> <button class="delete-team-btn">×</button>';
+  item.innerHTML = '<input type="text" class="manage-input manage-name" maxlength="20"> <input type="number" class="manage-input manage-score" value="0"> <button type="button" class="delete-team-btn" aria-label="모둠 삭제">삭제</button>';
   item.querySelector('.manage-name').value = `모둠 ${list.children.length + 1}`;
   list.appendChild(item); item.querySelector('.manage-name').focus();
 });
@@ -502,7 +504,7 @@ function addGoalRowToDOM(type, score = '', message = '', completed = false) {
   row.querySelector('.goal-message').value = message;
   document.getElementById(`${type}-goals-list`).appendChild(row);
 }
-document.querySelectorAll('.add-row-btn').forEach(btn => {
+goalManagementView.querySelectorAll('.add-row-btn').forEach(btn => {
   btn.onclick = () => addGoalRowToDOM(btn.dataset.type);
 });
 goalManagementView.addEventListener('click', e => {
@@ -568,6 +570,7 @@ function updateScoreProgress() {
   progress.setAttribute('aria-valuemax', linkPoints);
   progress.setAttribute('aria-valuenow', remainder);
   progress.setAttribute('aria-valuetext', `${remainder}점 / ${linkPoints}점`);
+  conversionProgress.textContent = linkEnabled ? `${remainder} / ${linkPoints}` : '';
   conversionRule.textContent = linkEnabled ? `모둠 ${linkPoints}점 = 학급 1점` : '점수 연동 안 함';
 }
 function setScoreLink(enabled, points) {
@@ -593,8 +596,13 @@ selectAllButton.onclick = () => {
   renderBatchControls();
 };
 undoButton.onclick = undoScore;
-document.getElementById('batch-up').onclick = () => batchDelta.value = (batchDelta.valueAsNumber || 0) + 1;
-document.getElementById('batch-down').onclick = () => batchDelta.value = (batchDelta.valueAsNumber || 0) - 1;
+batchDelta.oninput = updateBatchButton;
+for (const [id, delta] of [['batch-up', 1], ['batch-down', -1]]) {
+  document.getElementById(id).onclick = () => {
+    batchDelta.value = (batchDelta.valueAsNumber || 0) + delta;
+    updateBatchButton();
+  };
+}
 batchForm.onsubmit = event => {
   event.preventDefault();
   syncFromStorage();
