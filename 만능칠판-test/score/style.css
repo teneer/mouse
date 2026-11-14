@@ -327,3 +327,26 @@ body.goal-active #top-row{flex-direction:column;align-items:stretch;gap:10px}
 body.goal-active #class-area{width:100%;max-width:100%;margin:0}
 body.goal-active #goal-panel{position:relative;top:auto;right:auto;bottom:auto;width:100%;height:auto;min-height:135px;transform:none;opacity:1;pointer-events:auto}
 @media(max-width:340px){.scoreboard{gap:4px}.team-card{padding:7px 1px 30px}.team-name{font-size:10px}.team-number{font-size:23px}}
+
+/* 카드의 원본 형태를 유지: 가로·세로 크기는 동일 배율로 조정 */
+body{padding-bottom:85px}
+#display-area{width:var(--score-inverse-width,100%);max-width:none}
+.main-scoreboard{
+ width:min(100%,400px);max-width:400px;
+ aspect-ratio:400 / 210;min-height:0;
+ padding:12px 8px;margin:12px auto 8px;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.main-controls{width:100%;justify-content:center}
+.scoreboard{align-items:start}
+.team-card{
+ aspect-ratio:200 / 155;min-height:0;
+ display:flex;flex-direction:column;justify-content:center;
+ padding:9px 4px 30px;overflow:hidden;
+}
+.team-name{flex:0 0 auto}
+.team-controls{flex:0 0 auto}
+@media(max-width:340px){.team-card{padding:6px 1px 26px}}
+/* 배율 버튼은 상단 표시줄이 아니라 기존 설정 메뉴 안에 배치 */
+.score-size-controls{position:static;z-index:auto;background:transparent;border:0;padding:6px 0;flex-wrap:wrap;justify-content:center}
+.score-size-controls output{min-width:40px}

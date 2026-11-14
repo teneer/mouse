@@ -9,7 +9,7 @@
 </head>
 
 <body>
-    <div class="score-size-controls" aria-label="점수판 표시 크기"><button type="button" id="scoreSizeDown" title="점수판 축소">−</button><output id="scoreSizeValue">100%</output><button type="button" id="scoreSizeUp" title="점수판 확대">＋</button><button type="button" id="scoreSizeReset" title="점수판 크기 초기화">원래 크기</button></div><div class="container">
+    <div class="container">
         <h1>학급 점수판 v.7</h1>
 
         <div id="display-area">
@@ -58,6 +58,7 @@
         
         <div id="settings-panel" class="settings-panel">
             <h3>설정</h3>
+            <div class="score-size-controls" aria-label="점수판 표시 크기"><span>표시 배율</span><button type="button" id="scoreSizeDown" title="점수판 축소">−</button><output id="scoreSizeValue">100%</output><button type="button" id="scoreSizeUp" title="점수판 확대">＋</button><button type="button" id="scoreSizeReset" title="배율 초기화">100%</button></div>
             <button id="open-goal-modal-btn">목표 관리</button>
             <button id="open-management-modal-btn">점수판 관리</button>
             <button id="reset-main-btn">학급 점수 초기화</button>

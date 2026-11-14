@@ -606,3 +606,18 @@ body.score-open #scoreSplitter{display:flex}
 body.score-resizing #canvas-container canvas,body.score-resizing #scoreFrame{pointer-events:none}
 #toolbarScaleWrap{z-index:1000}
 #scorePanelToggle[aria-expanded="true"]{background:#d1edff;border-color:#5093c6}
+
+/* 2026-11: 전체 크기의 칠판 위에 고정 점수판을 겹쳐 표시 */
+#canvas-container,body.score-open #canvas-container{left:0;right:0;top:0;bottom:0}
+#scorePanel{bottom:0}
+#scoreSplitter{bottom:0}
+#toolbar{
+  display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;
+  gap:10px;overflow-x:auto;overflow-y:hidden;max-height:none;
+  white-space:nowrap;scrollbar-width:thin;padding:8px 10px;
+}
+#toolbar>.toolbar-group{display:flex;align-items:center;flex:0 0 auto;gap:5px;margin:0}
+#toolbar .toolbar-item,#toolbar .button-group{flex:0 0 auto;margin:0}
+#toolbar .quick-colors,#toolbar .quick-sizes{gap:4px}
+#toolbar .mode-btn,#toolbar .action-btn{flex:0 0 auto}
+@media(max-width:700px){#toolbar{gap:10px}#toolbar>.toolbar-group{gap:5px}}

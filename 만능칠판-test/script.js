@@ -562,16 +562,15 @@ let scoreOpen=false,scoreShare=70,scoreDragging=false;
 const boardViewportWidth=()=>Math.max(1,Math.round($('canvas-container').getBoundingClientRect().width||innerWidth));
 const boardViewportHeight=()=>Math.max(1,Math.round($('canvas-container').getBoundingClientRect().height||innerHeight));
 function resizeBoardViewport(){
+  // 점수판은 원래 칠판 위에 나타나는 고정 패널이다.
+  // 캔버스 전체 크기와 viewportTransform은 점수판 ON/OFF와 무관하다.
   if(!c)return;
   const width=boardViewportWidth(),height=boardViewportHeight();
   if(c.width===width&&c.height===height)return;
   const vt=c.viewportTransform.slice();
-  const oldCenter=fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(vt));
   c.setDimensions({width,height});
-  // 6원소 affine transform 중 scale/skew를 그대로 유지, 중심 좌표만 조정
-  const shift=fabric.util.transformPoint(oldCenter,[vt[0],vt[1],vt[2],vt[3],0,0]);
-  vt[4]=width/2-shift.x;vt[5]=height/2-shift.y;
-  c.setViewportTransform(vt);c.calcOffset();rememberView();c.requestRenderAll();
+  c.setViewportTransform(vt);
+  c.calcOffset();c.requestRenderAll();
 }
 function setupIntegratedScorePanel(){
   const toggle=$('scorePanelToggle'),splitter=$('scoreSplitter'),panel=$('scorePanel');
@@ -586,7 +585,7 @@ function setupIntegratedScorePanel(){
     toggle.textContent=scoreOpen?'📊 점수판 닫기':'📊 점수판 열기';
     splitter.tabIndex=scoreOpen?0:-1;
     splitter.setAttribute('aria-valuenow',String(Math.round(scoreShare)));
-    requestAnimationFrame(resizeBoardViewport);
+    // 패널 토글/드래그는 캔버스의 좌표계를 변경하지 않는다.
   };
   toggle.addEventListener('click',()=>{scoreOpen=!scoreOpen;update();save();});
   const changeShare=clientX=>{
@@ -611,17 +610,10 @@ function setupIntegratedScorePanel(){
     else return;
     e.preventDefault();e.stopPropagation();update();save();
   });
-  const toolbar=$('toolbarScaleWrap');
-  const updateBottom=()=>{
-    const rect=toolbar.getBoundingClientRect();
-    document.documentElement.style.setProperty('--score-bottom',Math.max(0,innerHeight-rect.top)+'px');
-  };
   if(typeof ResizeObserver!=='undefined'){
-    new ResizeObserver(()=>{resizeBoardViewport();updateBottom();}).observe($('canvas-container'));
-    new ResizeObserver(updateBottom).observe(toolbar);
+    new ResizeObserver(resizeBoardViewport).observe($('canvas-container'));
   }
-  window.addEventListener('resize',updateBottom);
-  update();updateBottom();
+  update();
 }
 
 async function boot() {

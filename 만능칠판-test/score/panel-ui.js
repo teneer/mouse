@@ -6,6 +6,7 @@
  try{const saved=Number(localStorage.getItem(stateKey));if(saved>=60&&saved<=150)scale=saved;}catch{}
  const setScale=n=>{
   scale=Math.max(60,Math.min(150,n));root.style.setProperty('--score-scale',String(scale/100));
+  root.style.setProperty('--score-inverse-width',(10000/scale)+'%');
   value.textContent=scale+'%';
   try{localStorage.setItem(stateKey,String(scale));}catch{}
   requestAnimationFrame(updateColumns);
