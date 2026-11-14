@@ -11,7 +11,7 @@ html { height: 100%; }
 body {
   font-family: 'Segoe UI', Arial, sans-serif; background: var(--light-bg);
   background-image: linear-gradient(to bottom right, #f1f9fe, #eafaf1);
-  margin: 0; min-height: 100vh
+  margin: 0; min-height: 100vh;
   overflow-x: hidden; /* 가로 스크롤 방지 */
   overflow-y: auto;   /* 내용이 넘칠 때만 세로 스크롤 생성 */
 }
@@ -77,16 +77,16 @@ h1 { margin-top: 36px; text-shadow: 1px 1px 2px var(--shadow-color); }
 }
 .team-minus-btn:hover { background: rgba(0, 0, 0, 0.1); color: var(--accent-color); }
 .team-increase, .team-decrease { animation: pop 0.2s; }
-.team-card:nth-child(10n+1){border-top-color:#1561ad;background-color:rgba(21,97,173,0.1);}
-.team-card:nth-child(10n+2){border-top-color:#2ecc71;background-color:rgba(46,204,113,0.1);}
-.team-card:nth-child(10n+3){border-top-color:#e74c3c;background-color:rgba(231,76,60,0.1);}
-.team-card:nth-child(10n+4){border-top-color:#f39c12;background-color:rgba(243,156,18,0.1);}
-.team-card:nth-child(10n+5){border-top-color:#9b59b6;background-color:rgba(155,89,182,0.1);}
-.team-card:nth-child(10n+6){border-top-color:#12343b;background-color:rgba(18,52,59,0.1);}
-.team-card:nth-child(10n+7){border-top-color:#c7af6b;background-color:rgba(199,175,107,0.1);}
-.team-card:nth-child(10n+8){border-top-color:#3d7c47;background-color:rgba(61,124,71,0.1);}
-.team-card:nth-child(10n+9){border-top-color:#431c5d;background-color:rgba(67,28,93,0.1);}
-.team-card:nth-child(10n+10){border-top-color:#eb1736;background-color:rgba(235,23,54,0.1);}
+.team-card:nth-child(10n+1){--card-accent:#1561ad;background-color:rgba(21,97,173,0.1);}
+.team-card:nth-child(10n+2){--card-accent:#2ecc71;background-color:rgba(46,204,113,0.1);}
+.team-card:nth-child(10n+3){--card-accent:#e74c3c;background-color:rgba(231,76,60,0.1);}
+.team-card:nth-child(10n+4){--card-accent:#f39c12;background-color:rgba(243,156,18,0.1);}
+.team-card:nth-child(10n+5){--card-accent:#9b59b6;background-color:rgba(155,89,182,0.1);}
+.team-card:nth-child(10n+6){--card-accent:#12343b;background-color:rgba(18,52,59,0.1);}
+.team-card:nth-child(10n+7){--card-accent:#c7af6b;background-color:rgba(199,175,107,0.1);}
+.team-card:nth-child(10n+8){--card-accent:#3d7c47;background-color:rgba(61,124,71,0.1);}
+.team-card:nth-child(10n+9){--card-accent:#431c5d;background-color:rgba(67,28,93,0.1);}
+.team-card:nth-child(10n+10){--card-accent:#eb1736;background-color:rgba(235,23,54,0.1);}
 #conversion-rule { display: inline-block; font-size: 14px; font-weight: 500; color: #555; background-color: rgba(0, 0, 0, 0.05); padding: 4px 10px; border-radius: 12px; margin-left: 10px; vertical-align: middle; }
 @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 @media (max-width: 700px) { .scoreboard { max-width: 400px; justify-content: center; gap: 18px; } .team-card { min-width: 120px; max-width: 150px; padding: 18px 10px 14px 10px; } }
@@ -292,69 +292,136 @@ body.goal-active #goal-panel {
 
 
 
-/* 통합 패널에서만 적용. iframe 자체 너비를 기준으로 열 수를 계산 */
-html,body{width:100%;height:100%;max-width:100%;overflow-x:hidden}
-body{min-height:100%;overflow-y:auto;--score-scale:1}
-.container{width:100%;max-width:none;padding:0 7px}
-.container>h1{display:none}
-.score-size-controls{position:sticky;top:0;z-index:1100;background:#f5f8fcf2;padding:5px 8px;display:flex;align-items:center;justify-content:center;gap:5px;border-bottom:1px solid #dde7f0;font-size:12px}
-.score-size-controls button{background:white;border:1px solid #b6c8e8;border-radius:6px;min-width:27px;height:27px;cursor:pointer;font:inherit;padding:3px 6px}
-.score-size-controls output{min-width:42px;text-align:center;font-weight:bold}
-#display-area{zoom:var(--score-scale);width:100%;max-width:none;gap:10px}
-#top-row,#bottom-row,#class-area{max-width:100%;min-width:0}
-.main-scoreboard{width:100%;max-width:400px;margin:13px auto 6px;padding:15px 7px}
-.main-controls{gap:clamp(2px,1.5vw,12px)}
-.main-btn{padding:5px clamp(5px,1.8vw,16px);font-size:clamp(22px,5vw,34px)}
-#number{font-size:clamp(36px,9vw,72px);min-width:0;margin:0 5px}
-.scoreboard{width:100%;max-width:none!important;margin:10px 0 0;display:grid;grid-template-columns:repeat(var(--team-columns,3),minmax(0,1fr));gap:8px;justify-content:stretch!important}
-.team-card{min-width:0!important;max-width:none!important;width:100%;margin:0;min-height:102px;padding:9px 3px 32px;border-radius:10px}
-.team-name{font-size:clamp(11px,2.8vw,16px);padding:1px 2px;text-align:center;white-space:nowrap;max-width:100%;margin-right:12px}
-.team-number{font-size:clamp(23px,5.5vw,40px)}
-.team-controls{margin-top:5px}
-.team-minus-btn{width:28px;height:28px;font-size:20px}
-.team-remove-btn{width:25px;height:25px;font-size:15px;border-radius:0 10px 0 8px}
-#conversion-rule{margin:4px 0;font-size:11px}
-.settings-panel-toggle{top:42px;right:6px}
-#settings-toggle-btn{width:34px;height:34px;font-size:18px}
-.settings-panel{top:81px;width:min(250px,94vw)}
-.modal-box{width:min(500px,calc(100vw - 16px));max-width:100%;max-height:90vh}
-.modal-content{padding:12px}
-.modal-box h3,.modal-buttons{padding:12px}
-.fullscreen-view{max-width:100vw;overflow-x:hidden}
-.management-content,.goal-container{max-width:100%!important}
-#goal-panel{max-width:100%}
-body.goal-active #top-row{flex-direction:column;align-items:stretch;gap:10px}
-body.goal-active #class-area{width:100%;max-width:100%;margin:0}
-body.goal-active #goal-panel{position:relative;top:auto;right:auto;bottom:auto;width:100%;height:auto;min-height:135px;transform:none;opacity:1;pointer-events:auto}
-@media(max-width:340px){.scoreboard{gap:4px}.team-card{padding:7px 1px 30px}.team-name{font-size:10px}.team-number{font-size:23px}}
+/* 통합 점수판 */
+html, body {width:100%;max-width:100%;overflow-x:hidden}
+.container {width:100%;max-width:none;padding:34px min(7px, 4vw) calc(var(--toolbar-clearance, 0px) + 12px)}
+.container > h1 {display:none}
+#display-area {gap:10px;max-width:none;padding-bottom:0}
+#top-row, #bottom-row, #class-area {min-width:0;max-width:100%}
+#class-area {max-width:none}
 
-/* 카드의 원본 형태를 유지: 가로·세로 크기는 동일 배율로 조정 */
-body{padding-bottom:85px}
-#display-area{width:var(--score-inverse-width,100%);max-width:none}
-.main-scoreboard{
- width:min(100%,400px);max-width:400px;
- aspect-ratio:400 / 210;min-height:0;
- padding:12px 8px;margin:12px auto 8px;
- display:flex;flex-direction:column;align-items:center;justify-content:center;
+.main-scoreboard, .team-card {
+  box-sizing:border-box;
+  container-type:inline-size;
+  min-width:0;
+  min-height:0;
+  max-width:100%;
+  padding:0;
+  border-top-width:0;
+  background-image:linear-gradient(var(--card-accent), var(--card-accent));
+  background-repeat:no-repeat;
+  background-size:100% 3px;
 }
-.main-controls{width:100%;justify-content:center}
-.scoreboard{align-items:start}
-.team-card{
- aspect-ratio:200 / 155;min-height:0;
- display:flex;flex-direction:column;justify-content:center;
- padding:9px 4px 30px;overflow:hidden;
+.main-scoreboard {
+  --card-accent:var(--primary-color);
+  width:var(--class-width, 100%);
+  aspect-ratio:var(--class-ratio, 16 / 9);
+  margin:12px auto 8px;
+  display:grid;
+  place-content:center;
+  grid-template-columns:minmax(0, 1fr);
 }
-.team-name{flex:0 0 auto}
-.team-controls{flex:0 0 auto}
-@media(max-width:340px){.team-card{padding:6px 1px 26px}}
-/* 배율 버튼은 상단 표시줄이 아니라 기존 설정 메뉴 안에 배치 */
-.score-size-controls{position:static;z-index:auto;background:transparent;border:0;padding:6px 0;flex-wrap:wrap;justify-content:center}
-.score-size-controls output{min-width:40px}
-
-/* 설정 안의 배율 조절 버튼은 일반 전체 너비 설정 버튼과 구별 */
-.settings-panel .score-size-controls{display:grid;grid-template-columns:auto 32px 42px 32px;gap:5px;justify-content:center;align-items:center}
-.settings-panel .score-size-controls>span{grid-column:1/-1;text-align:center;font-size:12px;font-weight:600}
-.settings-panel .score-size-controls>button{width:auto;min-width:0;height:30px;padding:3px 5px;background:#fff;color:#213b55;border:1px solid #b6c8e8;border-radius:6px;font-size:13px}
-.settings-panel .score-size-controls>button:hover{background:#e7f1fc}
-.settings-panel .score-size-controls>button#scoreSizeReset{grid-column:1/-1;justify-self:stretch}
-.settings-panel .score-size-controls output{min-width:0;text-align:center}
+.main-controls {gap:4cqw;margin:0}
+.main-btn {
+  width:18cqw;
+  height:15cqw;
+  padding:0;
+  line-height:1;
+  font-size:9cqw;
+  border-radius:3cqw;
+}
+#number {font-size:15cqw;min-width:0;margin:0;line-height:1.1;font-variant-numeric:tabular-nums}
+#change {font-size:8cqw}
+#star-progress-container {
+  gap:.35cqw;
+  margin:2cqw 0 0;
+  height:auto;
+  min-height:0;
+  line-height:1;
+}
+#star-progress-container:empty {display:none}
+.star {font-size:3.55cqw}
+.scoreboard {
+  width:min(100%, var(--team-row-width, 100%));
+  max-width:none;
+  margin:10px auto 0;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:var(--team-gap, 8px);
+}
+.team-card {
+  --card-accent:var(--secondary-color);
+  width:var(--team-width, 28%);
+  aspect-ratio:var(--team-ratio, 4 / 3);
+  flex:0 0 auto;
+  margin:0;
+  display:grid;
+  align-content:center;
+  justify-items:center;
+  grid-template-columns:minmax(0, 1fr);
+  overflow:hidden;
+}
+.team-name {
+  width:68cqw;
+  max-width:none;
+  margin:0;
+  padding:0;
+  font-size:min(18px, calc(64cqw / var(--team-name-half-length, 7)));
+  line-height:1.1;
+  text-align:center;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+}
+.team-controls {margin:1cqw 0 0}
+.team-number {font-size:16cqw;line-height:1;font-variant-numeric:tabular-nums}
+.team-change {font-size:13cqw}
+.team-minus-btn, .team-remove-btn {
+  width:22cqw;
+  height:20cqw;
+  padding:0;
+  font-size:15cqw;
+  line-height:1;
+}
+.team-minus-btn {border-radius:0 0 0 6cqw}
+.team-remove-btn {border-radius:0 6cqw 0 5cqw}
+#conversion-rule {margin:4px 0;font-size:11px}
+.settings-panel-toggle {top:4px;right:6px}
+#settings-toggle-btn {width:min(34px, 88vw);height:34px;padding:0;font-size:18px}
+.settings-panel {
+  top:40px;
+  width:min(250px, 100%);
+  max-height:calc(100dvh - 40px - var(--toolbar-clearance, 0px));
+  padding:clamp(4px, 5vw, 16px);
+  overflow:auto;
+  overflow-wrap:anywhere;
+}
+.settings-panel button {padding-inline:4px}
+.score-card-ratio {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;font-size:13px}
+.score-card-ratio select {max-width:100%;min-width:0;font:inherit}
+.score-size-controls {display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;text-align:center}
+.score-size-controls > span {width:100%;font-size:12px;font-weight:600}
+.settings-panel .score-size-controls > button {
+  width:auto;
+  max-width:100%;
+  min-height:30px;
+  padding:3px 6px;
+  background:#fff;
+  color:#213b55;
+  border:1px solid #b6c8e8;
+  border-radius:6px;
+  font-size:13px;
+}
+.settings-panel .score-size-controls > button:hover {background:#e7f1fc}
+.score-size-controls output {font-size:13px;font-weight:700}
+.modal-box {width:min(500px, calc(100vw - 16px));max-width:100%;max-height:calc(100dvh - var(--toolbar-clearance, 0px) - 8px)}
+.modal-content, .modal-box h3, .modal-buttons {padding:12px}
+.fullscreen-view {max-width:100vw;overflow-x:hidden;padding-bottom:var(--toolbar-clearance, 0px)}
+.management-content, .goal-container {max-width:100%!important}
+#goal-panel {max-width:100%}
+body.goal-active #top-row {flex-direction:column;align-items:stretch;gap:10px}
+body.goal-active #class-area {width:100%;max-width:100%;margin:0}
+body.goal-active #goal-panel {position:relative;inset:auto;width:100%;height:auto;min-height:135px;transform:none;opacity:1;pointer-events:auto}

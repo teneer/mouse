@@ -5,12 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=test-3">
+    <link rel="stylesheet" href="style.css?v=test-4">
 </head>
 
 <body>
     <div class="container">
         <h1>학급 점수판 v.7</h1>
+        <div class="settings-panel-toggle">
+            <button id="settings-toggle-btn" type="button" aria-label="점수판 설정">⚙️</button>
+        </div>
 
         <div id="display-area">
             
@@ -52,13 +55,17 @@
                 </div>
             </div>
 
-        </div> <div class="settings-panel-toggle">
-            <button id="settings-toggle-btn">⚙️</button>
         </div>
         
         <div id="settings-panel" class="settings-panel">
             <h3>설정</h3>
             <div class="score-size-controls" aria-label="점수판 표시 크기"><span>표시 배율</span><button type="button" id="scoreSizeDown" title="점수판 축소">−</button><output id="scoreSizeValue">100%</output><button type="button" id="scoreSizeUp" title="점수판 확대">＋</button><button type="button" id="scoreSizeReset" title="배율 초기화">100%</button></div>
+            <label class="score-card-ratio">학급 카드 비율
+                <select id="classCardRatio"><option value="16:9">16:9</option><option value="4:3">4:3</option></select>
+            </label>
+            <label class="score-card-ratio">모둠 카드 비율
+                <select id="teamCardRatio"><option value="16:9">16:9</option><option value="4:3">4:3</option></select>
+            </label>
             <button id="open-goal-modal-btn">목표 관리</button>
             <button id="open-management-modal-btn">점수판 관리</button>
             <button id="reset-main-btn">학급 점수 초기화</button>
@@ -133,6 +140,6 @@
 
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script src="script.js"></script><script src="panel-ui.js?v=test-3"></script>
+    <script src="script.js?v=test-4"></script><script src="panel-ui.js?v=test-4"></script>
 </body>
 </html>

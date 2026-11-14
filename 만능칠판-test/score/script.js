@@ -228,7 +228,11 @@ function renderTeams() {
     removeBtn.onclick = e => { e.stopPropagation(); openManagementModal(); };
     card.appendChild(removeBtn);
     const nameSpan = document.createElement('div');
-    nameSpan.className = 'team-name'; nameSpan.textContent = team.name;
+    nameSpan.className = 'team-name';
+    nameSpan.textContent = team.name;
+    nameSpan.title = team.name;
+    const halfLength = Math.ceil(Array.from(nameSpan.textContent).length / 2);
+    nameSpan.style.setProperty('--team-name-half-length', Math.max(7, halfLength));
     card.appendChild(nameSpan);
     const controlsDiv = document.createElement('div'); controlsDiv.className = 'team-controls';
     const numberSpan = document.createElement('span');
@@ -247,7 +251,6 @@ function renderTeams() {
   });
   renderStars();
   updateStarProgress();
-  setTimeout(updateScoreboardAlignment, 10);
 }
 
 // 모둠·학급 점수는 클릭하는 순간 함께 확정합니다. 애니메이션은 상태를 수정하지 않습니다.
@@ -480,13 +483,6 @@ function showGoalAlert(message) {
   goalAlert.classList.add('show'); playSound(sounds.success);
   setTimeout(() => goalAlert.classList.remove('show'), 4000);
 }
-function updateScoreboardAlignment() {
-  const cards = scoreboard.children;
-  if (cards.length < 2) { scoreboard.style.justifyContent = 'center'; return; }
-  const firstTop = cards[0].offsetTop;
-  const wrapped = [...cards].some(card => card.offsetTop > firstTop);
-  scoreboard.style.justifyContent = wrapped ? 'flex-start' : 'center';
-}
 function renderStars() {
   starContainer.innerHTML = '';
   if (teams.length > 1) {
@@ -561,7 +557,6 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   changeTeamScore(teamIndex, e.shiftKey ? -step : step);
 });
-window.addEventListener('resize', updateScoreboardAlignment);
 window.addEventListener('load', () => {
   installEffectStyle();
   loadFromStorage();

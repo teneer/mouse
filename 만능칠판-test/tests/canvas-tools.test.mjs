@@ -5,10 +5,36 @@ class Rect {
  constructor(options){Object.assign(this,options);}
  set(options){Object.assign(this,options);return this;}
  setCoords(){}
+ render(ctx){ctx.object=this;}
  getBoundingRect(){return {left:this.left,top:this.top,width:this.width,height:this.height};}
 }
 globalThis.fabric={
  Point:class{constructor(x,y){this.x=x;this.y=y;}},Rect,
+ util:{
+  createCanvasElement(){
+   const ctx={
+    clearRect(){this.object=null;},
+    save(){},restore(){},
+    translate(x,y){this.left=-x;this.top=-y;},
+    transform(){},
+    getImageData(_x,_y,width,height){
+     const data=new Uint8ClampedArray(width*height*4), object=this.object;
+     if (object) {
+      for(let y=0;y<height;y++) {
+       for(let x=0;x<width;x++) {
+        const px=this.left+x,py=this.top+y;
+        const withinRect=px>=object.left && px<object.left+object.width &&
+          py>=object.top && py<object.top+object.height;
+        if (withinRect && (!object.paintedAt || object.paintedAt(px,py))) data[(y*width+x)*4+3]=255;
+       }
+      }
+     }
+     return {data};
+    }
+   };
+   return {getContext(){return ctx;}};
+  }
+ },
  PencilBrush:class{constructor(c){this.canvas=c;}},
  Color:class{constructor(color){this.color=color;}setAlpha(a){this.alpha=a;return this;}toRgba(){return `${this.color}:${this.alpha}`;}}
 };
@@ -20,7 +46,7 @@ function fixture() {
  zoomToPoint(p,z){this.zoomPoint=p;this.viewportTransform[0]=this.viewportTransform[3]=z;},
  bringToFront(o){this.objects=this.objects.filter(x=>x!==o);this.objects.push(o);},
  setViewportTransform(v){this.viewportTransform=v;},getPointer(e){return {x:e.clientX,y:e.clientY};},
- add(o){this.objects.push(o);},remove(o){this.objects=this.objects.filter(x=>x!==o);},findTarget(){return this.hit;}
+ add(o){this.objects.push(o);},remove(o){this.objects=this.objects.filter(x=>x!==o);}
  };
  const t=new CanvasTools({canvas:c,canEdit:()=>editable,onChange:()=>changes++,onViewport:()=>views++,onMode:()=>{},onText:p=>textPoint=p});
  return {c,t,changes:()=>changes,views:()=>views,text:()=>textPoint,block:()=>editable=false};
@@ -50,14 +76,30 @@ test('pen and marker use separate settings and transparent marker',()=>{
  t.setMode('marker');assert.equal(c.freeDrawingBrush.width,30);assert.match(c.freeDrawingBrush.color,/:0.32$/);
 });
 test('object erase is one history edit per gesture',()=>{
- const f=fixture(),obj=new Rect({left:0,top:0,width:10,height:10});f.c.objects=[obj];f.t.setMode('eraser');f.c.hit=obj;
+ const f=fixture(),obj=new Rect({left:0,top:0,width:10,height:10});f.c.objects=[obj];f.t.setMode('eraser');
  f.t.down({e:{clientX:0,clientY:0,button:0}});f.t.up();assert.equal(f.c.objects.length,0);assert.equal(f.changes(),1);
 });
 test('eraser is object-only and repeated hits in one gesture save once',()=>{
  const f=fixture(),a=new Rect({left:10,top:10,width:10,height:10}),b=new Rect({left:100,top:100,width:10,height:10});
- f.c.objects=[a,b];f.t.setMode('eraser');f.c.hit=a;
+ f.c.objects=[a,b];f.t.setMode('eraser');
  f.t.down({e:{clientX:10,clientY:10,button:0}});f.t.move({e:{clientX:11,clientY:11}});f.t.up();
  assert.deepEqual(f.c.objects,[b]);assert.equal(f.changes(),1);assert.equal('eraser' in f.t,false);
+});
+test('eraser preserves a diagonal in empty bounds and deletes it when a drag crosses the stroke',()=>{
+ const {c,t,changes}=fixture();
+ const diagonal=new Rect({left:10,top:10,width:100,height:100,paintedAt:(x,y)=>x===y});
+ c.objects=[diagonal];
+ t.setMode('eraser');
+ t.down({e:{clientX:90,clientY:20,button:0}});
+ t.move({e:{clientX:95,clientY:30}});
+ t.up();
+ assert.deepEqual(c.objects,[diagonal]);
+ assert.equal(changes(),0);
+ t.down({e:{clientX:90,clientY:40,button:0}});
+ t.move({e:{clientX:40,clientY:90}});
+ t.up();
+ assert.deepEqual(c.objects,[]);
+ assert.equal(changes(),1);
 });
 test('locked editor ignores pointer input',()=>{
  const f=fixture();f.t.setMode('move');f.block();f.t.down({e:{clientX:0,clientY:0,button:0}});assert.equal(f.t.gesture,false);
