@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>만능칠판 3</title><link rel="stylesheet" href="shell.css"></head>
+<body><div id="app"><header class="appbar"><strong>만능칠판 3</strong><span class="subheading">통합 전자칠판</span><button id="panelToggle" type="button" aria-controls="scorePanel" aria-expanded="false">학급 점수판 열기</button></header>
+<main id="workspace" class="workspace" style="--board-share:70%">
+<section id="boardPanel" class="panel" aria-label="전자칠판"><iframe id="boardFrame" title="전자칠판" src="./board/index.html" allow="clipboard-read; clipboard-write" loading="eager"></iframe></section>
+<div id="splitter" class="splitter" role="separator" aria-label="전자칠판과 점수판 너비 조절" aria-orientation="vertical" aria-valuemin="20" aria-valuemax="80" aria-valuenow="70" tabindex="0"><span class="grip"></span></div>
+<aside id="scorePanel" class="panel" aria-label="학급 점수판" aria-hidden="true" inert><iframe id="scoreFrame" title="학급 점수판" src="./score/학급온도계.html" loading="eager"></iframe></aside>
+</main></div><script type="module" src="shell.js"></script></body></html>
