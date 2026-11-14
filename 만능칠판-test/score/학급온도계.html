@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=classroom-layout-5">
+    <link rel="stylesheet" href="style.css?v=classroom-layout-6">
 </head>
 
 <body>
@@ -62,7 +62,7 @@
                 </div>
                 
                 <div id="create-teams-btn-wrap">
-                    <button id="create-teams-btn" onclick="showTeamSetupModal()">모둠 점수판 생성</button>
+                    <button id="create-teams-btn">모둠 점수판 생성</button>
                 </div>
             </section>
         </div>
@@ -73,6 +73,7 @@
                 <button type="button" id="undo-score" disabled>되돌리기</button>
                 <div class="batch-amount">
                     <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
+                    <button type="button" id="batch-reset" aria-label="입력한 점수 지우기" hidden>×</button>
                     <div class="batch-stepper">
                         <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
                         <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
@@ -96,7 +97,7 @@
                     <input id="score-fixed-columns" type="number" min="1" max="6" step="1" value="3" inputmode="numeric">
                 </label>
                 <p class="score-setting-hint" id="score-layout-hint">사용 가능한 가로·세로 공간에서 모둠카드가 가장 크게 보이도록 배치합니다.</p>
-                <label class="score-setting-row">모둠 카드 비율
+                <label class="score-setting-row">학급·모둠 카드 비율
                     <select id="score-card-ratio">
                         <option value="4:3">4:3</option>
                         <option value="16:9">16:9</option>
@@ -142,8 +143,8 @@
                 <input type="number" id="team-count" min="1" max="12" value="6">
             </div>
             <div class="modal-footer" style="padding: 20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="hideTeamSetupModal()" style="padding:8px 16px;">취소</button>
-                <button onclick="createTeams()" style="padding:8px 16px; background:#3498db; color:white; border:none; border-radius:4px;">확인</button>
+                <button id="cancel-team-setup" style="padding:8px 16px;">취소</button>
+                <button id="confirm-team-setup" style="padding:8px 16px; background:#3498db; color:white; border:none; border-radius:4px;">확인</button>
             </div>
         </div>
     </div>
@@ -205,6 +206,6 @@
 
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script src="script.js?v=classroom-layout-4"></script><script type="module" src="panel-ui.js?v=classroom-layout-4"></script>
+    <script type="module" src="script.js?v=classroom-layout-6"></script><script type="module" src="panel-ui.js?v=score-ux-classroom-layout-6"></script>
 </body>
 </html>

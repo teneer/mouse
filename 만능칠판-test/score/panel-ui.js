@@ -1,4 +1,5 @@
-import { measureTeamLayout } from './team-layout.js?v=2';
+import { fitScoreFont } from './score-display.js';
+import { measureTeamLayout } from './team-layout.js?v=3';
 
 (() => {
   const scaleKey = 'whiteboard.test.score-scale.v1';
@@ -9,6 +10,10 @@ import { measureTeamLayout } from './team-layout.js?v=2';
   const viewport = document.getElementById('team-viewport');
   const scoreboard = document.getElementById('scoreboard');
   const classScore = document.getElementById('number');
+  const classControls = classScore.parentElement;
+  const classCard = document.querySelector('.main-scoreboard');
+  const classButtons = [...classControls.querySelectorAll('button')];
+  const measure = document.createElement('canvas').getContext('2d');
   const modeSelect = document.getElementById('score-layout-mode');
   const columnsRow = document.getElementById('score-fixed-columns-row');
   const columnsInput = document.getElementById('score-fixed-columns');
@@ -34,21 +39,34 @@ import { measureTeamLayout } from './team-layout.js?v=2';
     root.style.setProperty('--toolbar-clearance', `${Number(frame?.dataset.toolbarHeight ?? 0)}px`);
     const width = viewport.clientWidth;
     const height = viewport.clientHeight;
-    if (width <= 0 || height <= 0) return;
-    const ratio = ratioSelect.value === '16:9' ? 16 / 9 : 4 / 3;
-    const gap = Math.min(10, Math.floor(width / 18));
-    const { columns, cardWidth } = measureTeamLayout({
-      width, height, count: scoreboard.childElementCount, ratio, gap, previousColumns,
-      fixedColumns: modeSelect.value === 'fixed' ? fixedColumns : null,
-    });
-    previousColumns = columns;
-    // Round down to subpixels so the fitted grid does not acquire a scrollbar at the boundary.
-    const widthPx = Math.floor(cardWidth * 16) / 16;
-    scoreboard.style.setProperty('--team-columns', String(columns));
-    scoreboard.style.setProperty('--team-card-width', `${widthPx}px`);
-    scoreboard.style.setProperty('--team-gap', `${gap}px`);
-    const classFontSize = parseFloat(getComputedStyle(classScore).fontSize);
-    root.style.setProperty('--team-score-max', `${Math.min(40, classFontSize * 0.67)}px`);
+    if (width > 0 && height > 0) {
+      const ratio = ratioSelect.value === '16:9' ? 16 / 9 : 4 / 3;
+      const gap = Math.min(10, Math.floor(width / 18));
+      const { columns, cardWidth } = measureTeamLayout({
+        width, height, count: scoreboard.childElementCount, ratio, gap, previousColumns,
+        fixedColumns: modeSelect.value === 'fixed' ? fixedColumns : null,
+        maxAutoColumns: Number(frame?.dataset.panelPercent) <= 10 ? 1 : 6,
+        scale: scale / 100,
+      });
+      previousColumns = columns;
+      const widthPx = Math.floor(cardWidth * 16) / 16;
+      scoreboard.style.setProperty('--team-columns', String(columns));
+      scoreboard.style.setProperty('--team-card-width', `${widthPx}px`);
+      scoreboard.style.setProperty('--team-gap', `${gap}px`);
+      classCard.style.setProperty('--class-card-width',Math.max(128,widthPx*1.25)+'px');
+    } else if (!scoreboard.childElementCount) {
+      classCard.style.removeProperty('--class-card-width');
+    }
+
+    const style = getComputedStyle(classControls);
+    const preferred = 76 * scale / 100;
+    const font = getComputedStyle(classScore);
+    const space = classControls.clientWidth-classButtons.reduce((width,button)=>width+button.getBoundingClientRect().width,0)-2*(parseFloat(style.columnGap)||0);
+    if (measure && classControls.clientWidth > 0) {
+      measure.font = `${font.fontWeight} ${preferred}px ${font.fontFamily}`;
+      const size=fitScoreFont(preferred,space,measure.measureText(classScore.textContent).width+2);
+      classScore.style.setProperty('--class-score-size',size+'px');
+    }
   }
 
   function scheduleLayout() {
@@ -123,7 +141,9 @@ import { measureTeamLayout } from './team-layout.js?v=2';
   }
   const resizeObserver = new ResizeObserver(scheduleLayout);
   resizeObserver.observe(viewport);
-  resizeObserver.observe(classScore);
+  resizeObserver.observe(classControls);
+  new MutationObserver(scheduleLayout).observe(classScore,{childList:true});
+  document.fonts?.ready.then(scheduleLayout);
   let teamCount = scoreboard.childElementCount;
   new MutationObserver(() => {
     if (teamCount === scoreboard.childElementCount) return;

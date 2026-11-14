@@ -1,3 +1,5 @@
+import {mergeConversions,scoreRemainder} from './score-display.js';
+
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
 // 점수는 즉시 확정하고, 애니메이션은 확정된 점수를 설명하는 시각 효과로만 사용합니다.
 const sounds = {
@@ -23,6 +25,7 @@ let currentActiveGoal = null;
 let activeGoalRef = null;
 const defaultLinkPoints = 3;
 const undoWindow = 2000;
+let conversionAnimation=null, queuedConversion=null, conversionFlight=null;
 let linkEnabled = true;
 let linkPoints = defaultLinkPoints;
 let lastScoreChange = null;
@@ -139,7 +142,7 @@ function syncFromStorage(effect = null, expectedVersion = null) {
   lastAppliedVersion = state.version;
   renderCurrentState();
   // 늦게 도착한 메시지는 현재 저장 상태에 해당하는 경우에만 연출합니다.
-  if (effect && expectedVersion === state.version) playScoreEffect(effect);
+  if (effect && expectedVersion === state.version) queueScoreEffect(effect);
 }
 if (syncChannel) {
   syncChannel.onmessage = event => {
@@ -157,6 +160,7 @@ window.addEventListener('storage', event => {
 });
 
 function renderCurrentState() {
+  resetConversion();
   renderClassNumber(count);
   renderLinkSettings();
   renderTeams();
@@ -199,6 +203,7 @@ function undoScore() {
   if (!lastScoreChange) return;
   const previous = lastScoreChange;
   lastScoreChange = null;
+  resetConversion();
   count = previous.count;
   teams.forEach((team, index) => { team.score = previous.scores[index]; });
   restoreActiveGoal(previous.activeGoalRef);
@@ -212,6 +217,7 @@ function changeClassScore(amount) {
   syncFromStorage();
   const next = count + amount;
   if (next < minScore || next > maxScore) return;
+  resetConversion();updateScoreProgress();
   recordScoreChange(`class:${amount}`);
   const old = count;
   count = next;
@@ -289,6 +295,20 @@ function renderTeams() {
       steps.appendChild(button);
     }
     card.appendChild(steps);
+    const remove=document.createElement('button');
+    remove.type='button';remove.className='team-remove';remove.textContent='×';
+    remove.setAttribute('aria-label',team.name+' 삭제');
+    remove.onclick=()=>{
+      const name=team.name;
+      const version=lastAppliedVersion;
+      if(!confirm(`“${name}” 모둠을 삭제할까요?`))return;
+      syncFromStorage();
+      if(lastAppliedVersion!==version || teams[idx]?.name!==name)return;
+      teams.splice(idx,1);
+      selectedTeams.clear();lastScoreChange=null;
+      renderCurrentState();saveToStorage();
+    };
+    card.appendChild(remove);
     scoreboard.appendChild(card);
   });
   renderBatchControls();
@@ -318,6 +338,7 @@ function renderBatchControls() {
 
 function updateBatchButton() {
   const delta = batchDelta.valueAsNumber;
+  document.getElementById('batch-reset').hidden = !Number.isFinite(delta) || delta===0;
   applyBatchButton.disabled = !selectedTeams.size || !Number.isSafeInteger(delta) || delta === 0;
 }
 
@@ -355,16 +376,13 @@ function changeTeamScores(indices, amount, undoKey = null) {
   count += classDiff;
   updateScoreProgress();
   renderBatchControls();
-  if (classDiff) {
-    updateNumber(classDiff > 0 ? 'increase' : 'decrease', oldCount, count);
-    displayFloatingNumber(changeElement, classDiff, '0px', '-20px');
-  }
+  if (classDiff) checkForGoalAchievement('class', oldCount, count);
   checkForGoalAchievement('team', oldTotal, newTotal);
-  const effect = { kind: 'team', idx: indices[0], amount: amount * indices.length, classDiff, rate: linkEnabled ? linkPoints : 0 };
+  const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
   saveToStorage(effect);
   playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease);
   if (classDiff) playSound(classDiff > 0 ? sounds.mainIncrease : sounds.mainDecrease);
-  playScoreEffect(effect);
+  queueScoreEffect(effect);
 }
 // 모든 효과는 JS에서 만들어서 기존 CSS 파일을 수정할 필요가 없습니다.
 function installEffectStyle() {
@@ -401,22 +419,56 @@ function flyLabel(label, from, to, delay = 0) {
   animation.onfinish = () => node.remove();
   animation.oncancel = () => node.remove();
 }
-function playScoreEffect(effect) {
-  if (!effect || effect.kind !== 'team') return;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  const teamNode = document.getElementById(`team-number-${effect.idx}`);
-  const from = centerOf(teamNode);
-  const bar = centerOf(progress);
-  const main = centerOf(numberElement);
-  if (effect.rate > 0 && bar) {
-    flyLabel(`${effect.amount > 0 ? '+' : '−'}${Math.abs(effect.amount)}`, from, bar);
-    if (effect.classDiff) {
-      flyLabel(`${effect.classDiff > 0 ? '+' : '−'}${Math.abs(effect.classDiff)}`, bar, main, 220);
-      if (numberElement.animate) numberElement.animate([
-        { transform: 'scale(1)' }, { transform: 'scale(1.16)' }, { transform: 'scale(1)' }
-      ], { duration: 380, delay: 520 });
-    }
+function resetConversion() {
+  clearTimeout(conversionFlight);
+  conversionAnimation?.cancel();
+  conversionAnimation=null;
+  queuedConversion=null;
+  progress.removeAttribute('data-converting');
+}
+function queueScoreEffect(effect) {
+  if(!effect || effect.kind!=='team')return;
+  const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if(reduced || !effect.rate || !Number.isFinite(effect.oldTotal) || !linkEnabled){
+    renderClassNumber(count);updateScoreProgress();return;
   }
+  if(conversionAnimation){
+    queuedConversion=mergeConversions(queuedConversion,effect);
+    return;
+  }
+  const teamNode=document.getElementById(`team-number-${effect.idx}`);
+  const bar=centerOf(progress);
+  if(bar)flyLabel(`${effect.amount>0?'+':'−'}${Math.abs(effect.amount)}`,centerOf(teamNode),bar);
+  const from=100*scoreRemainder(effect.oldTotal,effect.rate)/effect.rate;
+  const to=100*scoreRemainder(effect.newTotal,effect.rate)/effect.rate;
+  const fill=progress.firstElementChild;
+  if(!effect.classDiff || !fill?.animate){
+    renderClassNumber(count);updateScoreProgress();return;
+  }
+  const forward=effect.classDiff>0;
+  const animation=fill.animate([
+    {width:from+'%',offset:0},
+    {width:forward?'100%':'0%',offset:.55},
+    {width:forward?'100%':'0%',offset:.72},
+    {width:forward?'0%':'100%',offset:.73},
+    {width:to+'%',offset:1}
+  ],{duration:475,fill:'forwards',easing:'linear'});
+  conversionAnimation=animation;
+  renderClassNumber(count-effect.classDiff);
+  progress.setAttribute('data-converting','');
+  conversionFlight=setTimeout(()=>{
+    if(conversionAnimation===animation)flyLabel(`${forward?'+':'−'}${Math.abs(effect.classDiff)}`,bar,centerOf(numberElement));
+  },300);
+  animation.onfinish=()=>{
+    if(conversionAnimation!==animation)return;
+    const next=queuedConversion;
+    conversionAnimation=null;queuedConversion=null;
+    clearTimeout(conversionFlight);
+    animation.cancel();progress.removeAttribute('data-converting');
+    renderClassNumber(count-(next?.classDiff||0));
+    if(next)queueScoreEffect(next);
+    else updateScoreProgress();
+  };
 }
 
 function openManagementModal() {
@@ -569,7 +621,7 @@ function renderLinkSettings() {
   linkRule.hidden = !linkEnabled;
 }
 function updateScoreProgress() {
-  const remainder = ((totalTeamScore() % linkPoints) + linkPoints) % linkPoints;
+  const remainder = scoreRemainder(totalTeamScore(),linkPoints);
   progress.hidden = !linkEnabled;
   progress.style.setProperty('--filled', `${100 * remainder / linkPoints}%`);
   progress.style.setProperty('--division', `${100 / linkPoints}%`);
@@ -588,8 +640,10 @@ function setScoreLink(enabled, points) {
     return;
   }
   if (enabled === linkEnabled && points === linkPoints) return;
+  resetConversion();
   linkEnabled = enabled;
   linkPoints = points;
+  renderClassNumber(count);
   if (lastScoreChange) lastScoreChange.key = null;
   renderLinkSettings();
   updateScoreProgress();
@@ -611,6 +665,9 @@ document.querySelector('.container').addEventListener('click', event => {
 });
 undoButton.onclick = undoScore;
 batchDelta.oninput = updateBatchButton;
+document.getElementById('batch-reset').onclick=()=>{
+  batchDelta.value='0';updateBatchButton();batchDelta.focus();
+};
 for (const [id, delta] of [['batch-up', 1], ['batch-down', -1]]) {
   document.getElementById(id).onclick = () => {
     batchDelta.value = (batchDelta.valueAsNumber || 0) + delta;
@@ -620,7 +677,9 @@ for (const [id, delta] of [['batch-up', 1], ['batch-down', -1]]) {
 batchForm.onsubmit = event => {
   event.preventDefault();
   syncFromStorage();
-  changeTeamScores([...selectedTeams], batchDelta.valueAsNumber);
+  const indices=[...selectedTeams].sort((a,b)=>a-b);
+  const amount=batchDelta.valueAsNumber;
+  changeTeamScores(indices,amount,`batch:${indices.join(',')}:${amount}`);
 };
 
 document.getElementById('main-increase-btn').onclick = increment;
@@ -700,3 +759,7 @@ window.addEventListener('load', () => {
   initialized = true;
   syncFromStorage();
 });
+
+document.getElementById('create-teams-btn').onclick=showTeamSetupModal;
+document.getElementById('cancel-team-setup').onclick=hideTeamSetupModal;
+document.getElementById('confirm-team-setup').onclick=createTeams;

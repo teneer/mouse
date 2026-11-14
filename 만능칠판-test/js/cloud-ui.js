@@ -26,7 +26,7 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,ch
     renderFiles();
     queueFiles();
   });
-  try {$('viewSync').checked = localStorage.getItem('wb42.viewSync') === 'true';} catch {}
+  try {$('viewSync').checked = sessionStorage.getItem('wb42.viewSync') === 'true';} catch {}
 
   function stage(name) {
     guideOpen = name === 'guide';
@@ -53,7 +53,6 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,ch
     text('deviceStatus',linked
       ? cloud.online ? cloud.pending.size ? `연결됨 · 전송 대기 ${cloud.pending.size}건` : '연결됨' : '연결 대기 중'
       : '이 기기의 칠판을 사용 중');
-    $('viewSync').disabled = !cloud.boardReady;
     $('deviceResume').hidden = linked || !reconnectOptions;
     if (linked) {
       if ($('deviceConnected').hidden && !guideOpen) stage('connected');
@@ -169,8 +168,8 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,ch
     button.onclick = () => stage(cloud.options ? 'connected' : 'start');
   }
   $('viewSync').onchange = () => {
-    try {localStorage.setItem('wb42.viewSync',String($('viewSync').checked));}catch{}
-    if ($('viewSync').checked && !cloud.latestView) startView();
+    try {sessionStorage.setItem('wb42.viewSync',String($('viewSync').checked));}catch{}
+    if ($('viewSync').checked) startView();
     changeView();
   };
   action('deviceCheck',async ()=>{

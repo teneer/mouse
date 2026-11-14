@@ -1,3 +1,6 @@
+import {reorderPages} from './board-navigation.js';
+import {normalizePattern} from './board-background.js';
+
 // Firestore orders completed operations. The same reducer runs on each device
 // and when replaying locally saved operations that are awaiting upload.
 const copy = value => structuredClone(value);
@@ -18,7 +21,9 @@ export function pagePatch(before, after) {
   const order = newObjects.some(object => !old.has(object.id)) || !same(oldOrder, newOrder)
     ? [...next.keys()] : null;
   const background = before.canvas.background === after.canvas.background ? null : after.canvas.background;
-  return objects.length || order || background !== null ? {objects, order, background} : null;
+  const pattern = normalizePattern(after.canvas.wbBackgroundPattern);
+  const patternChanged = !same(normalizePattern(before.canvas.wbBackgroundPattern), pattern);
+  return objects.length || order || background !== null || patternChanged ? {objects, order, background, pattern:patternChanged ? pattern : null} : null;
 }
 
 function patchContent(content, patch) {
@@ -36,7 +41,12 @@ function patchContent(content, patch) {
   } else {
     content.canvas.objects = [...objects.values()];
   }
+  if (content.canvas.objects.some(object=>object.wbPinned)) {
+    const current=content.canvas.objects;
+    content.canvas.objects=[...current.filter(object=>object.wbPinned),...current.filter(object=>!object.wbPinned)];
+  }
   if (patch.background !== null) content.canvas.background = patch.background;
+  if (patch.pattern) content.canvas.wbBackgroundPattern = normalizePattern(patch.pattern);
 }
 
 export function boardPages(board) {
@@ -51,6 +61,10 @@ export function applyOperation(board, operation, revision) {
     for (const page of operation.pages) {
       if (!Object.hasOwn(board.pages, page.id)) board.pages[page.id] = {...copy(page), version:revision};
     }
+    return;
+  }
+  if(kind==='reorder'){
+    reorderPages(boardPages(board),operation.order).forEach((page,index)=>{page.order=index;});
     return;
   }
   const page = board.pages[pageId];

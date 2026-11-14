@@ -619,3 +619,79 @@ body.goal-active #goal-panel {
   transform:none;opacity:1;pointer-events:auto;
 }
 .score-setting-hint {margin:0;font-size:12px;line-height:1.4;color:var(--muted-text)}
+
+button, .main-scoreboard, .team-card, #batch-score {
+  -webkit-user-select:none;
+  user-select:none;
+}
+#batch-delta {user-select:text;-webkit-user-select:text}
+#number, #number[data-long-score] {
+  font-size:var(--class-score-size, 76px);
+  white-space:nowrap;
+  overflow-wrap:normal;
+}
+.team-card {display:block}
+.team-select-btn {
+  position:absolute;
+  inset:0;
+  display:block;
+  width:100%;
+  height:100%;
+}
+.team-name {position:absolute;top:min(10px, 8cqh);left:min(8px, 10cqw);right:min(30px, 29cqw)}
+.team-controls {position:absolute;inset:0;pointer-events:none}
+.team-number {font-size:min(40px, 34cqh, 25cqw)}
+.team-number[data-long-score] {font-size:min(40px, 34cqh, 24cqw)}
+.team-steps {position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;padding:0;pointer-events:none}
+.team-steps button {width:min(46px, 46cqw);min-height:min(44px, 32cqh);pointer-events:auto}
+.team-remove {
+  position:absolute;
+  top:0;
+  right:0;
+  width:min(34px, 42cqw);
+  min-height:min(34px, 30cqh);
+  padding:0;
+  border:0;
+  border-radius:0 12px 0 8px;
+  background:transparent;
+  color:#a93327;
+  font-size:min(18px, 25cqh);
+  cursor:pointer;
+}
+.team-remove:hover {background:#a933271f}
+#batch-score #batch-reset {width:18px;min-height:0;padding:0;background:#fff;font-size:15px}
+.batch-amount:has(#batch-reset:not([hidden])) {width:89px}
+#batch-score .batch-actions {padding:0}
+#batch-score .batch-actions > * {box-sizing:border-box}
+#score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
+
+/* Reserve the full class area up front so the team grid and class card do not resize each other. */
+#class-area {
+  display:grid;
+  justify-items:center;
+  background:var(--summary-bg);
+  border-bottom:1px solid var(--panel-line);
+  box-sizing:border-box;
+  height:clamp(145px, 30vh, 220px);
+  transition:none;
+  padding:6px 0;
+}
+.main-scoreboard {
+  box-sizing:border-box;
+  width:min(100%, var(--class-card-width, 275px));
+  aspect-ratio:var(--score-card-ratio, 4 / 3);
+  align-self:center;
+  /* One reservation for both ratios prevents changes in team columns feeding back into this area. */
+  height:auto;
+  min-height:min-content;
+  padding:6px clamp(3px, 2vw, 10px);
+  border:0;
+  border-radius:10px;
+}
+.main-btn, .main-controls:has(#number[data-long-score]) .main-btn {width:min(44px, 19cqw)}
+.main-controls {gap:min(12px, 3cqw)}
+@media(max-width:230px) {
+  #class-area {height:clamp(130px, 28vh, 205px)}
+  .main-scoreboard {padding-inline:3px}
+  .score-progress-group {margin-top:10px}
+}

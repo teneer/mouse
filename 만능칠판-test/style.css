@@ -659,3 +659,31 @@ body.score-resizing #canvas-container canvas,body.score-resizing #scoreFrame{poi
   box-shadow: 0 4px 18px #15324c26;
 }
 #importProgress[hidden] { display: none; }
+
+button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
+  -webkit-user-select:none;
+  user-select:none;
+}
+#toolbar {touch-action:pan-y}
+.page-tile[data-page] {touch-action:none}
+#toolbar {scrollbar-width:none}
+#toolbar::-webkit-scrollbar {display:none}
+#toolbar > .toolbar-group:first-child {margin-inline-start:auto}
+#toolbar > .toolbar-group:last-child {margin-inline-end:auto}
+.view-sync input {cursor:inherit}
+#pageList {max-width:min(90vw, 550px)}
+#pageTiles {display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;width:min(76vw, 490px);max-height:55vh;overflow:auto}
+.page-tile {display:grid;gap:4px;place-items:center;background:#f4f7fa;border:1px solid #afc3d6;border-radius:8px;padding:4px;cursor:pointer}
+.page-tile[aria-current=true],.page-tile.reordering {outline:2px solid #1862ad;outline-offset:-2px}
+.page-tile img,.page-tile-preview {display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#e4eaf0;border-radius:3px}
+.page-tile-add {font-size:1.7rem;min-height:65px}
+#sharedSettingsModal fieldset {margin-block:12px;border:1px solid #ccd7e3;border-radius:8px}
+#sharedSettingsModal fieldset label {display:inline-flex;align-items:center;gap:6px;margin:6px}
+#favoriteSizes input {width:5ch}
+#sizeDefaults p {margin-block:6px}
+#backgroundModal label, #backgroundObjects label {display:block;margin-block:10px}
+#backgroundObjects {max-height:45vh;overflow:auto}
+#backgroundColors button {border-width:2px}
+
+#backgroundColors [aria-pressed=true] {outline:2px solid #1862ad;outline-offset:2px}
+#backgroundSpacing {vertical-align:middle}

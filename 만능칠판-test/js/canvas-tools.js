@@ -27,7 +27,7 @@ export class CanvasTools {
   setMode(mode) {
     this.mode=mode;const c=this.canvas;
     c.discardActiveObject();c.isDrawingMode=mode==='pen'||mode==='marker';c.selection=mode==='select';c.skipTargetFind=mode==='move';
-    c.getObjects().forEach(o=>o.set({selectable:mode==='select',evented:true}));
+    c.getObjects().forEach(o=>o.set({selectable:mode==='select' && !o.wbPinned && !o.wbAssetMissing,evented:!o.wbPinned && !o.wbAssetMissing}));
     const cursors={
       pen:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27 viewBox=%270 0 28 28%27%3E%3Cpath d=%27M3 23L18 8l5 5L8 28 3 23z%27 fill=%27%23444444%27/%3E%3Cpath d=%27M18 8l2-2 5 5-2 2z%27 fill=%27%23222222%27/%3E%3Cpath d=%27M3 23l-1 4 4-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 2 27, crosshair',
       marker:'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2732%27 height=%2732%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M3 26L20 9l5 5L8 31 3 26z%27 fill=%27%23ffd92f%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M20 9l3-3 5 5-3 3z%27 fill=%27%23ffef85%27 stroke=%27%23666666%27/%3E%3Cpath d=%27M3 26l-1 5 6-1z%27 fill=%27%23ffffff%27/%3E%3C/svg%3E") 2 31, crosshair',
@@ -76,7 +76,7 @@ export class CanvasTools {
     // Render candidates independently so other objects, the page background and
     // selection handles never count as hits.
     const hits=c.getObjects().filter(object=>{
-      if (object.wbAssetMissing || object.excludeFromExport || object.visible===false || object.opacity===0) return false;
+      if (object.wbPinned || object.wbAssetMissing || object.excludeFromExport || object.visible===false || object.opacity===0) return false;
       const bounds=object.getBoundingRect(false,true);
       if (!object.shadow && (bounds.left>=right || bounds.top>=bottom ||
           bounds.left+bounds.width<left || bounds.top+bounds.height<top)) return false;

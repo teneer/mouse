@@ -1,8 +1,10 @@
+import {reorderPages} from './js/board-navigation.js';
 import {uid, clone} from './js/constants.js';
 import {resolvePageWrite} from './js/conflicts.js';
 const SCOPE = new URL('.', location.href).pathname;
 const DB_NAME = `WhiteboardPagesDB:${SCOPE}`;
 export const SIGNAL_KEY = `whiteboard-pages-signal:${SCOPE}`;
+const VIEW_SIGNAL_KEY = SIGNAL_KEY + ':view';
 export const CHANNEL_NAME = `whiteboard-pages:${SCOPE}`;
 export const SESSION_KEY = `whiteboard-pages-session:${SCOPE}`;
 export class BoardStore {
@@ -51,7 +53,7 @@ export class BoardStore {
     return new Promise((resolve,reject) => {
       const tx = this.db.transaction('pages','readwrite'), s = tx.objectStore('pages');
       const r = s.get(local.id); let result;
-      r.onsuccess = () => { result = resolvePageWrite(r.result, clone(local), baseVersion, uid(), Date.now()); if (!result.unchanged) s.put(result.page); };
+      r.onsuccess = () => { result = resolvePageWrite(r.result, {...clone(local),order:r.result?.order ?? local.order}, baseVersion, uid(), Date.now()); if (!result.unchanged) s.put(result.page); };
       tx.oncomplete = () => resolve(result);
       tx.onabort = tx.onerror = () => reject(tx.error || Error('자동저장에 실패했습니다.'));
     });
@@ -66,6 +68,18 @@ export class BoardStore {
         s.put({...p,deleted:true,content:null,version:p.version+1,updatedAt:Date.now()});
       };
       tx.oncomplete=()=>resolve(); tx.onabort=tx.onerror=()=>reject(failure || tx.error);
+    });
+  }
+  reorderPages(ids) {
+    return new Promise((resolve,reject)=>{
+      const tx=this.db.transaction('pages','readwrite'), pages=tx.objectStore('pages');
+      const request=pages.getAll();
+      request.onsuccess=()=>{
+        const active=request.result.filter(page=>!page.deleted).sort((a,b)=>a.order-b.order||a.id.localeCompare(b.id));
+        reorderPages(active,ids).forEach((page,index)=>{if(page.order!==index)pages.put({...page,order:index});});
+      };
+      tx.oncomplete=resolve;
+      tx.onabort=tx.onerror=()=>reject(tx.error);
     });
   }
   getAsset(id) {return this.request('assets','readonly',s=>s.get(id));}
@@ -120,16 +134,29 @@ export async function readLegacy() {
   } finally {db.close();}
 }
 export class TabSync {
-  constructor(onChange) {
-    this.onChange=onChange; this.id=uid();
-    try { this.channel=new BroadcastChannel(CHANNEL_NAME); this.channel.onmessage=e=>{if(e.data?.sender!==this.id) onChange();}; } catch {}
-    this.storageHandler=e=>{if(e.key===SIGNAL_KEY) onChange();};
+  constructor(onChange,onView) {
+    this.id=uid();
+    let lastView;
+    const receive=message=>{
+      if(!message || message.sender===this.id)return;
+      if(message.view){
+        if(lastView!==message.nonce){lastView=message.nonce;onView?.(message.view);}
+      }else onChange();
+    };
+    try { this.channel=new BroadcastChannel(CHANNEL_NAME); this.channel.onmessage=e=>receive(e.data); } catch {}
+    this.storageHandler=e=>{
+      if(e.key===SIGNAL_KEY || e.key===VIEW_SIGNAL_KEY){try{receive(JSON.parse(e.newValue));}catch{}}
+    };
     window.addEventListener('storage',this.storageHandler);
     this.timer=setInterval(()=>{if(document.visibilityState==='visible') onChange();},5000);
+    this.readView=()=>{try{return JSON.parse(localStorage.getItem(VIEW_SIGNAL_KEY))?.view;}catch{return null;}};
   }
-  notify() {
-    this.channel?.postMessage({sender:this.id,time:Date.now()});
-    try {localStorage.setItem(SIGNAL_KEY,JSON.stringify({sender:this.id,nonce:uid()}));} catch {}
+  broadcast(view) {
+    const message={sender:this.id,nonce:uid(),view};
+    this.channel?.postMessage(message);
+    try {localStorage.setItem(view?VIEW_SIGNAL_KEY:SIGNAL_KEY,JSON.stringify(message));} catch {}
   }
+  notify() {this.broadcast();}
+  sendView(view) {this.broadcast(view);}
   close() {clearInterval(this.timer);this.channel?.close();window.removeEventListener('storage',this.storageHandler);}
 }

@@ -3,8 +3,8 @@ const MIN_READABLE_WIDTH = 72;
 const MAX_CARD_WIDTH = 220;
 const COLUMN_CHANGE_MARGIN = 0.03;
 
-export function measureTeamLayout({ width, height, count, ratio, gap, fixedColumns, previousColumns }) {
-  const maxWidth = Math.min(width, MAX_CARD_WIDTH);
+export function measureTeamLayout({ width, height, count, ratio, gap, fixedColumns, previousColumns, maxAutoColumns = MAX_COLUMNS, scale = 1 }) {
+  const maxWidth = Math.min(width, MAX_CARD_WIDTH, MAX_CARD_WIDTH * scale);
   const widthFor = columns => Math.max(0, Math.min(maxWidth, (width - gap * (columns - 1)) / columns));
   const readableWidth = Math.min(MIN_READABLE_WIDTH, maxWidth);
 
@@ -15,7 +15,7 @@ export function measureTeamLayout({ width, height, count, ratio, gap, fixedColum
   }
 
   const candidates = [];
-  for (let columns = 1; columns <= maxOccupiedColumns; columns++) {
+  for (let columns = 1; columns <= Math.min(maxOccupiedColumns,maxAutoColumns); columns++) {
     const rows = Math.max(1, Math.ceil(count / columns));
     const horizontalWidth = widthFor(columns);
     const verticalWidth = Math.max(0, (height - gap * (rows - 1)) * ratio / rows);

@@ -158,6 +158,7 @@ export class BoardFiles {
     const waiters = new Set(canvas ? [canvas] : []);
     const job = {key, object, waiters};
     this.cache.set(key, job);
+    job.done=new Promise(resolve=>{job.finish=resolve;});
     this.queue.push(job);
     this.drain();
     return null;
@@ -166,7 +167,7 @@ export class BoardFiles {
   drain() {
     while (this.rendering < 2 && this.queue.length) {
       const job = this.queue.shift();
-      if (this.cache.get(job.key) !== job) continue;
+      if (this.cache.get(job.key) !== job) {job.finish();continue;}
       this.rendering++;
       this.render(job.object).then(bitmap => {
         if (this.cache.get(job.key) === job) {
@@ -182,6 +183,7 @@ export class BoardFiles {
         console.warn('PDF·이미지 표시 실패', error);
       }).finally(() => {
         this.rendering--;
+        job.finish();
         job.waiters.forEach(canvas => canvas.requestRenderAll());
         this.drain();
       });
@@ -212,6 +214,11 @@ export class BoardFiles {
     await page.render({canvasContext:canvas.getContext('2d'), viewport, background:'#fff'}).promise;
     page.cleanup();
     return canvas;
+  }
+
+  async settlePreview(canvas) {
+    const pending=[...this.cache.values()].filter(entry=>entry.waiters?.has(canvas));
+    await Promise.all(pending.map(entry=>entry.done));
   }
 
   installFabric() {
