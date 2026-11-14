@@ -24,19 +24,14 @@
     if (available <= 0) return;
     const panelPercent = Number(frame?.dataset.panelPercent ?? 30);
     const gap = Math.min(8, Math.floor(available / 12));
-    const preferredColumns = panelPercent <= 10 ? 1
-      : panelPercent < 20 ? 2
-      : panelPercent <= 30 ? 3
-      : Math.min(12, Math.max(3, Math.floor((available + gap) / 114)));
-    const columns = panelPercent === 30 ? 3
-      : Math.min(preferredColumns, Math.max(1, Math.floor((available + gap) / 66)));
-    const classWidth = Math.min(available, Math.min(available * 0.92, 400) * scale / 100);
-    const teamSlot = (available - gap * (columns - 1)) / columns;
-    const teamWidth = Math.floor(4 * Math.min(teamSlot, classWidth * 0.69,
-      Math.min(teamSlot * 0.9, 200) * scale / 100)) / 4;
-    root.style.setProperty('--class-width', `${classWidth}px`);
-    root.style.setProperty('--team-width', `${teamWidth}px`);
-    root.style.setProperty('--team-row-width', `${(teamWidth * columns + gap * (columns - 1)).toFixed(3)}px`);
+    const minimumCardWidth = 150;
+    const fittedColumns = Math.max(1, Math.floor((available + gap) / (minimumCardWidth + gap)));
+    const columns = panelPercent <= 10 ? 1 : Math.min(panelPercent <= 30 ? 3 : 12, fittedColumns);
+    const slotWidth = (available - gap * (columns - 1)) / columns;
+    const cardWidth = Math.floor(4 * Math.min(slotWidth, Math.min(slotWidth, 220) * scale / 100)) / 4;
+    root.style.setProperty('--class-width', `${cardWidth}px`);
+    root.style.setProperty('--team-columns', String(columns));
+    root.style.setProperty('--team-row-width', `${(cardWidth * columns + gap * (columns - 1)).toFixed(3)}px`);
     root.style.setProperty('--team-gap', `${gap}px`);
     root.style.setProperty('--toolbar-clearance', `${Number(frame?.dataset.toolbarHeight ?? 0)}px`);
   }

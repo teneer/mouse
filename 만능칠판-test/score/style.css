@@ -141,24 +141,6 @@ h1 { margin-top: 36px; text-shadow: 1px 1px 2px var(--shadow-color); }
 .goal-alert-message { font-size: 18px; font-weight: 500; margin: 0; }
 @keyframes tada { from{transform:scale3d(1,1,1)} 10%,20%{transform:scale3d(.9,.9,.9) rotate3d(0,0,1,-3deg)} 30%,50%,70%,90%{transform:scale3d(1.1,1.1,1.1) rotate3d(0,0,1,3deg)} 40%,60%,80%{transform:scale3d(1.1,1.1,1.1) rotate3d(0,0,1,-3deg)} to{transform:scale3d(1,1,1)} }
 
-/* ▼▼▼ [새 기능] 별 프로그레스 바 스타일 ▼▼▼ */
-#star-progress-container {
-    display: flex;
-    justify-content: center;
-    gap: 5px;
-    margin-top: 15px;
-    height: 24px;
-}
-.star {
-    font-size: 24px;
-    color: #e0e0e0; /* 비활성 별 색상 */
-    transition: color 0.3s, transform 0.2s;
-}
-.star.filled {
-    color: #fdd835; /* 활성 별 색상 (노란색) */
-    transform: scale(1.2);
-}
-
 /* --- style.css 맨 아래에 추가 (크기 매칭 및 레이아웃 수정) --- */
 
 /* 1. 기본 설정 */
@@ -295,7 +277,14 @@ body.goal-active #goal-panel {
 /* 통합 점수판 */
 html, body {width:100%;max-width:100%;overflow-x:hidden}
 .container {width:100%;max-width:none;padding:34px min(7px, 4vw) calc(var(--toolbar-clearance, 0px) + 12px)}
-.container > h1 {display:none}
+.container > h1, #scoreboard-title {
+  margin:4px auto 8px;
+  width:min(100%, var(--team-row-width, 100%));
+  font-size:clamp(16px, 5vw, 24px);
+  text-align:left;
+  text-shadow:none;
+}
+:root {--score-gold:#f5c632}
 #display-area {gap:10px;max-width:none;padding-bottom:0}
 #top-row, #bottom-row, #class-area {min-width:0;max-width:100%}
 #class-area {max-width:none}
@@ -321,40 +310,61 @@ html, body {width:100%;max-width:100%;overflow-x:hidden}
   place-content:center;
   grid-template-columns:minmax(0, 1fr);
 }
-.main-controls {gap:4cqw;margin:0}
+.main-controls {gap:4cqw;margin:0;min-width:0}
 .main-btn {
-  width:18cqw;
-  height:15cqw;
+  width:min(42px, 20cqw);
+  height:min(40px, 19cqw);
   padding:0;
   line-height:1;
-  font-size:9cqw;
+  font-size:clamp(13px, 11cqw, 24px);
   border-radius:3cqw;
 }
-#number {font-size:15cqw;min-width:0;margin:0;line-height:1.1;font-variant-numeric:tabular-nums}
+#number {font-size:min(42px, 15cqw);min-width:0;margin:0;line-height:1.1;font-variant-numeric:tabular-nums}
 #change {font-size:8cqw}
-#star-progress-container {
-  gap:.35cqw;
-  margin:2cqw 0 0;
-  height:auto;
-  min-height:0;
-  line-height:1;
+.score-progress-group {
+  display:grid;
+  gap:clamp(2px, 2.5cqw, 6px);
+  width:88%;
+  margin:clamp(3px, 8cqw, 16px) auto 0;
+  text-align:center;
 }
-#star-progress-container:empty {display:none}
-.star {font-size:3.55cqw}
+#score-progress {
+  position:relative;
+  overflow:hidden;
+  height:clamp(4px, 5cqw, 10px);
+  border-radius:6px;
+  background:#dce7ed;
+}
+.score-progress-fill {height:100%;width:var(--filled, 0%);background:var(--score-gold)}
+#score-progress:not([data-continuous])::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:repeating-linear-gradient(to bottom, transparent 0 2px, #fff 2px 4px);
+  mask-image:repeating-linear-gradient(to right, transparent 0 max(0%, calc(var(--division, 33.333%) - 1px)), #000 max(0%, calc(var(--division, 33.333%) - 1px)) var(--division, 33.333%));
+}
+#conversion-rule {
+  margin:0;
+  padding:0;
+  border-radius:0;
+  background:none;
+  font-size:min(13px, 6cqw);
+  line-height:1.15;
+  overflow-wrap:anywhere;
+}
 .scoreboard {
   width:min(100%, var(--team-row-width, 100%));
   max-width:none;
   margin:10px auto 0;
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
+  display:grid;
+  grid-template-columns:repeat(var(--team-columns, 3), minmax(0, 1fr));
   gap:var(--team-gap, 8px);
 }
 .team-card {
   --card-accent:var(--secondary-color);
-  width:var(--team-width, 28%);
+  width:100%;
   aspect-ratio:var(--team-ratio, 4 / 3);
-  flex:0 0 auto;
   margin:0;
   display:grid;
   align-content:center;
@@ -362,24 +372,43 @@ html, body {width:100%;max-width:100%;overflow-x:hidden}
   grid-template-columns:minmax(0, 1fr);
   overflow:hidden;
 }
+.team-select-btn {
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  width:100%;
+  padding:0;
+  border:0;
+  border-radius:inherit;
+  background:transparent;
+  color:inherit;
+  cursor:pointer;
+}
+.team-card.team-selected .team-select-btn {
+  background:color-mix(in srgb, var(--score-gold) 32%, transparent);
+  box-shadow:inset 0 0 0 4px var(--score-gold);
+}
+.team-select-btn:focus-visible {outline:2px solid var(--primary-dark);outline-offset:-5px}
 .team-name {
-  width:68cqw;
+  position:absolute;
+  top:7cqw;
+  left:9cqw;
+  width:62cqw;
   max-width:none;
   margin:0;
   padding:0;
-  font-size:min(18px, calc(64cqw / var(--team-name-half-length, 7)));
-  line-height:1.1;
-  text-align:center;
-  white-space:normal;
-  overflow-wrap:anywhere;
-  display:-webkit-box;
-  -webkit-box-orient:vertical;
-  -webkit-line-clamp:2;
+  font-size:min(18px, calc(62cqw / var(--team-name-half-length, 7)));
+  line-height:1;
+  text-align:left;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
-.team-controls {margin:1cqw 0 0}
-.team-number {font-size:16cqw;line-height:1;font-variant-numeric:tabular-nums}
+.team-controls {margin:0}
+.team-number {font-size:min(40px, 17cqw);line-height:1;font-variant-numeric:tabular-nums}
 .team-change {font-size:13cqw}
-.team-minus-btn, .team-remove-btn {
+.team-minus-btn, .team-plus-btn, .team-remove-btn {
   width:22cqw;
   height:20cqw;
   padding:0;
@@ -388,7 +417,71 @@ html, body {width:100%;max-width:100%;overflow-x:hidden}
 }
 .team-minus-btn {border-radius:0 0 0 6cqw}
 .team-remove-btn {border-radius:0 6cqw 0 5cqw}
-#conversion-rule {margin:4px 0;font-size:11px}
+.team-plus-btn {
+  position:absolute;
+  bottom:0;
+  right:0;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  border:0;
+  border-radius:0 0 6cqw 0;
+  background:rgba(0,0,0,.05);
+  color:#236246;
+  font-weight:700;
+  cursor:pointer;
+}
+.team-plus-btn:hover {background:#c8edde}
+
+[hidden] {display:none !important}
+#batch-score {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:6px;
+  margin:14px 0 0;
+  padding-top:10px;
+  border-top:1px solid #cadfe1;
+}
+.batch-actions {
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:4px;
+  max-width:100%;
+  margin-left:auto;
+}
+#batch-score button {
+  min-height:42px;
+  padding:0 6px;
+  border:0;
+  border-radius:8px;
+  background:#e4edf2;
+  color:#1c3146;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+#batch-score #apply-batch {background:#185ba8;color:#fff}
+#batch-score button:disabled {opacity:.55;cursor:default}
+.batch-amount {display:flex;border:1px solid #cadfe1;border-radius:8px;background:#fff}
+#batch-delta {
+  width:42px;
+  min-width:0;
+  padding:2px;
+  border:0;
+  border-radius:8px;
+  appearance:textfield;
+  text-align:center;
+  font:inherit;
+}
+#batch-delta::-webkit-inner-spin-button, #batch-delta::-webkit-outer-spin-button {appearance:none;margin:0}
+.batch-stepper {display:grid;border-left:1px solid #cadfe1}
+#batch-score .batch-stepper button {min-height:21px;width:26px;padding:0;border-radius:0}
+#batch-score .batch-stepper button + button {border-top:1px solid #cadfe1}
+#score-link-points {width:min(76px, 100%);font:inherit}
 .settings-panel-toggle {top:4px;right:6px}
 #settings-toggle-btn {width:min(34px, 88vw);height:34px;padding:0;font-size:18px}
 .settings-panel {

@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=test-4">
+    <link rel="stylesheet" href="style.css?v=test-6">
 </head>
 
 <body>
     <div class="container">
-        <h1>학급 점수판 v.7</h1>
+        <h1>학급 점수</h1>
         <div class="settings-panel-toggle">
             <button id="settings-toggle-btn" type="button" aria-label="점수판 설정">⚙️</button>
         </div>
@@ -21,12 +21,17 @@
                 <div id="class-area">
                     <div class="main-scoreboard">
                         <div class="main-controls">
-                            <button id="main-decrease-btn" class="main-btn">−</button>
+                            <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
                             <span id="number">0</span>
-                            <button id="main-increase-btn" class="main-btn">+</button>
+                            <button id="main-increase-btn" class="main-btn" aria-label="학급 점수 1점 추가">+</button>
                         </div>
                         <div id="change"></div>
-                        <div id="star-progress-container"></div>
+                        <div class="score-progress-group">
+                            <div id="score-progress" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+                                <div class="score-progress-fill"></div>
+                            </div>
+                            <span id="conversion-rule">모둠 3점 = 학급 1점</span>
+                        </div>
                     </div>
                 </div>
 
@@ -47,16 +52,30 @@
             </div>
 
             <div id="bottom-row">
-                <h2 id="scoreboard-title" style="display: none;">모둠 점수판 <span id="conversion-rule"></span></h2>
+                <h2 id="scoreboard-title" style="display: none;">모둠 점수</h2>
                 <div id="scoreboard" class="scoreboard"></div>
                 
                 <div id="create-teams-btn-wrap">
                     <button id="create-teams-btn" onclick="showTeamSetupModal()">모둠 점수판 생성</button>
                 </div>
             </div>
-
         </div>
-        
+
+        <form id="batch-score" hidden>
+            <button type="button" id="select-all-teams">전체선택</button>
+            <div class="batch-actions">
+                <button type="button" id="undo-score" disabled>되돌리기</button>
+                <div class="batch-amount">
+                    <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
+                    <div class="batch-stepper">
+                        <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
+                        <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
+                    </div>
+                </div>
+                <button type="submit" id="apply-batch" disabled>반영</button>
+            </div>
+        </form>
+
         <div id="settings-panel" class="settings-panel">
             <h3>설정</h3>
             <div class="score-size-controls" aria-label="점수판 표시 크기"><span>표시 배율</span><button type="button" id="scoreSizeDown" title="점수판 축소">−</button><output id="scoreSizeValue">100%</output><button type="button" id="scoreSizeUp" title="점수판 확대">＋</button><button type="button" id="scoreSizeReset" title="배율 초기화">100%</button></div>
@@ -66,6 +85,13 @@
             <label class="score-card-ratio">모둠 카드 비율
                 <select id="teamCardRatio"><option value="16:9">16:9</option><option value="4:3">4:3</option></select>
             </label>
+            <label class="score-card-ratio">점수 연동
+                <select id="score-link-mode">
+                    <option value="on">모둠 점수 연동</option>
+                    <option value="off">연동 안 함</option>
+                </select>
+            </label>
+            <label class="score-card-ratio" id="score-link-rule">모둠 <input id="score-link-points" type="number" min="1" step="1" value="3" aria-label="학급 1점에 필요한 모둠 점수">점 = 학급 1점</label>
             <button id="open-goal-modal-btn">목표 관리</button>
             <button id="open-management-modal-btn">점수판 관리</button>
             <button id="reset-main-btn">학급 점수 초기화</button>
@@ -140,6 +166,6 @@
 
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script src="script.js?v=test-4"></script><script src="panel-ui.js?v=test-4"></script>
+    <script src="script.js?v=test-6"></script><script src="panel-ui.js?v=test-6"></script>
 </body>
 </html>
