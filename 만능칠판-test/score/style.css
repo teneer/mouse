@@ -493,16 +493,15 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
   display:flex;
   flex:0 0 auto;
   width:max-content;
-  justify-content:safe flex-end;
+  justify-content:flex-end;
   align-items:center;
-  overflow-x:auto;
-  scrollbar-width:thin;
+  flex-wrap:wrap;
   gap:4px;
   max-width:100%;
   margin-left:auto;
   padding:2px;
 }
-.batch-actions > * {flex:none}
+.batch-actions > * {flex:none;max-width:100%}
 #batch-score button {
   min-height:42px;
   padding:0 6px;
@@ -514,9 +513,13 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
   font-weight:700;
   cursor:pointer;
 }
-#batch-score #apply-batch {min-width:min(60px, 100%);background:var(--primary-color);color:#fff}
+#batch-score #select-all-teams, #batch-score #undo-score, #batch-score #apply-batch {
+  width:60px;
+  max-width:100%;
+}
+#batch-score #apply-batch {background:var(--primary-color);color:#fff}
 #batch-score button:disabled {opacity:.55;cursor:default}
-.batch-amount {display:flex;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
+.batch-amount {display:flex;width:71px;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
 #batch-delta {
   width:42px;
   min-width:0;
