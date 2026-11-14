@@ -76,7 +76,7 @@ export class CanvasTools {
     // Render candidates independently so other objects, the page background and
     // selection handles never count as hits.
     const hits=c.getObjects().filter(object=>{
-      if (object.excludeFromExport || object.visible===false || object.opacity===0) return false;
+      if (object.wbAssetMissing || object.excludeFromExport || object.visible===false || object.opacity===0) return false;
       const bounds=object.getBoundingRect(false,true);
       if (!object.shadow && (bounds.left>=right || bounds.top>=bottom ||
           bounds.left+bounds.width<left || bounds.top+bounds.height<top)) return false;

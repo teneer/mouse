@@ -610,3 +610,52 @@ body.score-resizing #canvas-container canvas,body.score-resizing #scoreFrame{poi
 }
 #toolbar>.toolbar-group{display:flex;align-items:center;flex:0 0 auto;gap:5px;margin:0}
 #toolbar button,#toolbar input{flex:0 0 auto;margin:0}
+
+.view-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  white-space: nowrap;
+}
+.view-sync:has(:disabled) { opacity: .55; }
+.cloud-dialog {
+  width: min(36rem, 94vw);
+  max-height: 85dvh;
+  overflow: auto;
+  box-sizing: border-box;
+}
+.cloud-dialog h3 { margin: 1.1rem 0 .4rem; }
+.cloud-dialog li { margin-block: .4rem; }
+.cloud-dialog label { display: block; margin-top: .75rem; }
+.cloud-dialog input, .cloud-dialog textarea {
+  width: 100%;
+  margin-top: .3rem;
+  padding: .5rem;
+  border: 1px solid #a9bbc9;
+  border-radius: 7px;
+  box-sizing: border-box;
+  font: inherit;
+}
+.cloud-buttons { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .65rem; }
+#devicePairCode { display: block; margin-block: 1rem; font: bold 1.15rem monospace; overflow-wrap: anywhere; }
+#devicePairCode[hidden] { display: none; }
+#managedFiles { list-style: none; margin: 0; padding: 0; }
+#managedFiles li { padding: .7rem 0; border-top: 1px solid #dbe3e9; overflow-wrap: anywhere; }
+#managedFiles p { margin: .35rem 0; }
+#importProgress {
+  position: fixed;
+  z-index: 9000;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .55rem;
+  background: white;
+  border: 1px solid #ccd7e1;
+  border-radius: 9px;
+  box-shadow: 0 4px 18px #15324c26;
+}
+#importProgress[hidden] { display: none; }

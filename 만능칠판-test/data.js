@@ -8,8 +8,11 @@ export const SESSION_KEY = `whiteboard-pages-session:${SCOPE}`;
 export class BoardStore {
   async open() {
     this.db = await new Promise((resolve, reject) => {
-      const r = indexedDB.open(DB_NAME, 1);
-      r.onupgradeneeded = () => {
+      const r = indexedDB.open(DB_NAME, 2);
+      r.onupgradeneeded = event => {
+        r.result.createObjectStore('assets', {keyPath:'id'});
+        r.result.createObjectStore('cloudOperations', {keyPath:'id'}).createIndex('boardId', 'boardId');
+        if (event.oldVersion) return;
         r.result.createObjectStore('pages', {keyPath: 'id'});
         r.result.createObjectStore('screens', {keyPath: 'id'});
         r.result.createObjectStore('meta');
@@ -65,16 +68,34 @@ export class BoardStore {
       tx.oncomplete=()=>resolve(); tx.onabort=tx.onerror=()=>reject(failure || tx.error);
     });
   }
+  getAsset(id) {return this.request('assets','readonly',s=>s.get(id));}
+  putAsset(asset) {return this.request('assets','readwrite',s=>s.put(asset));}
+  deleteAsset(id) {return this.request('assets','readwrite',s=>s.delete(id));}
+  putCloudOperation(operation) {return this.request('cloudOperations','readwrite',s=>s.put(operation));}
+  async listCloudOperations(boardId) {
+    const rows = await this.request('cloudOperations','readonly',s=>s.index('boardId').getAll(boardId));
+    return rows.sort((a,b)=>a.time-b.time);
+  }
+  cacheCloudState(boardId,state,confirmed) {
+    return new Promise((resolve,reject)=>{
+      const tx=this.db.transaction(['meta','cloudOperations'],'readwrite');
+      tx.objectStore('meta').put(state,'cloud-state:'+boardId);
+      for(const id of confirmed)tx.objectStore('cloudOperations').delete(id);
+      tx.oncomplete=resolve;
+      tx.onabort=tx.onerror=()=>reject(tx.error);
+    });
+  }
   listScreens() { return this.request('screens','readonly',s=>s.getAll()).then(a=>a.sort((x,y)=>y.savedAt-x.savedAt)); }
   putScreen(screen) { return this.request('screens','readwrite',s=>s.put(screen)); }
   deleteScreen(id) { return this.request('screens','readwrite',s=>s.delete(id)); }
   getMeta(key) { return this.request('meta','readonly',s=>s.get(key)); }
   setMeta(key,value) { return this.request('meta','readwrite',s=>s.put(value,key)); }
-  async appendBackup(pages, screens) {
+  async appendBackup(pages, screens, assets = []) {
     return new Promise((resolve,reject)=>{
-      const tx=this.db.transaction(['pages','screens'],'readwrite');
+      const tx=this.db.transaction(['pages','screens','assets'],'readwrite');
       pages.forEach(p=>tx.objectStore('pages').put(p));
       screens.forEach(s=>tx.objectStore('screens').put(s));
+      assets.forEach(asset=>tx.objectStore('assets').put(asset));
       tx.oncomplete=resolve;tx.onabort=tx.onerror=()=>reject(tx.error);
     });
   }
