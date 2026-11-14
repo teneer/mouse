@@ -7,7 +7,7 @@ import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedT
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
 import {CloudBoard} from './js/cloud.js';
-import {boardPages, pagePatch, validView} from './js/cloud-model.js';
+import {boardPages, pagePatch, pageTitle, validView} from './js/cloud-model.js';
 import {wireCloudUI} from './js/cloud-ui.js';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js';
@@ -24,7 +24,7 @@ const isColor=value=>typeof value==='string' && /^#[0-9a-f]{6}$/i.test(value);
 const priorColor=parseQuickColors(JSON.stringify(readPreference('wb42.quickColors'))).find(color=>!QUICK_DEFAULTS.includes(color));
 const shared={color:'#000000',level:3,favoriteColor:readPreference('wb42.favoriteColor')??priorColor,
   favoriteSize:normalizeFavoriteSize(readPreference('wb42.favoriteSize'))};
-let favoriteDraft, favoriteBackground=readPreference('wb42.favoriteBackground'), localView, pageListGeneration=0;
+let favoriteDraft, favoriteBackground=readPreference('wb42.favoriteBackground'), localView, pageListGeneration=0, renamePageId=null;
 let groupSession=null,suppressSelection=false;
 let cloud, boardFiles, cloudUI, cloudBase, cloudRefresh=false, cloudRefreshTimer, viewTimer, applyingView=false;
 let cancelledText=false, cloudHistory=null, seenView=null;
@@ -59,7 +59,13 @@ function rememberView(publish=false) {
       if(!$('viewSync').checked || applyingView)return;
       const [zoom,,,,left,top]=c.viewportTransform;
       const view={pageId:current.id,zoom,x:(c.width/2-left)/zoom,y:(c.height/2-top)/zoom};
-      if(cloudActive())cloud.sendView(view).catch(fail);
+      const frame=$('scoreFrame');
+      if(frame){
+        view.scoreShare=scoreShare;
+        const scale=Number(frame.dataset.scoreScale || readPreference('whiteboard.test.score-scale.v1'));
+        if(scale>=60 && scale<=150)view.scoreScale=scale;
+      }
+      if(cloudActive())cloud.sendView({...view,sourceTab:sync.id}).catch(fail);
       else sync.sendView(view);
     },350);
   }
@@ -151,7 +157,7 @@ async function run(fn,label='처리 중입니다.') {
 }
 async function setPage(page,reset=false,keepView=true) {
   rememberView();const previous=current?clone(current):null;
-  current=clone(page);cloudBase=cloudActive()?clone(page.content):null;const pageNumber=Math.min(MAX_PAGES,Math.max(1,pages.findIndex(p=>p.id===page.id)+1));current.name=`페이지 ${pageNumber}`;dirty=false;
+  current=clone(page);cloudBase=cloudActive()?clone(page.content):null;dirty=false;
   try {await loadCanvas(c,current.content.canvas);await checkFiles(current.content);}catch(error){
     current=previous;cloudBase=cloudActive()?previous?.content:null;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
   }
@@ -183,11 +189,16 @@ async function createPage(content) {
   const result=await store.commitPage(page,0);
   sync.notify();pages=await store.listPages();await setPage(result.page,true,false);rememberView(true);
 }
+function displayPageTitle(page,index) {
+  return pageTitle(page?.title) || `페이지 ${index+1}`;
+}
 function renderPages() {
   pages=pages.slice(0,MAX_PAGES);
   const index=Math.max(0,pages.findIndex(p=>p.id===current?.id));
   $('pageListBtn').textContent=String(index+1);
-  $('pageListBtn').setAttribute('aria-label',`페이지 목록 · 현재 ${index+1}쪽`);
+  const title=displayPageTitle(pages[index],index);
+  $('pageListBtn').title=title;
+  $('pageListBtn').setAttribute('aria-label',`페이지 목록 · ${index+1}쪽 · ${title}`);
   $('addPageBtn').disabled=pages.length>=MAX_PAGES;
   $('duplicatePageBtn').disabled=pages.length>=MAX_PAGES;
   $('deletePageBtn').disabled=pages.length<=1;
@@ -203,16 +214,52 @@ async function movePage(source,target) {
   renderPages();
   if(openedPopup==='pageList')renderPageTiles();
 }
+function openPageRename(page,index) {
+  renamePageId=page.id;
+  $('pageNameInput').value=displayPageTitle(page,index);
+  openModal('pageRenameModal');
+  $('pageNameInput').focus();
+  $('pageNameInput').select();
+}
+async function savePageTitle(event) {
+  event.preventDefault();
+  const id=renamePageId, title=pageTitle($('pageNameInput').value);
+  if(!id || $('pageRenameModal').style.display!=='flex')return;
+  const submit=event.submitter || event.currentTarget.querySelector('[type=submit]');
+  if(submit.disabled)return;
+  submit.disabled=true;
+  try{
+    await flush();
+    if(cloudActive()){
+      const page=cloud.projected().pages[id];
+      if(!page || page.deleted)throw Error('이미 삭제된 페이지입니다.');
+      await cloud.enqueue({kind:'rename',pageId:id,title});
+      pages=boardPages(cloud.projected());
+    }else{
+      if(!await store.renamePage(id,title))throw Error('이미 삭제된 페이지입니다.');
+      pages=await store.listPages();sync.notify();
+    }
+    renderPages();
+    if(renamePageId===id && $('pageRenameModal').style.display==='flex'){
+      closeModal('pageRenameModal');
+      $('pageListBtn').focus();
+    }
+  }finally{submit.disabled=false;}
+}
 function renderPageTiles() {
   const generation=++pageListGeneration;
   const grid=$('pageTiles');
   grid.replaceChildren();
   for(const [index,page] of pages.entries()){
+    const wrap=document.createElement('div');wrap.className='page-tile-wrap';
     const tile=document.createElement('button');
     tile.type='button';tile.className='page-tile';tile.dataset.page=page.id;
     tile.setAttribute('aria-current',String(page.id===current?.id));
     const preview=document.createElement('div');preview.className='page-tile-preview';
-    const label=document.createElement('span');label.textContent=`${index+1}쪽`;
+    const title=displayPageTitle(page,index);
+    const label=document.createElement('span');label.className='page-tile-name';label.textContent=title;
+    tile.title=title;
+    tile.setAttribute('aria-label',`${index+1}쪽 · ${title}`);
     tile.append(preview,label);
     tile.onclick=()=>run(()=>activatePage(page.id));
     tile.onkeydown=event=>{
@@ -220,7 +267,15 @@ function renderPageTiles() {
       const target=pages[index+(event.key==='ArrowLeft'?-1:1)];
       if(target){event.preventDefault();movePage(page.id,target.id).catch(fail);}
     };
-    grid.append(tile);
+    const menu=document.createElement('details');menu.className='page-tile-menu';
+    const trigger=document.createElement('summary');trigger.textContent='…';
+    trigger.setAttribute('aria-label',title+' 옵션');
+    const rename=document.createElement('button');rename.type='button';rename.className='action-btn';rename.textContent='이름 편집';
+    rename.onclick=()=>openPageRename(page,index);
+    menu.ontoggle=()=>{
+      if(menu.open)for(const other of grid.querySelectorAll('details[open]'))if(other!==menu)other.open=false;
+    };
+    menu.append(trigger,rename);wrap.append(tile,menu);grid.append(wrap);
   }
   if(pages.length<MAX_PAGES){
     const add=document.createElement('button');
@@ -678,7 +733,7 @@ async function importBackup(file) {
   if(input.format!=='whiteboard-pages'||input.schema!==2||!Array.isArray(input.pages)||!Array.isArray(input.screens))throw Error('만능칠판 2.0 백업 파일이 아닙니다.');
   if(input.pages.length+input.screens.length>1000)throw Error('백업 항목은 1,000개까지 한 번에 가져올 수 있습니다.');
   const now=Date.now();
-  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:`페이지 ${Math.min(MAX_PAGES,i+1)}`,content,version:1,order:now+i,createdAt:now,updatedAt:now};});
+  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:`페이지 ${Math.min(MAX_PAGES,i+1)}`,title:pageTitle(p.title)||undefined,content,version:1,order:now+i,createdAt:now,updatedAt:now};});
   const screens=[];
   for(const s of input.screens) {
     const content=validateContent(s.content);
@@ -802,14 +857,13 @@ async function refreshCloud() {
     }
     renderPages();updateHistory();
     const view=cloud.latestView;
-    if($('viewSync').checked && view && view!==seenView && view.device===cloud.deviceId)seenView=view;
+    if($('viewSync').checked && view && view!==seenView && (view.sourceTab ? view.sourceTab===sync.id : view.device===cloud.deviceId))seenView=view;
     if($('viewSync').checked && view && view!==seenView && pages.some(page=>page.id===view.pageId) && !isTextEditing() && !modalOpen()){
       seenView=view;applyingView=true;
       try{
         if(current.id!==view.pageId)await run(()=>activatePage(view.pageId));
         if(current.id===view.pageId){
-          c.setViewportTransform([view.zoom,0,0,view.zoom,c.width/2-view.x*view.zoom,c.height/2-view.y*view.zoom]);
-          c.requestRenderAll();rememberView();
+          applyViewport(view);
         }
       }finally{applyingView=false;}
     }
@@ -817,6 +871,11 @@ async function refreshCloud() {
   }finally{cloudRefresh=false;}
 }
 
+function applyViewport(view){
+  receiveScoreView(view);
+  c.setViewportTransform([view.zoom,0,0,view.zoom,c.width/2-view.x*view.zoom,c.height/2-view.y*view.zoom]);
+  c.requestRenderAll();rememberView();
+}
 async function applyLocalView(){
   const view=localView;
   if(!current || cloudActive() || !$('viewSync').checked || !view || seenView===view || applyingView || dirty || saving || busy || modalOpen() || tools.gesture || isTextEditing())return;
@@ -825,8 +884,7 @@ async function applyLocalView(){
   try{
     if(current.id!==view.pageId)await run(()=>activatePage(view.pageId));
     if(current.id!==view.pageId)return;
-    c.setViewportTransform([view.zoom,0,0,view.zoom,c.width/2-view.x*view.zoom,c.height/2-view.y*view.zoom]);
-    c.requestRenderAll();rememberView();
+    applyViewport(view);
   }finally{applyingView=false;if(view!==localView)queueMicrotask(()=>applyLocalView().catch(fail));}
 }
 async function refreshRemote() {
@@ -868,6 +926,7 @@ function wireUI() {
   wireAppearanceSettings();wireBackgroundSettings();
   wireToolbarDrag($('toolbar'),()=>{cancelDeletePress();closePopups();});
   wirePageReorder($('pageTiles'),(source,target)=>movePage(source,target).catch(fail));
+  $('pageRenameForm').onsubmit=event=>savePageTitle(event).catch(fail);
   for(const id of ['textBgEnabled','textBgColor','textBorderEnabled','textBorderColor','textBorderWidth'])$(id).onchange=updateTextProps;
   $('moreTextPropsBtn').onclick=openTextProps;
   $('contextGroup').onclick=()=>{closeContext();groupObjects();};$('contextUngroup').onclick=()=>{closeContext();groupObjects(true);};
@@ -935,7 +994,7 @@ function wireUI() {
     if(!pages.length){await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();}
     await setPage(pages[0]);rememberView(true);
   });};
-  $('saveBtn').onclick=()=>{if(!allowed())return;$('saveScreenNameInput').value=current.name;openModal('saveConfirmModal');$('saveScreenNameInput').focus();$('saveScreenNameInput').select();};
+  $('saveBtn').onclick=()=>{if(!allowed())return;$('saveScreenNameInput').value=displayPageTitle(pages.find(page=>page.id===current.id),pages.findIndex(page=>page.id===current.id));openModal('saveConfirmModal');$('saveScreenNameInput').focus();$('saveScreenNameInput').select();};
   $('confirmSaveBtn').onclick=()=>run(async()=>{
     const name=$('saveScreenNameInput').value.trim() || '제목 없음';await flush();const content=capture(),view={viewportTransform:c.viewportTransform.slice(),width:c.width,height:c.height},thumbnail=await makeCurrentViewportThumbnail();
     await store.putScreen({id:uid(),name,savedAt:Date.now(),content,view,thumbnail});sync.notify();closeModal('saveConfirmModal');notify('현재 페이지를 저장 화면으로 보관했습니다.');
@@ -996,6 +1055,7 @@ function wireUI() {
 const PANEL_STORAGE_KEY='whiteboard.test.scorepanel.v1';
 const MIN_BOARD_SHARE=20,MAX_BOARD_SHARE=90;
 let scoreOpen=false,scoreShare=70,scoreDragging=false;
+let receiveScoreView=()=>{};
 const boardViewportWidth=()=>Math.max(1,Math.round($('canvas-container').getBoundingClientRect().width||innerWidth));
 const boardViewportHeight=()=>Math.max(1,Math.round($('canvas-container').getBoundingClientRect().height||innerHeight));
 function resizeBoardViewport(){
@@ -1026,6 +1086,14 @@ function setupIntegratedScorePanel(){
     splitter.setAttribute('aria-valuenow',String(Math.round(scoreShare)));
     // 패널 토글/드래그는 캔버스의 좌표계를 변경하지 않는다.
   };
+  receiveScoreView=view=>{
+    if(Number.isFinite(view.scoreShare) && !scoreDragging && scoreShare!==view.scoreShare){
+      scoreShare=clamp(view.scoreShare);
+      update();save();
+    }
+    if(Number.isFinite(view.scoreScale))frame.dataset.syncedScoreScale=String(view.scoreScale);
+  };
+  frame.addEventListener('score-display-scale',()=>rememberView(true));
   const toolbar=$('toolbar');
   const updateToolbarHeight=()=>{
     frame.dataset.toolbarHeight=String(Math.ceil(toolbar.getBoundingClientRect().height));
@@ -1045,7 +1113,7 @@ function setupIntegratedScorePanel(){
     splitter.setPointerCapture(e.pointerId);e.preventDefault();
   });
   splitter.addEventListener('pointermove',e=>{if(scoreDragging)changeShare(e.clientX);});
-  const stop=()=>{if(!scoreDragging)return;scoreDragging=false;document.body.classList.remove('score-resizing');splitter.classList.remove('dragging');save();};
+  const stop=()=>{if(!scoreDragging)return;scoreDragging=false;document.body.classList.remove('score-resizing');splitter.classList.remove('dragging');save();rememberView(true);};
   splitter.addEventListener('pointerup',stop);splitter.addEventListener('pointercancel',stop);splitter.addEventListener('lostpointercapture',stop);
   splitter.addEventListener('keydown',e=>{
     if(!scoreOpen)return;
@@ -1055,7 +1123,7 @@ function setupIntegratedScorePanel(){
     else if(e.key==='Home')scoreShare=MIN_BOARD_SHARE;
     else if(e.key==='End')scoreShare=MAX_BOARD_SHARE;
     else return;
-    e.preventDefault();e.stopPropagation();update();save();
+    e.preventDefault();e.stopPropagation();update();save();rememberView(true);
   });
   if(typeof ResizeObserver!=='undefined'){
     new ResizeObserver(resizeBoardViewport).observe($('canvas-container'));

@@ -53,7 +53,7 @@ export class BoardStore {
     return new Promise((resolve,reject) => {
       const tx = this.db.transaction('pages','readwrite'), s = tx.objectStore('pages');
       const r = s.get(local.id); let result;
-      r.onsuccess = () => { result = resolvePageWrite(r.result, {...clone(local),order:r.result?.order ?? local.order}, baseVersion, uid(), Date.now()); if (!result.unchanged) s.put(result.page); };
+      r.onsuccess = () => { result = resolvePageWrite(r.result, {...clone(local),order:r.result?.order ?? local.order,title:r.result?r.result.title:local.title}, baseVersion, uid(), Date.now()); if (!result.unchanged) s.put(result.page); };
       tx.oncomplete = () => resolve(result);
       tx.onabort = tx.onerror = () => reject(tx.error || Error('자동저장에 실패했습니다.'));
     });
@@ -68,6 +68,18 @@ export class BoardStore {
         s.put({...p,deleted:true,content:null,version:p.version+1,updatedAt:Date.now()});
       };
       tx.oncomplete=()=>resolve(); tx.onabort=tx.onerror=()=>reject(failure || tx.error);
+    });
+  }
+  renamePage(id,title) {
+    return new Promise((resolve,reject)=>{
+      const tx=this.db.transaction('pages','readwrite'), pages=tx.objectStore('pages');
+      const request=pages.get(id);
+      request.onsuccess=()=>{
+        const page=request.result;
+        if(page && !page.deleted)pages.put({...page,title});
+      };
+      tx.oncomplete=()=>resolve(!!request.result && !request.result.deleted);
+      tx.onabort=tx.onerror=()=>reject(tx.error);
     });
   }
   reorderPages(ids) {

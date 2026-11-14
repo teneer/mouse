@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 4.2 · 점수판 통합 테스트</title><link href="style.css?v=board-ux-1" rel="stylesheet"/></head>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 4.2 · 점수판 통합 테스트</title><link href="style.css?v=board-ux-2" rel="stylesheet"/></head>
 <body>
 <div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
 <aside id="scorePanel" class="score-panel" aria-label="학급 점수판" aria-hidden="true" inert>
@@ -10,6 +10,7 @@
 
 <div id="feedbackStack"><div aria-live="polite" id="saveStatus" role="status">불러오는 중입니다.</div><div aria-live="polite" hidden="" id="toast" role="status"></div></div>
 <div id="toolbarScaleWrap"><div id="toolbarWrapper"><div id="toolbarToggle"><button aria-expanded="true" id="toolbarHideBtn" title="툴바 숨기기/보이기">▼</button></div><div aria-label="칠판 도구" id="toolbar">
+<div class="toolbar-group history-group"><button aria-label="실행 취소" class="action-btn icon-only" id="undoBtn" title="실행 취소 (Ctrl+Z)">↶</button><button aria-label="다시 실행" class="action-btn icon-only" id="redoBtn" title="다시 실행 (Ctrl+Shift+Z)">↷</button></div>
 <div class="toolbar-group"><button class="mode-btn toggle-btn" id="selectMoveToggleBtn"><span class="icon">🖱️</span><span id="selectMoveLabel">선택</span></button></div>
 <div class="toolbar-group">
 <button class="mode-btn" id="penModeBtn"><span class="icon">🖊️</span>펜</button>
@@ -24,7 +25,6 @@
 <button class="action-btn" type="button" id="backgroundBtn">배경</button>
 </div>
 
-<div class="toolbar-group history-group"><button aria-label="언두" class="action-btn icon-only" id="undoBtn" title="언두">←</button><button aria-label="리두" class="action-btn icon-only" id="redoBtn" title="리두">→</button></div>
 <div class="toolbar-group"><button class="action-btn" id="pageListBtn" data-popup="pageList" aria-controls="pageList" aria-expanded="false">1</button></div>
 <div class="toolbar-group"><button aria-expanded="false" class="action-btn" data-popup="moreSettings" id="moreBtn">더 보기 ▲</button></div>
 <div class="toolbar-group"><button aria-label="축소" class="action-btn" id="zoomOutBtn">−</button><span id="zoomLabel">100%</span><button aria-label="확대" class="action-btn" id="zoomInBtn">＋</button><button class="mode-btn" id="homeBtn"><span class="icon">🏠</span>홈</button></div>
@@ -113,6 +113,17 @@
   <span id="importProgressText" role="status">파일 확인 중…</span>
   <button class="action-btn" type="button" id="cancelImportBtn">취소</button>
 </div>
+<div aria-labelledby="pageRenameTitle" aria-modal="true" class="modal" id="pageRenameModal" role="dialog">
+  <div class="modal-content compact-modal-content">
+    <button aria-label="닫기" class="close-btn" data-close="pageRenameModal">×</button>
+    <h2 id="pageRenameTitle">페이지 이름 편집</h2>
+    <form id="pageRenameForm">
+      <label for="pageNameInput">이름</label>
+      <input id="pageNameInput" type="text" maxlength="80" autocomplete="off" placeholder="페이지 이름"/>
+      <div class="modal-actions"><button class="action-btn" type="submit">저장</button><button class="action-btn" type="button" data-close="pageRenameModal">취소</button></div>
+    </form>
+  </div>
+</div>
 <div aria-labelledby="backgroundTitle" aria-modal="true" class="modal" id="backgroundModal" role="dialog">
   <div class="modal-content compact-modal-content"><button aria-label="닫기" class="close-btn" data-close="backgroundModal">×</button>
     <h2 id="backgroundTitle">배경 변경</h2><div id="backgroundColors" class="cloud-buttons"></div>
@@ -130,7 +141,7 @@
 </div>
 <input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
 <div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=board-ux-1" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=board-ux-2" type="module"></script>
 <noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
 <div class="context-palette" role="group" aria-label="색상">
   <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>

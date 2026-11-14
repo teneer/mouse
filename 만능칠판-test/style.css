@@ -687,3 +687,14 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 
 #backgroundColors [aria-pressed=true] {outline:2px solid #1862ad;outline-offset:2px}
 #backgroundSpacing {vertical-align:middle}
+
+.page-tile-wrap {position:relative;min-width:0}
+.page-tile-wrap .page-tile {width:100%;height:100%;min-width:0;padding-top:28px;grid-template-columns:minmax(0,1fr);color:inherit}
+.page-tile-name {width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.page-tile-menu {position:absolute;top:3px;right:4px;z-index:1}
+.page-tile-menu[open] {z-index:2}
+.page-tile-menu summary {list-style:none;cursor:pointer;border-radius:4px;min-width:28px;min-height:24px;text-align:center;background:#e4edf6;color:#193752}
+.page-tile-menu summary::-webkit-details-marker {display:none}
+.page-tile-menu .action-btn {position:absolute;right:0;top:100%;height:32px;min-height:32px}
+#pageNameInput {display:block;width:100%;box-sizing:border-box;margin-top:6px}
+.history-group .icon-only {font-size:1.35em}

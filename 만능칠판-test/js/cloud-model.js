@@ -69,6 +69,11 @@ export function applyOperation(board, operation, revision) {
   }
   const page = board.pages[pageId];
   if (!page || page.deleted) return;
+  if (kind === 'rename') {
+    const title=pageTitle(operation.title);
+    if(title!==null)page.title=title;
+    return;
+  }
   if (kind === 'delete') {
     if (boardPages(board).length <= 1) return;
     page.deleted = true;
@@ -96,7 +101,13 @@ export function applyOperation(board, operation, revision) {
   page.version = revision;
 }
 
+export function pageTitle(value) {
+  return typeof value==='string' ? value.trim().slice(0,80) : null;
+}
+
 export function validView(view) {
   return typeof view?.pageId === 'string' && Number.isFinite(view.zoom) &&
-    view.zoom >= .1 && view.zoom <= 10 && Number.isFinite(view.x) && Number.isFinite(view.y);
+    view.zoom >= .1 && view.zoom <= 10 && Number.isFinite(view.x) && Number.isFinite(view.y) &&
+    (view.scoreShare===undefined || Number.isFinite(view.scoreShare) && view.scoreShare>=20 && view.scoreShare<=90) &&
+    (view.scoreScale===undefined || Number.isFinite(view.scoreScale) && view.scoreScale>=60 && view.scoreScale<=150);
 }

@@ -105,11 +105,18 @@ import { measureTeamLayout } from './team-layout.js?v=3';
     if (event.key === 'Enter') restoreColumnsInput();
   });
 
-  function setScale(next) {
+  function setScale(next, publish = false) {
     scale = Math.max(60, Math.min(150, next));
     scaleOutput.textContent = `${scale}%`;
     root.style.setProperty('--score-scale', String(scale / 100));
     writeSetting(scaleKey, scale);
+    if (frame) {
+      frame.dataset.scoreScale = String(scale);
+      if (publish) {
+        delete frame.dataset.syncedScoreScale;
+        frame.dispatchEvent(new Event('score-display-scale'));
+      }
+    }
     scheduleLayout();
   }
 
@@ -131,12 +138,16 @@ import { measureTeamLayout } from './team-layout.js?v=3';
   });
   applyRatio();
 
-  document.getElementById('scoreSizeDown').addEventListener('click', () => setScale(scale - 10));
-  document.getElementById('scoreSizeUp').addEventListener('click', () => setScale(scale + 10));
-  document.getElementById('scoreSizeReset').addEventListener('click', () => setScale(100));
+  document.getElementById('scoreSizeDown').addEventListener('click', () => setScale(scale - 10, true));
+  document.getElementById('scoreSizeUp').addEventListener('click', () => setScale(scale + 10, true));
+  document.getElementById('scoreSizeReset').addEventListener('click', () => setScale(100, true));
   if (frame) {
-    new MutationObserver(scheduleLayout).observe(frame, {
-      attributeFilter: ['data-panel-percent', 'data-toolbar-height'],
+    new MutationObserver(() => {
+      const incoming = Number(frame.dataset.syncedScoreScale);
+      if (incoming>=60 && incoming<=150 && incoming!==scale) setScale(incoming);
+      scheduleLayout();
+    }).observe(frame, {
+      attributeFilter: ['data-panel-percent', 'data-toolbar-height', 'data-synced-score-scale'],
     });
   }
   const resizeObserver = new ResizeObserver(scheduleLayout);
@@ -152,5 +163,6 @@ import { measureTeamLayout } from './team-layout.js?v=3';
     scheduleLayout();
   }).observe(scoreboard, { childList: true });
   applyLayoutSetting();
-  setScale(scale);
+  const initialScale = Number(frame?.dataset.syncedScoreScale);
+  setScale(initialScale>=60 && initialScale<=150 ? initialScale : scale);
 })();

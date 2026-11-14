@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fitScoreFont, mergeConversions, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
-import {applyOperation, boardPages, newBoard, pagePatch} from '../js/cloud-model.js';
+import {applyOperation, boardPages, newBoard, pagePatch, validView} from '../js/cloud-model.js';
 import {movePageId} from '../js/board-navigation.js';
 import {normalizeFavoriteSize, scaleFavoriteSize} from '../js/board-options.js';
 import {validateContent} from '../js/validation.js';
@@ -54,4 +54,25 @@ test('favorite size increase is bounded by all three tools with one multiplier',
   const values={pen:10,marker:100,text:160};
   assert.deepEqual(scaleFavoriteSize(values,true),{pen:12,marker:120,text:192});
   assert.equal(normalizeFavoriteSize({pen:0,marker:1,text:1}),null);
+});
+
+test('renaming a page preserves its content revision and survives reorder', () => {
+  const board=newBoard();
+  const content={canvas:{objects:[]}};
+  applyOperation(board,{kind:'seed',pages:[{id:'a',order:0,content},{id:'b',order:1,content}]},1);
+  applyOperation(board,{kind:'rename',pageId:'a',title:'  수업 정리  '},2);
+  applyOperation(board,{kind:'reorder',order:['b','a']},3);
+  assert.equal(boardPages(board)[1].title,'수업 정리');
+  assert.equal(board.pages.a.version,1);
+  assert.deepEqual(board.pages.a.content,content);
+  applyOperation(board,{kind:'rename',pageId:'a',title:'   '},4);
+  assert.equal(board.pages.a.title,'');
+});
+
+test('shared views support valid scoreboard sizes and older messages without sizes', () => {
+  const view={pageId:'a',zoom:1,x:0,y:0};
+  assert.equal(validView(view),true);
+  assert.equal(validView({...view,scoreShare:90,scoreScale:150}),true);
+  assert.equal(validView({...view,scoreShare:95}),false);
+  assert.equal(validView({...view,scoreScale:0}),false);
 });
