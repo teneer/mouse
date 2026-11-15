@@ -17,6 +17,7 @@ function playSound(sound) {
 }
 
 let count = 0;
+let displayedClassScore = 0;
 let teams = [];
 let classGoals = [];
 let teamGoals = [];
@@ -26,6 +27,7 @@ let activeGoalRef = null;
 const defaultLinkPoints = 3;
 const undoWindow = 2000;
 let conversionPlayer=null;
+let classFeedback=new AbortController();
 const queuedConversions=[];
 let linkEnabled = true;
 let linkPoints = defaultLinkPoints;
@@ -153,7 +155,7 @@ function renderCurrentState(effect) {
   renderLinkSettings();
   renderTeams();
   renderActiveGoal();
-  if(effect)queueScoreEffect(effect);
+  if(effect)presentScoreEffect(effect);
   else updateScoreProgress();
   if (getComputedStyle(goalManagementView).display !== 'none') renderGoalLists();
   // 관리 모달에 입력 중인 값은 원격 수신으로 덮어쓰지 않습니다.
@@ -168,6 +170,7 @@ function displayFloatingNumber(element, amount, topStart, topEnd) {
   setTimeout(() => { element.style.opacity = 0; element.style.top = topEnd; }, 600);
 }
 function renderClassNumber(score) {
+  displayedClassScore=score;
   const text = String(score);
   numberElement.textContent = text;
   numberElement.toggleAttribute('data-long-score', text.length >= 5);
@@ -201,7 +204,7 @@ function changeClassScore(amount) {
   count = next;
   checkForGoalAchievement('class',old,count);
   const effect={kind:'class',oldCount:old,classDiff:amount};
-  queueScoreEffect(effect,true);
+  presentScoreEffect(effect,true);
   renderBatchControls();
   saveToStorage(effect);
 }
@@ -358,7 +361,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
   const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldCount,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
   saveToStorage(effect);
   playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease);
-  queueScoreEffect(effect,true);
+  presentScoreEffect(effect,true);
 }
 
 function resetConversion() {
@@ -366,7 +369,8 @@ function resetConversion() {
   conversionPlayer?.abort();
   conversionPlayer=null;
   progress.removeAttribute('data-converting');
-  document.getElementById('class-conversion-delta')?.remove();
+  classFeedback.abort();
+  classFeedback=new AbortController();
 }
 
 function waitForEffect(ms,signal) {
@@ -380,8 +384,15 @@ function waitForEffect(ms,signal) {
 
 async function animateEffect(element,keyframes,options,signal) {
   signal.throwIfAborted();
-  if(!element.animate){await waitForEffect(options.duration,signal);return;}
-  const animation=element.animate(keyframes,options);
+  const duration=options.duration+(options.delay||0);
+  if(!element.animate){await waitForEffect(duration,signal);return;}
+  let animation;
+  try{animation=element.animate(keyframes,options);}
+  catch(error){
+    console.warn('점수 효과를 간소화합니다:',error);
+    await waitForEffect(duration,signal);
+    return;
+  }
   const abort=()=>animation.cancel();
   signal.addEventListener('abort',abort,{once:true});
   try{await animation.finished;}
@@ -389,7 +400,7 @@ async function animateEffect(element,keyframes,options,signal) {
 }
 
 function renderProgress(value,rate) {
-  progress.style.setProperty('--filled',`${100*value/rate}%`);
+  progress.style.setProperty('--filled',String(value/rate));
   progress.setAttribute('aria-valuenow',value);
   progress.setAttribute('aria-valuetext',`${value}점 / ${rate}점`);
   conversionProgress.textContent=`${value} / ${rate}`;
@@ -398,18 +409,19 @@ function renderProgress(value,rate) {
 async function moveProgress(from,to,rate,reduced,signal) {
   renderProgress(from,rate);
   if(!reduced && from!==to)await animateEffect(progress.firstElementChild,
-    [{width:`${100*from/rate}%`},{width:`${100*to/rate}%`}],{duration:220,easing:'ease-out'},signal);
+    [{transform:`scaleX(${from/rate})`},{transform:`scaleX(${to/rate})`}],{duration:340,easing:'ease-in-out'},signal);
   renderProgress(to,rate);
 }
 
 async function sendStars(rate,direction,reduced,signal) {
-  const bar=progress.getBoundingClientRect(), score=numberElement.getBoundingClientRect();
-  if(reduced || !bar.width || !score.width){await waitForEffect(200,signal);return;}
-  // The continuous bar (rates above 20) has no visual segments.
+  const bar=progress.getBoundingClientRect();
+  if(!bar.width){await waitForEffect(200,signal);return;}
+  const score=numberElement.getBoundingClientRect();
+  const target={x:score.width?score.left+score.width/2:bar.left+bar.width/2,y:score.height?score.top+score.height/2:bar.top-24};
+  // Continuous bars do not draw individual divisions.
   const segments=rate<=20?rate:1;
-  const target={x:score.left+score.width/2,y:score.top+score.height/2};
-  const stars=Array.from({length:segments},async (_,index)=>{
-    const start={x:bar.left+bar.width*(index+.5)/segments,y:bar.top+bar.height/2};
+  await Promise.all(Array.from({length:segments},async (_,index)=>{
+    const start={x:bar.left+bar.width*(index+.5)/segments,y:bar.top+bar.height/2-6};
     const [from,to]=direction>0?[start,target]:[target,start];
     const node=document.createElement('span');
     node.className='score-conversion-star';
@@ -418,44 +430,53 @@ async function sendStars(rate,direction,reduced,signal) {
     node.style.left=from.x+'px';node.style.top=from.y+'px';
     document.body.append(node);
     try{
+      if(reduced){await waitForEffect(360,signal);return;}
+      const x=to.x-from.x,y=to.y-from.y;
       await animateEffect(node,[
-        {transform:'translate(-50%, -50%) scale(.7)',opacity:0},
-        {transform:'translate(-50%, -85%) scale(1.12)',opacity:1,offset:.22},
-        {transform:`translate(calc(-50% + ${to.x-from.x}px), calc(-50% + ${to.y-from.y}px)) scale(.35)`,opacity:.8}
-      ],{duration:420,delay:Math.min(70,260/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
+        {transform:'translate(0, 0) scale(1)',opacity:1},
+        {transform:'translate(0, 0) scale(1.18)',opacity:1,offset:.32},
+        {transform:`translate(${x*.55}px, ${y*.55-12}px) scale(1)`,opacity:1,offset:.65},
+        {transform:`translate(${x}px, ${y}px) scale(.62)`,opacity:1}
+      ],{duration:680,delay:Math.min(55,220/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
     }finally{node.remove();}
-  });
-  await Promise.all(stars);
+  }));
 }
 
-async function showClassDelta(value,delta,audible,reduced,signal) {
-  renderClassNumber(value);
+function showClassDelta(delta,audible,reduced) {
+  renderClassNumber(displayedClassScore+delta);
   if(audible)playSound(delta>0?sounds.mainIncrease:sounds.mainDecrease);
   const label=document.createElement('span');
-  label.id='class-conversion-delta';label.textContent=delta>0?'+1':'−1';
+  label.className=delta>0?'class-score-delta gain':'class-score-delta loss';
+  label.textContent=delta>0?'+1':'−1';
   label.setAttribute('aria-hidden','true');
   const {left,top,width}=numberElement.getBoundingClientRect();
-  const labelX=Math.min(window.innerWidth-18,left+width+10);
-  label.style.left=labelX+'px';
-  label.style.top=top+'px';
+  label.style.left=(left+width/2)+'px';
+  label.style.top=Math.max(0,top-12)+'px';
   document.body.append(label);
-  try{
-    await Promise.all([
-      reduced ? waitForEffect(340,signal) : animateEffect(label,[
-        {opacity:1,transform:'translate(-50%, 0)'},
-        {opacity:1,transform:'translate(-50%, -5px)',offset:.65},
-        {opacity:0,transform:'translate(-50%, -10px)'}
-      ],{duration:340,fill:'both'},signal),
-      reduced ? Promise.resolve() : animateEffect(numberElement,[
-        {transform:'scale(1)'},{transform:'scale(1.16)'},{transform:'scale(1)'}
-      ],{duration:280},signal)
-    ]);
-  }finally{label.remove();}
+  const {signal}=classFeedback;
+  const color=getComputedStyle(label).color;
+  const baseColor=getComputedStyle(numberElement).color;
+  void Promise.all([
+    reduced ? waitForEffect(600,signal) : animateEffect(label,[
+      {opacity:1,transform:'translate(0, 0)'},
+      {opacity:1,transform:'translate(0, 0)',offset:.55},
+      {opacity:0,transform:'translate(0, -20px)'}
+    ],{duration:750,fill:'both'},signal),
+    reduced ? Promise.resolve() : animateEffect(numberElement,[
+      {transform:'scale(1)',color},{transform:'scale(1.2)',color},{transform:'scale(1)',color:baseColor}
+    ],{duration:200},signal)
+  ]).catch(error=>{
+    if(!signal.aborted)console.warn('점수 증감 효과 재생 실패:',error);
+  }).finally(()=>label.remove());
 }
 
-function queueScoreEffect(effect,audible=false) {
+function presentScoreEffect(effect,audible=false) {
   if(!['class','team'].includes(effect?.kind) || !Number.isSafeInteger(effect.oldCount)){
     resetConversion();renderClassNumber(count);updateScoreProgress();return;
+  }
+  if(effect.kind==='class'){
+    showClassDelta(effect.classDiff,audible,window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    return;
   }
   queuedConversions.push({effect,audible});
   if(conversionPlayer)return;
@@ -467,11 +488,6 @@ function queueScoreEffect(effect,audible=false) {
       while(queuedConversions.length){
         const {effect:next,audible}=queuedConversions.shift();
         const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        let visibleCount=next.oldCount;
-        if(next.kind==='class'){
-          await showClassDelta(visibleCount+next.classDiff,next.classDiff,audible,reduced,signal);
-          continue;
-        }
         if(!next.rate)continue;
         for(const step of conversionSteps(next.oldTotal,next.newTotal,next.rate)){
           await moveProgress(step.from,step.to,next.rate,reduced,signal);
@@ -480,9 +496,10 @@ function queueScoreEffect(effect,audible=false) {
           await waitForEffect(300,signal);
           await sendStars(next.rate,step.delta,reduced,signal);
           progress.removeAttribute('data-converting');
-          renderProgress(step.rest,next.rate);
-          visibleCount+=step.delta;
-          await showClassDelta(visibleCount,step.delta,audible,reduced,signal);
+          showClassDelta(step.delta,audible,reduced);
+          if(step.delta<0)await moveProgress(next.rate,step.rest,next.rate,reduced,signal);
+          else renderProgress(step.rest,next.rate);
+          await waitForEffect(320,signal);
         }
       }
     }catch(error){
