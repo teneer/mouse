@@ -1,3 +1,4 @@
+import {wireFirebaseGuide} from './firebase-guide.js';
 import {uid} from './constants.js';
 import {assetReferences} from './files.js';
 import {deviceInviteURL, encodeDeviceKey, encodeInvite, parseFirebaseConfig, readDeviceKey, readInvite} from './cloud-config.js';
@@ -7,6 +8,7 @@ import {FileTransfer} from './file-transfer.js';
 const $ = id => document.getElementById(id);
 const text = (id, value) => {$(id).textContent = value;};
 const message = error => ({
+  'auth/configuration-not-found':'Firebase 설정 안내 4단계에서 익명 로그인과 프로젝트 ID를 확인해 주세요.',
   'auth/operation-not-allowed':'Firebase 콘솔에서 익명 로그인을 켜 주세요.',
   'permission-denied':'Firebase 보안 규칙과 기기 승인 상태를 확인해 주세요.',
   'auth/invalid-api-key':'Firebase 웹 앱 설정을 다시 확인해 주세요.',
@@ -21,7 +23,17 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   const modalOpen = id => $(id).style.display === 'flex';
   let reconnectOptions=null;
   let redraw, manuallyChanged = false, previousOnline = false;
-  let activeStage = 'start', renderedKey = null, deviceListSignature;
+  let activeStage = 'start', renderedKey = null, deviceListSignature, selectedDevice;
+  const guide=wireFirebaseGuide($('deviceFirstGuide'));
+  const titles={start:'기기 연결',first:'처음 연결하기',guide:'기기 추가 방법',key:'이 기기 추가하기',
+    connected:'기기 관리',invite:'기기 추가',legacy:'코드로 연결',join:'연결 코드 발급',rename:'기기 이름 바꾸기',
+    remove:'기기 연결 해제',disconnect:'이 기기에서 연결 해제'};
+  document.addEventListener('pointerdown',event=>{
+    for (const menu of $('deviceList').querySelectorAll('details[open]')) if (!menu.contains(event.target)) menu.open=false;
+  });
+  $('deviceRenameInput').addEventListener('keydown',event=>{
+    if (event.key==='Enter' && !event.isComposing) {event.preventDefault();$('deviceRenameSave').click();}
+  });
   const transfer = new FileTransfer(cloud,files,id=>{
     const label = transfer.incoming.get(id)?.label;
     if (label) files.transfers.set(id,label);
@@ -34,7 +46,9 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     activeStage = name;
     const guideOpen = name === 'guide';
     const shown = guideOpen ? 'first' : name;
-    $('deviceSetupControls').hidden = guideOpen;
+    text('deviceTitle',titles[name]);
+    if (name==='first' || guideOpen) guide.open(guideOpen,guideOpen?5:0);
+    $('deviceModal').querySelector('.device-dialog').scrollTop=0;
     for (const item of $('deviceModal').querySelectorAll('[data-stage]')) item.hidden = item.dataset.stage !== shown;
     text('deviceMessage','');
     if (name === 'invite') drawInvite();
@@ -61,30 +75,46 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   }
 
   function drawDevices() {
-    const canRemove = cloud.online && cloud.deviceInvite !== undefined;
-    const signature = JSON.stringify([canRemove, cloud.deviceId, cloud.devices]);
-    if (signature === deviceListSignature) return;
-    deviceListSignature = signature;
-    const entries = cloud.devices.map(device => {
-      const li = document.createElement('li');
-      const own = device.id === cloud.deviceId;
-      li.textContent = device.label + (own ? ' (이 기기)' : '');
-      if (canRemove && !own) {
-        const remove = document.createElement('button');
-        remove.type = 'button';remove.className = 'action-btn device-remove';
-        remove.textContent = '연결 해제';
-        remove.setAttribute('aria-label',device.label + ' 연결 해제');
-        remove.onclick = async () => {
-          const prompt = device.label + '의 칠판 연결을 해제할까요?'
-            + (cloud.deviceInvite ? '\n열려 있는 초대의 키로 다시 등록할 수 있습니다.' : '');
-          if (!confirm(prompt)) return;
-          remove.disabled = true;
-          try {await cloud.removeDevice(device.id);}
-          catch (error) {text('deviceMessage',message(error));remove.disabled = false;}
-        };
-        li.append(remove);
+    const canManage=cloud.online && !cloud.revoked;
+    const canRemove=canManage && cloud.deviceInvite!==undefined;
+    const signature=JSON.stringify([canManage,canRemove,cloud.deviceId,cloud.devices]);
+    if (signature===deviceListSignature) return;
+    deviceListSignature=signature;
+    const devices=[...cloud.devices].sort((a,b)=>Number(b.id===cloud.deviceId)-Number(a.id===cloud.deviceId));
+    const entries=devices.map(device=>{
+      const item=document.createElement('li'), label=document.createElement('strong');
+      const own=device.id===cloud.deviceId;
+      label.textContent=device.label;
+      item.append(label);
+      if (own) {
+        const badge=document.createElement('span');
+        badge.className='device-own-badge';badge.textContent='이 기기';item.append(badge);
       }
-      return li;
+      if (!canManage) return item;
+      const menu=document.createElement('details'), trigger=document.createElement('summary'), actions=document.createElement('div');
+      menu.className='device-row-menu';
+      trigger.textContent='⋯';trigger.setAttribute('aria-label',device.label+' 메뉴');
+      actions.className='device-row-actions';
+      function option(label,show,danger=false) {
+        const button=document.createElement('button');
+        button.type='button';button.textContent=label;
+        button.className=danger?'dialog-action dialog-danger':'dialog-action';
+        button.onclick=()=>{menu.open=false;selectedDevice=device;show();};
+        actions.append(button);
+      }
+      option('이름 바꾸기',()=>{
+        stage('rename');const input=$('deviceRenameInput');input.value=device.label;input.focus();input.select();
+      });
+      if (!own && canRemove) option('연결 해제',()=>{
+        stage('remove');
+        text('deviceRemoveMessage',device.label+'의 칠판 연결을 해제할까요?'+
+          (cloud.deviceInvite?' 열려 있는 초대의 키로 다시 등록할 수 있습니다.':''));
+      },true);
+      menu.append(trigger,actions);item.append(menu);
+      menu.addEventListener('toggle',()=>{if (menu.open) {
+        for (const other of $('deviceList').querySelectorAll('details[open]')) if (other!==menu) other.open=false;
+      }});
+      return item;
     });
     $('deviceList').replaceChildren(...entries);
   }
@@ -110,14 +140,15 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
       : `오프라인 · 전송 대기 ${waiting}건`
       : '로컬 모드';
     text('deviceStatus',label);
+    $('deviceStatus').dataset.online=String(linked && cloud.online);
     if ($('cloudSyncStatus').textContent !== label) text('cloudSyncStatus',label);
     $('cloudSyncStatus').dataset.offline = String(linked && !cloud.online);
     $('deviceSeedScore').hidden = !linked || !cloud.boardReady || !cloud.online ||
       cloud.state.revision < cloud.head || !!cloud.projectedScore();
     $('deviceResume').hidden = linked || !reconnectOptions;
     if (linked) {
-      if (!['connected','guide','invite','legacy'].includes(activeStage)
-        || (cloud.revoked && activeStage !== 'connected')) stage('connected');
+      if (!['connected','guide','invite','legacy','rename','remove','disconnect'].includes(activeStage)
+        || (cloud.revoked && !['connected','disconnect'].includes(activeStage))) stage('connected');
       $('deviceShowInvite').hidden = cloud.revoked;
       $('deviceLegacy').hidden = cloud.revoked;
       $('deviceInvite').value = cloud.revoked ? '' : encodeInvite(cloud.options);
@@ -228,8 +259,26 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   $('deviceLegacyJoin').onclick = () => stage('join');
   $('deviceGuide').onclick = () => stage('guide');
   for (const button of $('deviceModal').querySelectorAll('[data-device-back]')) {
-    button.onclick = () => stage(cloud.options ? 'connected' : 'start');
+    button.onclick = () => {
+      stage(activeStage==='legacy'||activeStage==='guide'?'invite':activeStage==='join'?'key':cloud.options?'connected':'start');
+    };
   }
+  action('deviceRenameSave',async ()=>{
+    if (!selectedDevice) return;
+    try {await cloud.renameDevice(selectedDevice.id,$('deviceRenameInput').value);}
+    catch (error) {
+      if (error.code==='permission-denied') throw Error('기기 이름 변경을 사용하려면 Firebase에 최신 보안 규칙을 게시해 주세요.');
+      throw error;
+    }
+    stage('connected');
+    text('deviceMessage','기기 이름을 저장했습니다.');
+  });
+  action('deviceRemoveConfirm',async ()=>{
+    if (!selectedDevice) return;
+    await cloud.removeDevice(selectedDevice.id);
+    stage('connected');
+    text('deviceMessage','기기 연결을 해제했습니다.');
+  });
   action('deviceCheck',async ()=>{
     const config = parseFirebaseConfig($('firebaseConfig').value);
     await cloud.authenticate(config);
@@ -287,8 +336,8 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     await flush();await cloud.store.setMeta('cloudConnection',reconnectOptions);await cloud.start(reconnectOptions);
     stage('connected');status();
   });
-  action('deviceDisconnect',async ()=>{
-    if (!confirm('현재 칠판과 점수를 이 기기에 저장한 뒤 로컬에서 이어서 사용할까요?')) return;
+  $('deviceDisconnect').onclick=()=>stage('disconnect');
+  action('deviceDisconnectConfirm',async ()=>{
     const previous=cloud.revoked ? null : cloud.options;
     await cloud.disconnect(async()=>{await finishEdits();await scoreSync.idle();});
     reconnectOptions=previous;status();

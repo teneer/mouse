@@ -45,6 +45,10 @@ service cloud.firestore {
               && 'requestCode' in request.resource.data && request.resource.data.requestCode is string
               && getAfter(/databases/$(database)/documents/wbBoards/$(board)/requests/$(request.resource.data.requestCode)).data.approved == true
               && getAfter(/databases/$(database)/documents/wbBoards/$(board)/requests/$(request.resource.data.requestCode)).data.deviceId == uid));
+        allow update: if member(board)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label'])
+          && request.resource.data.label is string
+          && request.resource.data.label.size() >= 1 && request.resource.data.label.size() <= 50;
         allow delete: if member(board) && request.auth.uid != uid;
       }
 

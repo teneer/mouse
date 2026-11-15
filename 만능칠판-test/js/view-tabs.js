@@ -51,9 +51,10 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     return rows.sort((a,b)=>a.opened-b.opened||a.id.localeCompare(b.id));
   }
   const instance=uid();
+  const registeredLabel=id=>cloud.devices?.find(device=>device.id===id)?.label;
   function presence() {
     const view=currentView();
-    return {id:sync.id,owner:cloud.deviceId||'local',label:cloud.options?.label||'이 브라우저',
+    return {id:sync.id,owner:cloud.deviceId||'local',label:registeredLabel(cloud.deviceId)||cloud.options?.label||'이 브라우저',
       instance,opened:sync.opened,time:Date.now(),page:Math.max(1,pages().findIndex(page=>page.id===view.pageId)+1),full:view.scoreFull===true};
   }
   function render() {
@@ -71,7 +72,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       const label=document.createElement('label'), input=document.createElement('input');
       input.type='checkbox';input.checked=targets.includes(row.id);input.dataset.viewTab=row.id;
       input.onchange=()=>{const checked=input.checked;update(values=>checked?[...values,row.id]:values.filter(id=>id!==row.id));};
-      label.append(input,document.createTextNode(row.label+' · 탭 '+n+(row.id===sync.id?' (이 탭)':'')+' · '+(row.full?'점수판 전체 화면':row.page+'쪽')));
+      label.append(input,document.createTextNode((registeredLabel(row.owner)||row.label)+' · 탭 '+n+(row.id===sync.id?' (이 탭)':'')+' · '+(row.full?'점수판 전체 화면':row.page+'쪽')));
       list.append(label);
       if (focused===row.id) input.focus({preventScroll:true});
     }

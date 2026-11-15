@@ -107,6 +107,13 @@ export class CloudBoard {
     } finally {this.connecting = false;}
   }
 
+  async renameDevice(id,label) {
+    const name=label.trim();
+    if (!name || Array.from(name).length>50) throw Error('기기 이름을 1~50자로 입력해주세요.');
+    if (!this.online) throw Error('기기가 온라인일 때 이름을 변경할 수 있습니다.');
+    await this.fs.updateDoc(this.ref('devices',id),{label:name});
+  }
+
   async removeDevice(id) {
     if (!this.online) throw Error('기기가 온라인일 때 연결을 해제할 수 있습니다.');
     await this.fs.deleteDoc(this.ref('devices', id));

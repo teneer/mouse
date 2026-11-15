@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 6.0</title><link href="style.css?v=goal-status-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=1" rel="stylesheet"/></head>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 6.0</title><link href="style.css?v=device-guide-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=1" rel="stylesheet"/></head>
 <body>
 <div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
 
@@ -51,34 +51,32 @@
 <div aria-labelledby="helpTitle" aria-modal="true" class="modal" id="helpModal" role="dialog"><div class="modal-content"><header class="dialog-header"><h2 id="helpTitle">만능칠판 사용 안내</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="helpModal">×</button></header><ul><li>하단 툴바의 현재 색상과 크기를 누르면 선택 목록이 열립니다. 선택 모드의 우클릭 메뉴와 개체를 길게 눌러 여는 메뉴에서도 바로 바꿀 수 있습니다. 색상·크기 1~5단계는 펜·형광펜·텍스트가 공유합니다. 그룹 안의 객체는 그룹 더블클릭으로 내부 편집을 시작합니다.</li>
 <li>선택/이동 버튼을 누르면 모드가 바뀝니다. 이동 모드에서 화면을 끌거나, Space를 누른 채 끌거나, 마우스 가운데 버튼으로 이동할 수 있습니다.</li><li>마우스 휠 또는 −/＋로 10%~1,000%까지 확대·축소합니다. 홈은 100% 기본 위치로 돌아갑니다.</li><li>선택 모드에서 드래그하거나 Shift+클릭으로 여러 객체를 선택합니다. Ctrl/Cmd+G로 그룹, Ctrl/Cmd+Shift+G로 언그룹합니다.</li><li>Ctrl/Cmd+C·X·V로 시스템 클립보드를 사용합니다. 복사 버튼은 선택 객체를 PNG와 편집 가능한 데이터로 복사합니다. 외부 앱이 데이터를 제거하면 이미지나 텍스트로 붙여넣습니다. 권한이 거부되면 키보드 단축키를 사용해주세요.</li><li>PNG/JPG/GIF/PDF를 칠판에 끌어 넣거나 더 보기 → 이미지·PDF를 사용합니다. GIF는 정지 프레임이고, PDF는 칠판에서 필요한 쪽을 표시합니다. PDF 문자 편집은 지원하지 않습니다.</li><li>각 페이지의 편집 내용은 자동저장됩니다. 언두/리두는 페이지별로 최대 40개이며 용량에 따라 더 줄어듭니다. 새로고침과 원격 변경 수신 시 해당 기록은 초기화됩니다. 페이지 삭제와 저장 화면 삭제는 되돌릴 수 없습니다.</li><li>더 보기 → 기기 연결로 다른 기기에서 같은 칠판을 사용합니다. 파일은 더 보기 → 파일 관리에서 필요한 기기로 받습니다.</li><li>기기 연결을 사용하지 않을 때 같은 브라우저 프로필에서 칠판 내용을 공유합니다. 한 탭에서 화면 동기화를 켜면 모든 탭이 페이지·확대·화면 위치·점수판 상태를 공유합니다. 같은 페이지를 동시에 수정하면 충돌 복구 페이지를 추가합니다.</li><li>자동저장은 브라우저 저장소이지 서버 백업이 아닙니다. 더 보기 → JSON 백업으로 정기 보관해주세요. 주소/브라우저/프로필이 바뀌면 JSON 백업을 직접 가져와야 합니다.</li><li>이전 데이터 버튼은 같은 출처의 구버전 저장 화면과 자동저장 내용만 가져옵니다. 기존 객체는 모두 일반 객체가 됩니다. 원본 DB는 수정하지 않습니다.</li></ul></div></div>
 <div aria-labelledby="deviceTitle" aria-modal="true" class="modal" id="deviceModal" role="dialog">
-  <div class="modal-content cloud-dialog">
+  <div class="modal-content cloud-dialog device-dialog">
     <header class="dialog-header"><h2 id="deviceTitle">기기 연결</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="deviceModal">×</button></header>
-    <p id="deviceStatus"></p>
+    <p id="deviceStatus" class="device-status" role="status"></p>
     <section data-stage="start">
-      <p>PC·태블릿·휴대폰에서 같은 칠판을 사용합니다.</p>
-      <div class="cloud-buttons"><button class="action-btn" id="deviceFirst">처음 연결하기</button><button class="action-btn" id="deviceAdd">이 기기 추가하기</button><button class="action-btn" id="deviceResume" hidden>이전 연결 다시 열기</button></div>
-    </section>
-    <section data-stage="first" hidden>
-      <h3>1. Firebase 설정</h3>
-      <ol>
-        <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase 콘솔</a>에서 Spark 프로젝트를 만듭니다.</li>
-        <li><b>프로젝트 개요 → 앱 추가 → 웹(&lt;/&gt;)</b>에서 등록하고 <code>firebaseConfig</code> 값을 복사합니다.</li>
-        <li><b>Firestore Database → 데이터베이스 만들기</b>에서 Standard 버전의 기본 데이터베이스를 프로덕션 모드로 만듭니다.</li>
-        <li><b>Authentication → 시작하기 → 로그인 방법 → 익명</b>을 사용 설정합니다.</li>
-        <li><b>Firestore Database → 규칙</b>에 <a href="firestore.rules" target="_blank" rel="noopener">보안 규칙 파일</a>의 내용을 붙여넣고 게시합니다. 기존 프로젝트에 다른 앱의 규칙이 있다면 기존 규칙과 함께 적용합니다.</li>
-      </ol>
-      <div id="deviceSetupControls">
-      <h3>2. 이 기기 연결</h3>
-      <label for="firebaseConfig">Firebase 웹 앱 설정값</label>
-      <textarea id="firebaseConfig" rows="5" spellcheck="false" autocomplete="off"></textarea>
-      <div class="cloud-buttons"><button class="action-btn" id="deviceCheck">연결 확인</button></div>
-      <h3>3. 첫 동기화</h3>
-      <p>이 기기의 기존 칠판을 다른 기기에서도 사용합니다.</p>
-      <label for="deviceFirstName">기기 이름</label>
-      <input id="deviceFirstName" maxlength="50" placeholder="교실 PC"/>
-      <div class="cloud-buttons"><button class="action-btn" id="deviceSeed" disabled>첫 동기화 시작</button></div>
+      <div class="setting-section device-start-actions">
+        <div><h3>처음 연결하기</h3><p>Firebase 설정을 단계별로 진행하고 이 기기의 칠판을 공유합니다.</p><button class="dialog-action dialog-primary" id="deviceFirst">처음 연결하기</button></div>
+        <div><h3>이 기기 추가하기</h3><p>이미 공유 중인 칠판의 QR 또는 연결 키를 사용합니다.</p><button class="dialog-action" id="deviceAdd">이 기기 추가하기</button></div>
       </div>
-      <div class="cloud-buttons"><button class="action-btn" data-device-back>돌아가기</button></div>
+      <button class="dialog-action" id="deviceResume" hidden>이전 연결 다시 열기</button>
+    </section>
+    <section id="deviceFirstGuide" data-stage="first" hidden>
+      <div class="device-guide-progress"><span data-guide-step></span><progress aria-label="Firebase 설정 단계"></progress></div>
+      <div data-guide-content></div>
+      <div id="deviceSetupControls" class="setting-section" hidden>
+        <label for="firebaseConfig">Firebase 웹 앱 설정값</label>
+        <textarea id="firebaseConfig" rows="5" spellcheck="false" autocomplete="off"></textarea>
+        <div class="cloud-buttons"><button class="dialog-action" id="deviceCheck">연결 확인</button></div>
+        <label for="deviceFirstName">기기 이름</label>
+        <input id="deviceFirstName" maxlength="50" placeholder="교실 PC"/>
+        <div class="cloud-buttons"><button class="dialog-action dialog-primary" id="deviceSeed" disabled>첫 동기화 시작</button></div>
+      </div>
+      <div class="dialog-footer device-guide-nav">
+        <button class="dialog-action" data-device-back>돌아가기</button>
+        <button class="dialog-action" data-guide-prev>이전</button>
+        <button class="dialog-action dialog-primary" data-guide-next>다음</button>
+      </div>
     </section>
     <section data-stage="join" hidden>
       <ol>
@@ -102,9 +100,26 @@
       <div class="cloud-buttons"><button class="action-btn" id="deviceJoinWithKey">칠판에 연결</button><button class="action-btn" id="deviceLegacyJoin">다른 연결 방법</button><button class="action-btn" data-device-back>돌아가기</button></div>
     </section>
     <section id="deviceConnected" data-stage="connected" hidden>
-      <button class="action-btn" id="deviceSeedScore" hidden>이 기기 점수로 공유 시작</button>
-      <h3>연결된 기기</h3><ul id="deviceList"></ul>
-      <div class="cloud-buttons"><button class="action-btn" id="deviceShowInvite">기기 추가</button><button class="action-btn" id="deviceLegacy">다른 연결 방법</button><button class="action-btn" id="deviceGuide">연결 방법</button><button class="action-btn" id="deviceDisconnect">로컬 칠판으로 돌아가기</button></div>
+      <div class="device-list-heading"><h3>연결된 기기</h3><button class="dialog-action dialog-primary" id="deviceShowInvite">기기 추가</button></div>
+      <ul id="deviceList" aria-label="연결된 기기"></ul>
+      <button class="dialog-action" id="deviceSeedScore" hidden>이 기기 점수로 공유 시작</button>
+      <div class="dialog-footer device-local-footer"><button class="dialog-action" id="deviceDisconnect">이 기기에서 연결 해제</button></div>
+    </section>
+    <section data-stage="rename" hidden>
+      <label for="deviceRenameInput">기기 이름</label>
+      <input id="deviceRenameInput" maxlength="50" autocomplete="off" />
+      <div class="dialog-footer">
+        <button class="dialog-action" data-device-back>취소</button>
+        <button class="dialog-action dialog-primary" id="deviceRenameSave">저장</button>
+      </div>
+    </section>
+    <section data-stage="remove" hidden>
+      <p id="deviceRemoveMessage"></p>
+      <div class="dialog-footer"><button class="dialog-action" data-device-back>취소</button><button class="dialog-action dialog-danger" id="deviceRemoveConfirm">연결 해제</button></div>
+    </section>
+    <section data-stage="disconnect" hidden>
+      <p>현재 칠판과 점수를 이 기기에 저장한 뒤 로컬에서 이어서 사용합니다. 다른 기기는 계속 공유 칠판을 사용합니다.</p>
+      <div class="dialog-footer"><button class="dialog-action" data-device-back>취소</button><button class="dialog-action dialog-primary" id="deviceDisconnectConfirm">로컬에서 계속</button></div>
     </section>
     <section data-stage="invite" hidden>
       <h3>기기 추가</h3>
@@ -114,7 +129,7 @@
         <canvas id="deviceInviteQR" role="img" aria-label="이 칠판에 연결하는 QR 코드"></canvas>
         <div class="cloud-buttons"><button class="action-btn" id="deviceCopyKey">연결 키 복사</button><button class="action-btn" id="deviceEndInvite">초대 종료</button></div>
       </div>
-      <div class="cloud-buttons"><button class="action-btn" id="deviceStartInvite" hidden>초대 만들기</button><button class="action-btn" data-device-back>돌아가기</button></div>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceStartInvite" hidden>초대 만들기</button><button class="dialog-action" id="deviceLegacy">코드로 연결</button><button class="dialog-action" id="deviceGuide">추가 방법</button><button class="action-btn" data-device-back>돌아가기</button></div>
     </section>
     <section data-stage="legacy" hidden>
       <h3>연결 코드로 승인</h3>
@@ -168,7 +183,7 @@
 </div>
 <input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
 <div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=goal-status-1" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=device-guide-1" type="module"></script>
 <noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
 <div class="context-palette" role="group" aria-label="색상">
   <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>
