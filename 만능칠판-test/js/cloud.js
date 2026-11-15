@@ -1,5 +1,5 @@
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=goal-records-1';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=view-tabs-1';
 import {applyScoreOperation} from './shared-score.js?v=goal-records-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
@@ -430,18 +430,23 @@ export class CloudBoard {
     this.retryDelay=Math.min(this.retryDelay*2,60000);
   }
 
-  async sendSharedView(state,toggle) {
-    if(!this.online || !this.boardReady){
-      if(toggle)throw Error('기기가 온라인일 때 화면 동기화를 변경할 수 있습니다.');
+  async sendSharedView(state,toggle,changeTargets) {
+    if (!this.online || !this.boardReady) {
+      if (toggle!==undefined || changeTargets) throw Error('기기가 온라인일 때 화면 동기화를 변경할 수 있습니다.');
       return false;
     }
     const ref=this.ref('control','view');
-    const value={...state,device:this.deviceId,at:this.fs.serverTimestamp()};
-    if(toggle){await this.fs.setDoc(ref,value);return true;}
     return this.fs.runTransaction(this.db,async tx=>{
       const before=(await tx.get(ref)).data();
-      if(!before?.enabled || before.epoch!==state.epoch)return false;
-      tx.set(ref,value);return true;
+      const existing=Array.isArray(before?.targets)?before.targets:[];
+      const targets=changeTargets?[...new Set(changeTargets(existing))]:existing;
+      if (toggle===undefined && !changeTargets &&
+        (!before?.enabled || before.epoch!==state.epoch || !targets.includes(state.sourceTab))) return false;
+      const enabled=targets.length>0 && (toggle??(changeTargets?true:before?.enabled));
+      const view=changeTargets && !targets.includes(state.sourceTab) && before?.pageId ? before : state;
+      tx.set(ref,{...view,enabled,targets,epoch:changeTargets||toggle!==undefined?state.epoch:before.epoch,
+        device:this.deviceId,at:this.fs.serverTimestamp()});
+      return true;
     });
   }
 

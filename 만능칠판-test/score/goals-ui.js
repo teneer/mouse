@@ -1,5 +1,4 @@
 const $ = id => document.getElementById(id);
-const statuses = {pending:'미완료',done:'완료',withdrawn:'회수됨'};
 const button = (label,action) => {
   const item = document.createElement('button');
   item.type = 'button';item.textContent = label;item.onclick = action;
@@ -8,14 +7,24 @@ const button = (label,action) => {
 
 export function wireGoals({submit,teamList,celebrate}) {
   const view = $('goal-management-view'), popup = $('goal-celebration');
-  const chosen = new Set(), queue = [];
-  let system, active, timer, editingRevision, specificTeam, previous;
+  const queue = [];
+  let system, active, timer, editingRevision, previous;
+  const modalState = open => {
+    document.body.classList.toggle('goals-modal-open',open);
+    window.frameElement?.dispatchEvent(new CustomEvent('score-goals-modal',{detail:open}));
+  };
+  const central=$('goal-central-popup');
+  try {central.checked=localStorage.getItem('whiteboard.goal-central')==='1';} catch {}
+  central.onchange=()=>{try {localStorage.setItem('whiteboard.goal-central',central.checked?'1':'0');} catch {}};
+  const emitPopup = detail => window.frameElement?.dispatchEvent(new CustomEvent('score-celebration',{detail}));
+  const visible = () => !window.frameElement?.closest('[aria-hidden="true"]');
   const gifts = {class:'🎁',team:'📦'};
 
   function message(record) {
     return record.type === 'team' ? record.teamName + ' ' + record.message : record.message;
   }
   function show(record, replay) {
+    if (!visible() && !(central.checked && window.frameElement)) return;
     active=record;
     $('goal-celebration-title').textContent = record.type === 'class' ? '학급 목표 달성' : '모둠 목표 달성';
     $('goal-celebration-message').textContent = message(record);
@@ -23,7 +32,10 @@ export function wireGoals({submit,teamList,celebrate}) {
     use.hidden=record.status!=='pending';
     use.textContent=record.reward?'보상 사용 처리':'확인 완료';
     popup.dataset.type=record.type;
-    popup.hidden=false;
+    const useAction=use.hidden?null:()=>change([record],true);
+    const outside=central.checked && window.frameElement;
+    popup.hidden=!!outside;
+    if (outside) emitPopup({type:record.type,title:$('goal-celebration-title').textContent,message:message(record),close,use:useAction,label:use.textContent});
     clearTimeout(timer);timer=setTimeout(close,4000);
     if (!replay) celebrate();
   }
@@ -35,7 +47,7 @@ export function wireGoals({submit,teamList,celebrate}) {
     }
   }
   function close() {
-    clearTimeout(timer);active=null;popup.hidden=true;advance();
+    clearTimeout(timer);active=null;popup.hidden=true;emitPopup(null);advance();
   }
   function update(model, announce) {
     system=model;
@@ -51,13 +63,19 @@ export function wireGoals({submit,teamList,celebrate}) {
     }
     previous=structuredClone(system);
     advance();
-    if (view.style.display==='flex' && !$('goal-records').hidden) renderRecords();
+    if (view.style.display==='flex') refreshRows();
   }
   function change(records,complete) {
+    if (!records.length) return;
     submit({kind:'score-records',records:records.map(({id,reached})=>({id,reached})),complete});
   }
+  document.addEventListener('pointerdown',event=>{
+    window.frameElement?.dispatchEvent(new Event('score-frame-pointer'));
+    if (active && !popup.contains(event.target)) close();
+  },true);
+  window.frameElement?.addEventListener('score-dismiss-celebration',()=>{if (active) close();});
   $('goal-celebration-close').onclick=close;
-  $('goal-celebration-use').onclick=()=>{if (active) {change([active],true);if (active)close();}};
+  $('goal-celebration-use').onclick=()=>{if (active) {const current=active;change([current],true);if (active===current)close();}};
 
   function giftGroup(parent,teamId=null) {
     if (!parent) return;
@@ -84,6 +102,11 @@ export function wireGoals({submit,teamList,celebrate}) {
     row.querySelector('.goal-completion').value=goal.automatic?'auto':'manual';
     row.querySelector('.goal-reward').checked=!!goal.reward;
     row.append(button('삭제',()=>row.remove()));
+    const progress = document.createElement('details');
+    progress.className='goal-progress';
+    progress.innerHTML='<summary></summary><div class="goal-progress-body"></div>';
+    row.append(progress);
+    if (!goal.id) progress.hidden=true;
     $(type+'-goals-list').append(row);
   }
   function openSettings() {
@@ -93,19 +116,26 @@ export function wireGoals({submit,teamList,celebrate}) {
       $(type+'-goals-list').replaceChildren();
       system.goals.filter(goal=>goal.type===type).forEach(goal=>addRow(type,goal));
     }
-    $('goal-settings').hidden=false;$('goal-records').hidden=true;view.style.display='flex';
-  }
-  function showSettingsTab() {
-    if (editingRevision===undefined) {openSettings();return;}
-    $('goal-settings').hidden=false;$('goal-records').hidden=true;
+    view.style.display='flex';
+    modalState(true);
+    refreshRows();
+    $('cancel-goal-view').focus();
   }
   function openRecords(teamId) {
-    specificTeam=teamId;
-    $('goal-status-filter').value='pending';
-    $('goal-settings').hidden=true;$('goal-records').hidden=false;
-    view.style.display='flex';chosen.clear();renderRecords();
+    openSettings();
+    const record=system.records.find(row=>row.teamId===teamId && row.status==='pending');
+    if (!record) return;
+    const row=[...view.querySelectorAll('.goal-edit-row')].find(item=>item.dataset.goal===record.goalId);
+    if (row) {
+      row.querySelector('details').open=true;
+      row.scrollIntoView({block:'nearest'});
+    } else show(record,true);
   }
-  function closeView() {view.style.display='none';editingRevision=undefined;chosen.clear();}
+  function closeView() {
+    view.style.display='none';
+    editingRevision=undefined;
+    modalState(false);
+  }
   function saveGoals() {
     const goals=[];
     for (const type of ['class','team']) for (const row of $(type+'-goals-list').children) {
@@ -122,43 +152,46 @@ export function wireGoals({submit,teamList,celebrate}) {
     submit({kind:'score-goals',base:editingRevision,goals,includeExisting:$('goal-include-existing').checked});
     closeView();
   }
-  function renderRecords() {
-    const filter=$('goal-target-filter'), status=$('goal-status-filter').value;
-    const options=new Map([['all','전체 대상'],['class','학급'],['teams','전체 모둠']]);
-    for (const team of teamList()) options.set('team:'+team.id,team.name);
-    for (const row of system.records) if (row.teamId && !options.has('team:'+row.teamId)) options.set('team:'+row.teamId,row.teamName);
-    const target=specificTeam!==undefined ? specificTeam===null?'class':'team:'+specificTeam : filter.value;
-    specificTeam=undefined;
-    filter.replaceChildren(...[...options].map(([value,label])=>new Option(label,value)));
-    filter.value=options.has(target)?target:'all';
-    const records=system.records.filter(row=>(status==='all'||row.status===status) &&
-      (filter.value==='all'||filter.value===row.type||filter.value==='teams'&&row.type==='team'||filter.value==='team:'+row.teamId));
-    const sort=$('goal-sort').value;
-    records.sort((a,b)=>sort==='score'?a.score-b.score:(sort==='old'?1:-1)*((a.time||0)-(b.time||0)));
-    const list=$('goal-record-list');
-    list.replaceChildren();
-    if (!records.length) list.textContent='표시할 달성 기록이 없습니다.';
-    for (const row of records) {
-      const item=document.createElement('article'), title=document.createElement('strong'), text=document.createElement('p');
-      const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=chosen.has(row.id);
-      checkbox.disabled=row.status==='withdrawn'||row.automatic;
-      checkbox.setAttribute('aria-label',message(row)+' 선택');
-      checkbox.onchange=()=>{if (checkbox.checked) chosen.add(row.id);else chosen.delete(row.id);};
-      title.textContent=(row.teamName||'학급')+' · '+row.score+'점 · '+statuses[row.status];
-      text.textContent=row.message;
-      item.append(checkbox,title,text);
-      if (row.status!=='withdrawn') item.append(button('메시지 보기',()=>show(row,true)));
-      if (row.status==='pending') item.append(button(row.reward?'보상 사용':'확인 완료',()=>change([row],true)));
-      if (row.status==='done'&&!row.automatic) item.append(button('되돌리기',()=>change([row],false)));
-      list.append(item);
-    }
-    for (const [id,complete] of [['goal-complete-selected',true],['goal-undo-selected',false]]) {
-      $(id).onclick=()=>{change(records.filter(row=>chosen.has(row.id) && (complete?row.status==='pending':row.status==='done')),complete);chosen.clear();};
+  function refreshRows() {
+    for (const row of view.querySelectorAll('.goal-edit-row')) {
+      const goal=system.goals.find(item=>item.id===row.dataset.goal);
+      if (!goal) continue;
+      const root=row.querySelector('details'), body=root.querySelector('.goal-progress-body');
+      const found=new Map(system.records.filter(rec=>rec.goalId===goal.id).map(rec=>[rec.teamId,rec]));
+      const teams=goal.type==='class'?[{id:null,name:'학급'}]:teamList();
+      const finished=teams.filter(team=>found.get(team.id)?.status==='done').length;
+      root.querySelector('summary').textContent=goal.type==='class'
+        ? (finished?'✓ 완료':found.get(null)?.status==='pending'?'달성 · 완료 대기':'미달성')
+        : (finished && finished===teams.length?'✓ ':'')+finished+'/'+teams.length+' 완료';
+      const selected=new Set([...body.querySelectorAll('input:checked')].map(input=>input.value));
+      body.replaceChildren();
+      const checks=[];
+      for (const team of teams) {
+        const record=found.get(team.id), done=record?.status==='done', pending=record?.status==='pending';
+        const item=document.createElement('div');
+        item.className='goal-team-progress';
+        if (done) item.dataset.done='true';
+        if (done||pending) {
+          const check=document.createElement('input');
+          check.type='checkbox';check.value=record.id;check.checked=selected.has(record.id);
+          check.setAttribute('aria-label',team.name+' 선택');
+          checks.push({check,record});item.append(check);
+        }
+        item.append(document.createTextNode(team.name+' · '+(done?'✓ 완료':pending?'달성 · 완료 대기':'미달성')));
+        if (done||pending) item.append(button(done?'완료 취소':'완료 처리',()=>change([record],!done)));
+        if (pending) item.append(button('메시지',()=>show(record,true)));
+        body.append(item);
+      }
+      if (goal.type==='team' && checks.length) {
+        const actions=document.createElement('div');actions.className='goal-tabs';
+        actions.append(button('완료 대기 전체선택',()=>checks.forEach(({check,record})=>{check.checked=record.status==='pending';})));
+        for (const complete of [true,false]) actions.append(button(complete?'선택 완료':'선택 완료 취소',()=>{
+          change(checks.filter(({check,record})=>check.checked && record.status===(complete?'pending':'done')).map(({record})=>record),complete);
+        }));
+        body.append(actions);
+      }
     }
   }
-  $('goal-settings-tab').onclick=showSettingsTab;
-  $('goal-records-tab').onclick=()=>openRecords();
-  for (const id of ['goal-status-filter','goal-target-filter','goal-sort']) $(id).onchange=()=>{chosen.clear();renderRecords();};
   $('goal-management-view').querySelectorAll('.add-row-btn').forEach(control=>{control.onclick=()=>addRow(control.dataset.type);});
   $('close-goal-view-btn').onclick=saveGoals;
   $('cancel-goal-view').onclick=$('cancel-goal-edit').onclick=closeView;

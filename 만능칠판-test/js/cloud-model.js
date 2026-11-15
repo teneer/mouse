@@ -122,5 +122,7 @@ export function validView(view) {
 
 export function validViewState(value) {
   return typeof value?.enabled==='boolean' && typeof value.epoch==='string' &&
-    (!value.enabled || validView(value)) && (value.scoreOpen===undefined || typeof value.scoreOpen==='boolean');
+    (!value.enabled || validView(value)) &&
+    (value.targets===undefined || Array.isArray(value.targets) && value.targets.every(target=>typeof target==='string')) &&
+    (value.scoreFull===undefined || typeof value.scoreFull==='boolean') && (value.scoreOpen===undefined || typeof value.scoreOpen==='boolean');
 }

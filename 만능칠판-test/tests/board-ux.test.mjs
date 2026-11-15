@@ -94,3 +94,12 @@ test('shared screen state supports a global off signal and a full on snapshot', 
   assert.equal(validViewState(view),true);
   assert.equal(validViewState({...view,scoreOpen:'false'}),false);
 });
+
+test('only the explicitly selected tabs follow the shared viewport',async()=>{
+  const {activeView}=await import('../js/view-tabs.js');
+  const selected={enabled:true,targets:['pc1','tablet1'],scoreFull:true};
+  assert.equal(activeView(selected,'pc1'),true);
+  assert.equal(activeView(selected,'pc2'),false);
+  assert.equal(activeView({...selected,enabled:false},'pc1'),false);
+  assert.equal(activeView({enabled:true},'pc1'),false);
+});

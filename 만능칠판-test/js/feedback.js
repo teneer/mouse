@@ -15,5 +15,5 @@ export function makeStatusController(element, schedule = setTimeout, cancel = cl
   };
 }
 export function shouldClosePopups(target) {
-  return !target?.closest?.('.tip-up-settings,[data-popup],#objectContextMenu');
+  return !target?.closest?.('.tip-up-settings,[data-popup],#objectContextMenu,#viewSyncTrigger');
 }

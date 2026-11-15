@@ -754,8 +754,6 @@ button, .main-scoreboard, .team-card, #batch-score {
 #goal-celebration p {white-space:pre-wrap;overflow-wrap:anywhere;margin:.35rem 0}
 #goal-celebration button {pointer-events:auto;min-height:1.9rem}
 #goal-settings,#goal-records {overflow:auto;padding:.5rem}
-#goal-management-view:has(#goal-settings[hidden]) {pointer-events:none;background:transparent;justify-content:flex-end}
-#goal-management-view:has(#goal-settings[hidden]) .dialog-sheet {pointer-events:auto;max-height:75%;max-width:min(100%,34rem)}
 #goal-record-list article {padding:.45rem;border-bottom:1px solid #c8dce7;overflow-wrap:anywhere}
 #goal-record-list article p {margin:.2rem 0}
 .goal-edit-row {display:flex;flex-wrap:wrap}
@@ -763,3 +761,14 @@ button, .main-scoreboard, .team-card, #batch-score {
 #goal-edit-error {color:#9d3027}
 #score-volume {width:min(8rem,45%);}
 #score-unlock-audio {align-self:flex-end}
+
+body.goals-modal-open {background:transparent}
+body.goals-modal-open .container {visibility:hidden}
+#goal-management-view {background:#142a4190;align-items:center;justify-content:center;padding:12px}
+#goal-management-view > .dialog-sheet {background:#f7fbfd;width:min(840px,100%);max-height:94dvh;overflow:auto}
+.goal-edit-row {padding:.55rem;background:white;border:1px solid #c5dce7;border-radius:.5rem;margin-block:.35rem}
+.goal-progress {flex:0 0 100%;padding:.25rem .4rem}
+.goal-progress > summary {cursor:pointer;color:#195371}
+.goal-team-progress {display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;padding:.35rem}
+.goal-team-progress[data-done] {background:#e1f0db;color:#294c26}
+#score-maximize {min-width:max-content;padding:.15rem .3rem;font-size:clamp(.7rem,4cqw,.95rem)}

@@ -87,6 +87,14 @@ service cloud.firestore {
           && request.resource.data.token is string
           && request.resource.data.token.matches('[0-9a-f]{48}');
       }
+      match /viewTabs/{tab} {
+        allow read: if member(board);
+        allow create: if member(board) && request.resource.data.owner == request.auth.uid
+          && request.resource.data.id == tab;
+        allow update: if member(board) && resource.data.owner == request.auth.uid
+          && request.resource.data.owner == request.auth.uid && request.resource.data.id == tab;
+        allow delete: if member(board) && resource.data.owner == request.auth.uid;
+      }
       match /control/view {
         allow read: if member(board);
         allow write: if member(board) && request.resource.data.device == request.auth.uid;

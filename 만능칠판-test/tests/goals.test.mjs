@@ -44,3 +44,19 @@ test('creating an already reached goal can add a silent record',()=>{
   assert.equal(score().records[0].silent,true);
   assert.equal(score().records[0].status,'done');
 });
+
+test('an automatically completed goal can be cancelled and completes again only after another crossing',()=>{
+  const {score,send}=scenario();
+  send('score-goals','new',{base:null,goals:[goals[0]]});
+  send('score-delta','one',{group:'g',amount:1});
+  const [record]=score().records;
+  assert.equal(record.status,'done');
+  send('score-records','cancel',{complete:false,records:[{id:record.id,reached:record.reached}]});
+  assert.equal(record.status,'pending');
+  assert.equal(record.reached,'one');
+  send('score-delta','down',{group:'down',amount:-1});
+  assert.equal(record.status,'withdrawn');
+  send('score-delta','up',{group:'up',amount:1});
+  assert.equal(record.status,'done');
+  assert.equal(record.reached,'up');
+});

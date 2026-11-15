@@ -31,6 +31,7 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
         id,goalId:goal.id,teamId:team.id,type:goal.type,score:goal.score,message:goal.message,
         teamName:team.name || null,reward:goal.reward,automatic:goal.automatic
       };
+      entry.automatic = goal.automatic;
       entry.status = entry.automatic ? 'done' : 'pending';
       entry.reached = event.key;
       entry.time = event.authoredAt;
@@ -61,7 +62,7 @@ export function changeGoals(state, operation) {
     if (selection.get(record.id)!==record.reached) continue;
     if (operation.complete && record.status==='pending') {
       record.status='done';updated=true;
-    } else if (!operation.complete && record.status==='done' && !record.automatic) {
+    } else if (!operation.complete && record.status==='done') {
       const team = record.teamId===null ? state.count : state.teams.find(team=>team.id===record.teamId)?.score;
       record.status = team>=record.score ? 'pending' : 'withdrawn';
       updated=true;

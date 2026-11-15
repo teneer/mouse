@@ -1,3 +1,4 @@
+import {activeView,wireViewTabs} from './js/view-tabs.js';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
@@ -8,12 +9,12 @@ import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=goal-records-1';
+import {CloudBoard} from './js/cloud.js?v=view-tabs-1';
 import {wireScoreSync} from './js/score-sync.js?v=goal-records-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=goal-records-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=view-tabs-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=goal-records-1';
 import {validateContent} from './js/validation.js';
-import {makeStatusController,shouldClosePopups} from './js/feedback.js';
+import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
 import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js';
 const $=id=>document.getElementById(id);
@@ -45,7 +46,8 @@ function updateFeedbackPosition(){
   $('feedbackStack').style.bottom=`calc(${reserved}px + env(safe-area-inset-bottom, 0px))`;
 }
 function fail(error) {console.error(error);notify(error?.message || String(error));}
-function modalOpen() {return Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
+let tabViews, scoreFull=false;
+function modalOpen() {return document.body.classList.contains('score-goal-modal') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
 function isTextEditing() {
   return !!c?.getActiveObject()?.isEditing;
 }
@@ -59,6 +61,7 @@ function rememberView(publish=false) {
   session.activeId=current.id;session.views[current.id]=c.viewportTransform.slice();
   try {sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));} catch {}
   $('zoomLabel').textContent=`${Math.round(c.getZoom()*100)}%`;
+  if (publish) tabViews?.refresh();
   if(publish && sync && !applyingView && $('viewSync').checked) {
     clearTimeout(viewTimer);
     viewTimer=setTimeout(()=>{
@@ -72,24 +75,29 @@ function currentView(){
   const frame=$('scoreFrame');
   if(frame){
     view.scoreOpen=scoreOpen;
+    view.scoreFull=scoreFull;
     view.scoreShare=scoreShare;
     const scale=Number(frame.dataset.scoreScale || readPreference('whiteboard.test.score-scale.v1'));
     if(scale>=60 && scale<=150)view.scoreScale=scale;
   }
   return view;
 }
-async function publishView(toggle){
-  const shared=cloudActive()?cloud.latestView:sync.readView() || localView;
-  if(toggle===undefined && !shared?.enabled)return;
-  const enabled=toggle??true;
-  const epoch=toggle===undefined?shared.epoch:uid();
-  const state={enabled,epoch,sourceTab:sync.id,...(enabled?currentView():{})};
-  if(cloudActive()){
-    const accepted=await cloud.sendSharedView(state,toggle!==undefined);
-    if(!accepted)$('viewSync').checked=cloud.latestView?.enabled===true;
+const viewState=()=>cloud?.options?cloud.latestView:sync.readView() || localView;
+async function publishView(toggle,changeTargets){
+  const shared=viewState();
+  if(toggle===undefined && !changeTargets && !activeView(shared,sync.id))return;
+  const epoch=toggle===undefined && !changeTargets?shared.epoch:uid();
+  const state={epoch,sourceTab:sync.id,...currentView()};
+  if(cloud?.options){
+    await cloud.sendSharedView(state,toggle,changeTargets);
   }else{
-    localView=state;sync.sendView(state);
+    const old=shared?.targets||[];
+    const targets=changeTargets?[...new Set(changeTargets(old))]:old;
+    const enabled=targets.length>0&&(toggle??(!!changeTargets||shared?.enabled===true));
+    localView={...(changeTargets && !targets.includes(sync.id) && shared?.pageId ? shared:state),epoch,enabled,targets};
+    sync.sendView(localView);
   }
+  tabViews?.render();
 }
 function normalizedObjects(objects) {
   const ids=new Set();
@@ -761,7 +769,7 @@ function closePageActions(){
   pageActions.actions.hidePopover();
   pageActions=null;
 }
-function closePopups() {closePageActions();closeContext();document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup]').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
+function closePopups() {closePageActions();closeContext();document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup],#viewSyncTrigger').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
 function togglePopup(id,button) {
   if(busy)return;
   const was=openedPopup===id;closePopups();if(was)return;
@@ -922,8 +930,7 @@ function requestCloudRefresh(delay=25) {
 }
 async function refreshCloud() {
   if(!cloudActive() || !current)return;
-  if(cloud.latestView)$('viewSync').checked=cloud.latestView.enabled===true;
-  else $('viewSync').checked=false;
+  $('viewSync').checked=activeView(cloud.latestView,sync.id);
   if(cloudRefresh){requestCloudRefresh();return;}
   const board=cloud.projected();
   const remote=board.pages[current.id];
@@ -982,8 +989,8 @@ async function refreshCloud() {
     }
     renderPages();updateHistory();
     const view=cloud.latestView;
-    if(view?.enabled && view!==seenView && (view.sourceTab ? view.sourceTab===sync.id : view.device===cloud.deviceId))seenView=view;
-    if(view?.enabled && view!==seenView && pages.some(page=>page.id===view.pageId) && !isTextEditing() && !modalOpen()){
+    if(activeView(view,sync.id) && view!==seenView && (view.sourceTab ? view.sourceTab===sync.id : view.device===cloud.deviceId))seenView=view;
+    if(activeView(view,sync.id) && view!==seenView && pages.some(page=>page.id===view.pageId) && !isTextEditing() && !modalOpen()){
       seenView=view;applyingView=true;
       try{
         if(current.id!==view.pageId)await run(()=>activatePage(view.pageId));
@@ -1004,12 +1011,12 @@ function applyViewport(view){
 function restoreLocalView(){
   const state=sync.readView();
   localView=validViewState(state)?state:null;
-  $('viewSync').checked=localView?.enabled===true;
+  $('viewSync').checked=activeView(localView,sync.id);
   applyLocalView().catch(fail);
 }
 async function applyLocalView(){
   const view=localView;
-  if(!current || cloudActive() || !view?.enabled || seenView===view || applyingView || dirty || saving || busy || modalOpen() || tools.gesture || isTextEditing())return;
+  if(!current || cloudActive() || !activeView(view,sync.id) || seenView===view || applyingView || dirty || saving || busy || modalOpen() || tools.gesture || isTextEditing())return;
   if(!pages.some(page=>page.id===view.pageId))return;
   seenView=view;applyingView=true;
   try{
@@ -1058,7 +1065,6 @@ function wireUI() {
   $('passwordModalOkBtn').onclick=()=>resolvePassword($('pdfPasswordInput').value);
   $('passwordModalCancelBtn').onclick=()=>resolvePassword(null);
   $('pdfPasswordInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('passwordModalOkBtn').click();}});
-  document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
   const modeMap={penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
   Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
   $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
@@ -1154,7 +1160,8 @@ function wireUI() {
   });
   let spaceMode=null;
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape') {if(importAbort && !modalOpen())importAbort.abort();closeContext();closePopups();document.querySelectorAll('.modal').forEach(m=>{if(m.style.display==='flex')closeModal(m.id);});if(!busy)finishText();return;}
+    if (modalOpen() && !e.target.closest?.('.modal')) return;
+    if(e.key==='Escape') {if(modalOpen())return;if(importAbort)importAbort.abort();closeContext();closePopups();if(!busy)finishText();return;}
     if(modalOpen()) {
       if(e.key==='Tab') {
         const m=Array.from(document.querySelectorAll('.modal')).find(m=>m.style.display==='flex');
@@ -1210,8 +1217,11 @@ function setupIntegratedScorePanel(){
   const save=()=>{try{localStorage.setItem(PANEL_STORAGE_KEY,JSON.stringify({open:scoreOpen,share:scoreShare}));}catch{}};
   const update=()=>{
     document.body.classList.toggle('score-open',scoreOpen);
+    document.body.classList.toggle('score-full',scoreFull && scoreOpen);
+    frame.dataset.scoreFull=String(scoreFull && scoreOpen);
+    frame.dispatchEvent(new CustomEvent('score-full-changed',{detail:scoreFull && scoreOpen}));
     document.documentElement.style.setProperty('--board-share',scoreShare+'%');
-    frame.dataset.panelPercent=String(100-scoreShare);
+    frame.dataset.panelPercent=String(scoreFull?100:100-scoreShare);
     panel.inert=!scoreOpen;panel.setAttribute('aria-hidden',String(!scoreOpen));
     toggle.setAttribute('aria-expanded',String(scoreOpen));
     $('scorePanelLabel').textContent=scoreOpen?'점수판 닫기':'점수판 열기';
@@ -1223,18 +1233,48 @@ function setupIntegratedScorePanel(){
     if(!scoreDragging){
       const open=typeof view.scoreOpen==='boolean'?view.scoreOpen:scoreOpen;
       const share=Number.isFinite(view.scoreShare)?clamp(view.scoreShare):scoreShare;
-      if(open!==scoreOpen || share!==scoreShare){scoreOpen=open;scoreShare=share;update();save();}
+      const full=typeof view.scoreFull==='boolean'?view.scoreFull:scoreFull;
+      if(open!==scoreOpen || share!==scoreShare || full!==scoreFull){scoreOpen=open;scoreShare=share;scoreFull=full && open;update();updateToolbarHeight();save();}
     }
     if(Number.isFinite(view.scoreScale))frame.dataset.syncedScoreScale=String(view.scoreScale);
   };
   frame.addEventListener('score-display-scale',()=>rememberView(true));
   const toolbar=$('toolbar');
   const updateToolbarHeight=()=>{
-    frame.dataset.toolbarHeight=String(Math.ceil(toolbar.getBoundingClientRect().height));
+    frame.dataset.toolbarHeight=String(scoreFull?0:Math.ceil(toolbar.getBoundingClientRect().height));
   };
   new ResizeObserver(updateToolbarHeight).observe(toolbar);
   updateToolbarHeight();
-  toggle.addEventListener('click',()=>{scoreOpen=!scoreOpen;update();save();rememberView(true);});
+  toggle.addEventListener('click',()=>{scoreOpen=!scoreOpen;if(!scoreOpen)scoreFull=false;update();save();rememberView(true);});
+  frame.addEventListener('score-toggle-full',()=>{
+    scoreFull=!scoreFull;scoreOpen=true;update();updateToolbarHeight();save();rememberView(true);
+  });
+  frame.addEventListener('score-goals-modal',event=>{
+    if(event.detail){closePopups();closeContext();finishText();}
+    document.body.classList.toggle('score-goal-modal',event.detail);
+    for (const element of [$('canvas-container'),$('toolbarScaleWrap'),splitter]) element.inert=event.detail;
+    if (!event.detail) {
+      if(cloudActive())requestCloudRefresh();else applyLocalView().catch(fail);
+    }
+  });
+  const celebration=$('appCelebration');
+  let activePopup;
+  frame.addEventListener('score-celebration',event=>{
+    activePopup=event.detail;
+    celebration.hidden=!activePopup;
+    if(!activePopup)return;
+    celebration.dataset.type=activePopup.type;
+    $('appCelebrationTitle').textContent=activePopup.title;
+    $('appCelebrationMessage').textContent=activePopup.message;
+    $('appCelebrationUse').hidden=!activePopup.use;
+    $('appCelebrationUse').textContent=activePopup.label;
+  });
+  $('appCelebrationClose').onclick=()=>activePopup?.close();
+  $('appCelebrationUse').onclick=()=>{const current=activePopup;current?.use?.();if(activePopup===current)current?.close();};
+  document.addEventListener('pointerdown',event=>{
+    if(!celebration.contains(event.target))frame.dispatchEvent(new Event('score-dismiss-celebration'));
+  },true);
+  frame.addEventListener('score-frame-pointer',()=>{closePopups();closeContext();});
   let dragOffset=0;
   const changeShare=clientX=>{
     const width=document.documentElement.clientWidth||innerWidth;
@@ -1284,7 +1324,8 @@ async function boot() {
     if(!validViewState(view))return;
     localView=view;
     if(!cloudActive()){
-      $('viewSync').checked=view.enabled;
+      $('viewSync').checked=activeView(view,sync.id);
+      tabViews?.render();
       applyLocalView().catch(fail);
     }
   });
@@ -1305,8 +1346,8 @@ async function boot() {
   reloadLocalAfterDisconnect = useLocal;
   cloud=new CloudBoard(store,{
     board:()=>{requestCloudRefresh();scoreSync?.refresh();},
-    view:requestCloudRefresh,error:fail,
-    status:()=>{cloudUI?.status();scoreSync?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
+    view:()=>{requestCloudRefresh();tabViews?.render();},error:fail,
+    status:()=>{cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
   });
   scoreSync=wireScoreSync($('scoreFrame'),cloud,store,notify);
   cloudUI=wireCloudUI({cloud,files:boardFiles,openModal,notify,flush,scoreSync,
@@ -1326,14 +1367,7 @@ async function boot() {
     goTo:id=>{closeModal('fileManagerModal');return run(()=>activatePage(id));}
   });
   busy=false;syncSharedUI();updateHistory();updateFeedbackPosition();
-  $('viewSync').onchange=async()=>{
-    const control=$('viewSync'), enabled=control.checked;
-    control.disabled=true;
-    clearTimeout(viewTimer);
-    try{await publishView(enabled);}
-    catch(error){control.checked=(cloudActive()?cloud.latestView:localView)?.enabled===true;fail(error);}
-    finally{control.disabled=false;}
-  };
+  tabViews=wireViewTabs({sync,cloud,currentView,pages:()=>pages,togglePopup,closePopups,publish:publishView,readState:viewState,fail});
   restoreLocalView();
   const reconnect=cloud.resume();
   reconnect.catch(fail).finally(()=>scoreSync.ready().catch(fail));
