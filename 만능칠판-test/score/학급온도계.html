@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=shared-score-2">
+    <link rel="stylesheet" href="style.css?v=goal-records-1">
     <link rel="stylesheet" href="../dialog.css?v=appearance-1">
 </head>
 
@@ -14,13 +14,14 @@
         <span id="shared-score-message" role="status"></span>
         <button id="score-conflicts" type="button" hidden>점수 충돌 확인</button>
     </div>
+    <button id="score-unlock-audio" type="button" hidden>소리 켜기</button>
     <div class="container">
         <div id="display-area">
             <div id="top-row">
                 <section id="class-area" aria-labelledby="class-score-title">
                     <div class="main-scoreboard">
                         <header class="class-heading">
-                            <h1 id="class-score-title">학급 점수</h1>
+                            <div class="class-goal-heading"><h1 id="class-score-title">학급 점수</h1><div id="class-goal-gifts" hidden></div></div>
                             <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                         </header>
                         <div class="main-controls">
@@ -41,20 +42,6 @@
                     </div>
                 </section>
 
-                <div id="goal-panel">
-                    <div class="goal-header-row">
-                        <label class="goal-check-label">
-                            <input type="checkbox" id="goal-complete-checkbox"> 목표 완료
-                        </label>
-                        <span id="goal-close-btn" style="cursor:pointer; font-size:1.5rem; color:#888;">✖</span>
-                    </div>
-                    <div class="goal-content">
-                        <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
-                        <div id="goal-panel-message" style="font-size: 2em; font-weight: bold; word-break: keep-all; color: #2d3a4b;">
-                            목표 달성!
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <section id="bottom-row" aria-labelledby="scoreboard-title">
@@ -127,10 +114,15 @@
                     <span>점 = 학급 1점</span>
                 </label>
             </section>
+            <section class="score-settings-section">
+                <h4>이 탭의 효과음</h4>
+                <label class="score-setting-row">음량 <input id="score-volume" type="range" min="0" max="120" step="1" value="100"><output id="score-volume-level">100%</output></label>
+                <label class="score-setting-row">음소거 <input id="score-mute" type="checkbox"></label>
+            </section>
             <section class="score-settings-section" aria-labelledby="manage-settings-title">
                 <h4 id="manage-settings-title">관리</h4>
                 <div class="score-settings-actions">
-                    <button type="button" id="open-goal-modal-btn">목표 관리</button>
+                    <button type="button" id="open-goal-modal-btn">목표·달성 기록</button>
                     <button type="button" id="open-management-modal-btn">점수판 관리</button>
                 </div>
             </section>
@@ -183,35 +175,36 @@
       </div>
     </div>
 
-    <div id="goal-management-view" class="fullscreen-view" role="dialog" aria-modal="true" aria-labelledby="goal-manage-title">
+    <div id="goal-management-view" class="fullscreen-view" role="dialog" aria-labelledby="goal-manage-title">
       <div class="dialog-sheet">
-        <header class="dialog-header">
-            <h2 id="goal-manage-title">목표 관리</h2>
-            <button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button>
-        </header>
-        <div class="goal-container">
-            <div class="goal-column">
-                <h3>학급 목표</h3>
-                <div class="goal-list-header">
-                    <span>도달 점수</span>
-                    <span>목표 달성 문구</span>
-                </div>
-                <div id="class-goals-list" class="goal-list"></div>
-                <button class="add-row-btn" data-type="class">+ 학급 목표 추가</button>
-            </div>
-            <div class="goal-column">
-                <h3>모둠 목표 (총점 기준)</h3>
-                <div class="goal-list-header">
-                    <span>도달 점수</span>
-                    <span>목표 달성 문구</span>
-                </div>
-                <div id="team-goals-list" class="goal-list"></div>
-                <button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button>
-            </div>
+        <header class="dialog-header"><h2 id="goal-manage-title">목표·달성 기록</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
+        <nav class="goal-tabs"><button id="goal-settings-tab" type="button">목표 설정</button><button id="goal-records-tab" type="button">달성 기록</button></nav>
+        <div id="goal-settings">
+          <div class="goal-container">
+            <section class="goal-column"><h3>학급 목표</h3><div id="class-goals-list"></div><button class="add-row-btn" data-type="class">+ 학급 목표 추가</button></section>
+            <section class="goal-column"><h3>개별 모둠 목표</h3><div id="team-goals-list"></div><button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button></section>
+          </div>
+          <label><input type="checkbox" id="goal-include-existing"> 새 목표를 이미 달성한 대상의 기록도 만들기</label>
+          <p id="goal-edit-error" role="status"></p>
+          <div class="dialog-footer"><button class="dialog-action" id="cancel-goal-edit">취소</button><button class="dialog-action dialog-primary" id="close-goal-view-btn">저장</button></div>
         </div>
-        <div class="dialog-footer"><button class="dialog-action" id="cancel-goal-edit">취소</button><button class="dialog-action dialog-primary" id="close-goal-view-btn">완료</button></div>
+        <div id="goal-records" hidden>
+          <div class="goal-tabs">
+            <label>상태 <select id="goal-status-filter"><option value="pending">미완료</option><option value="done">완료</option><option value="withdrawn">회수됨</option><option value="all">전체</option></select></label>
+            <label>대상 <select id="goal-target-filter"></select></label>
+            <label>정렬 <select id="goal-sort"><option value="new">최근 달성순</option><option value="old">오래된 달성순</option><option value="score">목표 점수순</option></select></label>
+          </div>
+          <div id="goal-record-list"></div>
+          <div class="dialog-footer"><button id="goal-complete-selected" class="dialog-action dialog-primary">선택 완료 처리</button><button id="goal-undo-selected" class="dialog-action">선택 완료 되돌리기</button></div>
+        </div>
       </div>
     </div>
+
+    <aside id="goal-celebration" hidden aria-labelledby="goal-celebration-title">
+      <header><strong id="goal-celebration-title"></strong><button id="goal-celebration-close" aria-label="축하 메시지 닫기">×</button></header>
+      <p id="goal-celebration-message" role="status"></p>
+      <button id="goal-celebration-use" type="button">확인 완료</button>
+    </aside>
 
     <dialog class="score-delete-dialog" id="team-delete-dialog" aria-labelledby="team-delete-title">
         <form method="dialog">
@@ -234,8 +227,7 @@
             </div>
         </form>
     </dialog>
-    <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script type="module" src="script.js?v=shared-score-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
+    <script type="module" src="script.js?v=goal-records-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
 </body>
 </html>

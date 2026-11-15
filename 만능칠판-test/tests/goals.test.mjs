@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {applyScoreOperation} from '../js/shared-score.js';
+
+function scenario() {
+  const board={}, send=(kind, key, fields)=>applyScoreOperation(board,{kind,key,authoredAt:1,...fields});
+  send('score-seed','seed',{snapshot:{count:9,teams:[{id:'a',name:'햇살',score:2},{id:'b',name:'별빛',score:0}],classGoals:[{score:10}]}});
+  return {score:()=>board.score.state.goalSystem,send};
+}
+const goals=[
+  {id:'class',type:'class',score:10,message:'학급 달성',automatic:true,reward:false},
+  {id:'team',type:'team',score:3,message:'모둠 달성',automatic:false,reward:true}
+];
+test('simultaneous class and team goals create independent records and legacy goals are discarded',()=>{
+  const {score,send}=scenario();
+  assert.deepEqual(score().goals,[]);
+  send('score-goals','new',{base:null,goals});
+  send('score-delta','one',{group:'g',amount:1,targets:['a']});
+  assert.deepEqual(score().records.map(({teamId,status})=>[teamId,status]),[[null,'done'],['a','pending']]);
+  send('score-delta','two',{group:'h',amount:3,targets:['b']});
+  assert.deepEqual(score().records.map(record=>record.teamId),[null,'a','b']);
+});
+test('withdrawal and regrant reuse the record and reject a stale completion',()=>{
+  const {score,send}=scenario();
+  send('score-goals','new',{base:null,goals});
+  send('score-delta','one',{group:'g',amount:1,targets:['a']});
+  const id=score().records.find(row=>row.teamId==='a').id;
+  const record=()=>score().records.find(row=>row.id===id);
+  send('score-delta','down',{group:'h',amount:-1,targets:['a']});
+  assert.equal(record().status,'withdrawn');
+  send('score-delta','up',{group:'h2',amount:1,targets:['a']});
+  send('score-records','stale',{complete:true,records:[{id,reached:'one'}]});
+  assert.equal(record().status,'pending');
+  send('score-records','done',{complete:true,records:[{id,reached:'up'}]});
+  send('score-delta','down2',{group:'h',amount:-1,targets:['a']});
+  send('score-delta','up2',{group:'h2',amount:1,targets:['a']});
+  assert.equal(record().status,'done');
+  assert.equal(record().reached,'up');
+  assert.equal(score().records.length,2);
+});
+test('creating an already reached goal can add a silent record',()=>{
+  const {score,send}=scenario();
+  send('score-goals','new',{base:null,goals:[{...goals[0],score:9}],includeExisting:true});
+  assert.equal(score().records[0].silent,true);
+  assert.equal(score().records[0].status,'done');
+});

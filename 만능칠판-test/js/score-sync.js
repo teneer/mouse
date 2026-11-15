@@ -2,7 +2,7 @@ export function wireScoreSync(frame, cloud, store, notify) {
   const drafts = new Map();
   let write = Promise.resolve(), refreshQueued = false;
   let ready = false;
-  let previous;
+  let previous, wasOnline=false, catchingUp=true;
 
   function api() {return frame?.contentWindow?.whiteboardScore;}
   function snapshot() {
@@ -20,8 +20,12 @@ export function wireScoreSync(frame, cloud, store, notify) {
         const shared = !!cloud.options;
         const model = shared ? cloud.projectedScore(drafts.values()) : null;
         const key = JSON.stringify([shared,model]);
+        if (!cloud.online || !wasOnline) catchingUp=true;
+        wasOnline=cloud.online;
+        const live=cloud.online&&!catchingUp;
+        if (cloud.online && cloud.state.revision>=cloud.head) catchingUp=false;
         if (key === previous) return;
-        api().receive({shared,model,send,notice:notify});
+        api().receive({shared,model,send,notice:notify,live});
         previous = key;
       } catch (error) {notify(error.message);}
       finally {refreshQueued = false;}

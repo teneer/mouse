@@ -1,5 +1,6 @@
+import {changeGoals,readGoals,reconcileGoals} from '../score/goal-model.js';
 const min = -10000, max = 10000;
-const empty = () => ({count:0,teams:[],classGoals:[],teamGoals:[],activeGoal:null,scoreLink:{enabled:true,points:3}});
+const empty = () => ({count:0,teams:[],scoreLink:{enabled:true,points:3}});
 const copy = value => structuredClone(value);
 const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 const inRange = score => Number.isSafeInteger(score) && score >= min && score <= max;
@@ -7,7 +8,7 @@ const bounded = score => inRange(score) ? score : 0;
 const total = state => state.teams.reduce((sum,team)=>sum+team.score,0);
 
 export function scoreSnapshot(value, key) {
-  const initial = empty(), {scoreLink,activeGoal} = value || initial;
+  const initial = empty(), {scoreLink} = value || initial;
   return {
     count:bounded(value?.count),
     teams:(Array.isArray(value?.teams) ? value.teams : []).map((team,index)=>({
@@ -15,9 +16,7 @@ export function scoreSnapshot(value, key) {
       name:String(team.name || '모둠 ' + (index+1)).slice(0,50),
       score:bounded(team.score)
     })),
-    classGoals:copy(value?.classGoals || []),
-    teamGoals:copy(value?.teamGoals || []),
-    activeGoal:activeGoal || null,
+    goalSystem:readGoals(value?.goalSystem),
     scoreLink:{enabled:scoreLink?.enabled !== false, points:Number.isSafeInteger(scoreLink?.points) && scoreLink.points > 0 ? scoreLink.points : 3}
   };
 }
@@ -36,13 +35,6 @@ function applyDelta(state, operation) {
   state.count += classDiff;
   for (const team of teams) team.score += operation.amount;
 
-  for (const [type, before, after] of [['class',oldCount,state.count],['team',oldTotal,newTotal]]) {
-    const goals = type === 'class' ? state.classGoals : state.teamGoals;
-    goals.forEach((goal,index)=>{
-      if (!goal.completed && before < goal.score && after >= goal.score) state.activeGoal = {type,index};
-      if (state.activeGoal?.type === type && state.activeGoal.index === index && after < goal.score) state.activeGoal = null;
-    });
-  }
   if (!operation.targets) return {kind:'class',oldCount,classDiff};
   return {kind:'team',idx:state.teams.indexOf(teams[0]),amount:operation.amount*teams.length,classDiff,oldCount,oldTotal,newTotal,rate};
 }
@@ -55,6 +47,13 @@ export function applyScoreOperation(board, operation) {
   }
   const score = board.score;
   if (!score) return;
+  score.state.goalSystem ??= readGoals();
+  const before = {count:score.state.count,teams:copy(score.state.teams)};
+  if (kind === 'score-goals' || kind === 'score-records') {
+    if (!changeGoals(score.state,operation)) score.notice = {key,text:'다른 기기에서 목표나 달성 기록이 변경되었습니다. 다시 확인해 주세요.'};
+    else score.notice = null;
+    return;
+  }
 
   if (kind === 'score-delta') {
     const effect = applyDelta(score.state,operation);
@@ -69,11 +68,15 @@ export function applyScoreOperation(board, operation) {
         score.conflicts.push({id,candidate:before});
       }
     }
+    reconcileGoals(score.state,before,operation);
     score.notice = null;
     if (score.undo?.group !== operation.group) score.undo = {group:operation.group,amount:0,targets:operation.targets || null};
     score.undo.amount += operation.amount;
     score.version = key;
     score.effect = effect;
+    score.sounds ??= [];
+    score.sounds.push({key,effect});
+    if (score.sounds.length>64) score.sounds.shift();
     return;
   }
   if (kind === 'score-undo') {
@@ -92,11 +95,8 @@ export function applyScoreOperation(board, operation) {
       score.state.count += change;
     } else score.state.count -= undo.amount;
     if (score.overwrite) applyDelta(score.overwrite.before,{amount:-undo.amount,targets:undo.targets});
-    const active = score.state.activeGoal;
-    const goals = active?.type === 'class' ? score.state.classGoals : score.state.teamGoals;
-    if (active && (active.type === 'class' ? score.state.count : total(score.state)) < goals[active.index]?.score) score.state.activeGoal = null;
   } else if (kind === 'score-edit') {
-    const candidate = scoreSnapshot(operation.snapshot,key);
+    const candidate = scoreSnapshot({...operation.snapshot,goalSystem:score.state.goalSystem},key);
     if (equal(score.state,candidate)) return;
     if (score.version !== operation.base) {
       score.conflicts.push({id:key,candidate});
@@ -118,12 +118,13 @@ export function applyScoreOperation(board, operation) {
       return;
     }
     if (operation.useCandidate) {
-      score.state = copy(entry.candidate);
+      score.state = {...copy(entry.candidate),goalSystem:score.state.goalSystem};
       score.epoch = key;
     }
     score.overwrite = null;
     score.conflicts = score.conflicts.filter(item=>item!==entry);
   } else return;
+  reconcileGoals(score.state,before,operation);
   score.undo = null;
   score.notice = null;
   score.version = key;

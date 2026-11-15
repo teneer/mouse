@@ -1,3 +1,6 @@
+import {freshGoals,readGoals,changeGoals,reconcileGoals} from './goal-model.js';
+import {wireGoals} from './goals-ui.js';
+import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
@@ -10,20 +13,13 @@ const sounds = {
   confirm: new Audio('Sound/Confirm.MP3'),
   success: new Audio('Sound/Success small.MP3')
 };
-function playSound(sound) {
-  if (!sound) return;
-  const audio = sound.cloneNode();
-  audio.play().catch(error => console.warn('음원 재생 실패:', audio.src, error));
-}
+const playSound = wireScoreAudio();
 
 let count = 0;
 let displayedClassScore = 0;
 let teams = [];
-let classGoals = [];
-let teamGoals = [];
+let goalSystem = freshGoals(), localBaseline;
 const step = 1, minScore = -10000, maxScore = 10000;
-let currentActiveGoal = null;
-let activeGoalRef = null;
 const defaultLinkPoints = 3;
 const undoWindow = 2000;
 let conversionPlayer=null;
@@ -43,7 +39,6 @@ const managementModal = document.getElementById('management-modal');
 const settingsPanel = document.getElementById('settings-panel');
 const settingsToggleBtn = document.getElementById('settings-toggle-btn');
 const goalManagementView = document.getElementById('goal-management-view');
-const goalAlert = document.getElementById('goal-alert');
 const progress = document.getElementById('score-progress');
 const conversionRule = document.getElementById('conversion-rule');
 const conversionProgress = document.getElementById('conversion-progress');
@@ -62,15 +57,28 @@ const tabId = typeof crypto !== 'undefined' && crypto.randomUUID
 let serial = 0;
 let lastAppliedVersion = null;
 let initialized = false;
-let sharedMode = false, sharedScore = null, sharedSend, sharedNotice, managementBase, goalsBase;
+let sharedMode = false, sharedScore = null, sharedSend, sharedNotice, managementBase;
 let scoreGroup, migrationSnapshot;
 const sharedBanner = document.getElementById('shared-score-banner');
 const sharedMessage = document.getElementById('shared-score-message');
 const conflictsButton = document.getElementById('score-conflicts');
 const conflictsDialog = document.getElementById('score-conflict-dialog');
 const bodyControls = document.querySelector('.container');
+const goalUI = wireGoals({submit:submitGoal,teamList:()=>teams,celebrate:()=>playSound(sounds.success)});
+const ownScoreEvents = new Set();
+function submitGoal(operation) {
+  if (sharedMode) {sendScore(operation);return;}
+  if (changeGoals({count,teams,goalSystem}, {...operation,key:crypto.randomUUID(),authoredAt:Date.now()})) {
+    saveToStorage();
+    renderCurrentState();
+  }
+}
+function speakEffect(effect) {
+  if (effect?.kind==='team') playSound(effect.amount>0?sounds.teamIncrease:sounds.teamDecrease);
+  if (effect?.classDiff) playSound(effect.classDiff>0?sounds.mainIncrease:sounds.mainDecrease);
+}
 
-function applySharedScore(model) {
+function applySharedScore(model,live) {
   const previous = sharedScore;
   sharedScore = model;
   bodyControls.inert = !model;
@@ -83,6 +91,10 @@ function applySharedScore(model) {
     renderCurrentState();
     return;
   }
+  if (live && previous) {
+    const seen = new Set((previous.sounds || []).map(item=>item.key));
+    for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect);
+  }
   if (teams.length !== model.state.teams.length || teams.some((team,index)=>team.id !== model.state.teams[index].id)) selectedTeams.clear();
   if (JSON.stringify(snapshot(undefined)) === JSON.stringify(model.state)) {
     renderBatchControls();
@@ -91,25 +103,28 @@ function applySharedScore(model) {
   const effect = previous && previous.version !== model.version && model.effect?.oldCount === count
     && (model.effect.kind !== 'team' || model.effect.oldTotal === totalTeamScore()) ? model.effect : null;
   applyStateFields(structuredClone(model.state));
-  renderCurrentState(effect);
+  renderCurrentState(effect,live || ownScoreEvents.has(model.version));
+
 }
 
 window.whiteboardScore = {
   localSnapshot: () => initialized
     ? structuredClone(sharedMode ? readStoredState() || migrationSnapshot : snapshot(undefined)) : null,
-  receive({shared, model, send, notice}) {
+  receive({shared, model, send, notice, live}) {
     sharedSend = send;
     sharedNotice = notice;
     if (shared) {
       if (!sharedMode) {
         migrationSnapshot = structuredClone(snapshot(undefined));
+        goalUI.reset();ownScoreEvents.clear();
         selectedTeams.clear();
         lastScoreChange = null;
         scoreGroup = null;
       }
       sharedMode = true;
-      applySharedScore(model);
+      applySharedScore(model,live);
     } else if (sharedMode) {
+      goalUI.reset();ownScoreEvents.clear();
       sharedMode = false;
       sharedScore = null;
       bodyControls.inert = false;
@@ -130,7 +145,9 @@ window.whiteboardScore = {
 function sendScore(operation) {
   if (!sharedScore || !sharedSend) return;
   const key = crypto.randomUUID();
-  sharedSend({...operation,key});
+  ownScoreEvents.add(key);
+  if (ownScoreEvents.size>128) ownScoreEvents.delete(ownScoreEvents.values().next().value);
+  sharedSend({...operation,key,authoredAt:Date.now()});
 }
 function sharedDelta(amount, targets = null) {
   const signature = JSON.stringify([amount,targets]), now = performance.now();
@@ -178,42 +195,42 @@ function loadFromStorage() {
   if (state) {
     applyStateFields(state);
     lastAppliedVersion = state.version || null;
+    if (!state.goalSystem) {
+      try {
+        localStorage.setItem(STORAGE_KEY,JSON.stringify({...snapshot(state.version),effect:null}));
+      } catch (error) {console.error('목표 설정 초기화 실패:',error);}
+    }
     return;
   }
   // 과거 버전의 네 개 저장 키를 처음 열 때 가져옵니다.
   try {
     count = parseInt(localStorage.getItem('mainScore'), 10) || 0;
     teams = JSON.parse(localStorage.getItem('teams')) || [];
-    classGoals = JSON.parse(localStorage.getItem('classGoals')) || [];
-    teamGoals = JSON.parse(localStorage.getItem('teamGoals')) || [];
+    teams = normalizeTeams(teams);
   } catch (error) {
     console.error('기존 저장 데이터 읽기 실패:', error);
-    count = 0; teams = []; classGoals = []; teamGoals = [];
+    count = 0; teams = [];
   }
-  activeGoalRef = null;
+  goalSystem = freshGoals();
+  try {
+    localStorage.removeItem('classGoals');
+    localStorage.removeItem('teamGoals');
+  } catch {}
+}
+function normalizeTeams(value) {
+  return (Array.isArray(value)?value:[]).map((team,index)=>({...team,id:team.id||'legacy-team:'+index}));
 }
 function applyStateFields(state) {
   count = Number.isFinite(state.count) ? state.count : 0;
-  teams = Array.isArray(state.teams) ? state.teams : [];
-  classGoals = Array.isArray(state.classGoals) ? state.classGoals : [];
-  teamGoals = Array.isArray(state.teamGoals) ? state.teamGoals : [];
+  teams = normalizeTeams(state.teams);
+  goalSystem = readGoals(state.goalSystem);
+  localBaseline = {count,teams:structuredClone(teams)};
   linkEnabled = state.scoreLink?.enabled !== false;
   linkPoints = validLinkPoints(state.scoreLink?.points) ? state.scoreLink.points : defaultLinkPoints;
-  restoreActiveGoal(state.activeGoal);
-}
-function restoreActiveGoal(ref) {
-  activeGoalRef = ref || null;
-  const goals = activeGoalRef &&
-    (activeGoalRef.type === 'class' ? classGoals : teamGoals);
-  currentActiveGoal = goals ? goals[activeGoalRef.index] || null : null;
-  if (!currentActiveGoal || currentActiveGoal.completed) {
-    currentActiveGoal = null;
-    activeGoalRef = null;
-  }
 }
 function snapshot(version) {
   return {
-    version, count, teams, classGoals, teamGoals, activeGoal: activeGoalRef,
+    version, count, teams, goalSystem,
     scoreLink: { enabled: linkEnabled, points: linkPoints }
   };
 }
@@ -228,6 +245,11 @@ function saveToStorage(effect = null, base = sharedScore?.version) {
     return;
   }
   const version = tabId + ':' + (++serial);
+  reconcileGoals({count,teams,goalSystem},localBaseline||{count,teams},{key:version,authoredAt:Date.now()});
+  localBaseline={count,teams:structuredClone(teams)};
+  goalUI.update(goalSystem,true);
+  goalUI.giftGroup(document.getElementById('class-goal-gifts'));
+  for (const gift of document.querySelectorAll('[data-team-gifts]')) goalUI.giftGroup(gift,gift.dataset.teamGifts);
   const state = {...snapshot(version),effect};
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -247,7 +269,8 @@ function syncFromStorage(state = readStoredState()) {
   lastScoreChange = null;
   applyStateFields(state);
   lastAppliedVersion = state.version;
-  renderCurrentState(state.effect);
+  renderCurrentState(state.effect, true);
+  speakEffect(state.effect);
 }
 window.addEventListener('storage', event => {
   if (event.key !== STORAGE_KEY || !event.newValue || !initialized) return;
@@ -260,14 +283,14 @@ window.addEventListener('storage', event => {
   } catch(error) {console.error('점수 동기화 실패:',error);}
 });
 
-function renderCurrentState(effect) {
+function renderCurrentState(effect,announce=false) {
   if(!effect){resetConversion();renderClassNumber(count);}
   renderLinkSettings();
+  goalUI.update(goalSystem,announce);
+  goalUI.giftGroup(document.getElementById('class-goal-gifts'));
   renderTeams();
-  renderActiveGoal();
   if(effect)presentScoreEffect(effect);
   else updateScoreProgress();
-  if (getComputedStyle(goalManagementView).display !== 'none') renderGoalLists();
   // 관리 모달에 입력 중인 값은 원격 수신으로 덮어쓰지 않습니다.
 }
 function displayFloatingNumber(element, amount, topStart, topEnd) {
@@ -291,7 +314,7 @@ function recordScoreChange(key = null) {
     lastScoreChange.time = now;
     return;
   }
-  lastScoreChange = { key, time: now, count, scores: teams.map(team => team.score), activeGoalRef };
+  lastScoreChange = { key, time: now, count, scores: teams.map(team => team.score) };
 }
 function undoScore() {
   if (sharedMode) {
@@ -305,7 +328,6 @@ function undoScore() {
   lastScoreChange = null;
   count = previous.count;
   teams.forEach((team, index) => { team.score = previous.scores[index]; });
-  restoreActiveGoal(previous.activeGoalRef);
   numberElement.className = '';
   renderCurrentState();
   saveToStorage();
@@ -317,7 +339,6 @@ function changeClassScore(amount) {
   recordScoreChange(`class:${amount}`);
   const old = count;
   count = next;
-  checkForGoalAchievement('class',old,count);
   const effect={kind:'class',oldCount:old,classDiff:amount};
   presentScoreEffect(effect,true);
   renderBatchControls();
@@ -376,6 +397,10 @@ function renderTeams() {
     numberSpan.className = 'team-number';
     renderTeamNumber(numberSpan, team.score);
     controls.appendChild(numberSpan); selectButton.appendChild(controls);
+    const gifts=document.createElement('div');
+    gifts.className='team-goal-gifts';gifts.dataset.teamGifts=team.id;
+    goalUI.giftGroup(gifts,team.id);card.appendChild(gifts);
+    gifts.style.setProperty('--score-digits',String(team.score).length);
     const changeEl = document.createElement('div');
     changeEl.id = `team-change-${idx}`; changeEl.className = 'team-change';
     card.appendChild(changeEl);
@@ -478,6 +503,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
     const numberEl = document.getElementById(`team-number-${index}`);
     if (numberEl) {
       renderTeamNumber(numberEl, next);
+      numberEl.closest('.team-card').querySelector('.team-goal-gifts')?.style.setProperty('--score-digits',String(next).length);
       numberEl.className = 'team-number ' + (amount > 0 ? 'team-increase' : 'team-decrease');
       setTimeout(() => { numberEl.className = 'team-number'; }, 200);
     }
@@ -485,8 +511,6 @@ function changeTeamScores(indices, amount, undoKey = null) {
   });
   count += classDiff;
   renderBatchControls();
-  if (classDiff) checkForGoalAchievement('class', oldCount, count);
-  checkForGoalAchievement('team', oldTotal, newTotal);
   const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldCount,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
   saveToStorage({...effect,inputAmount:amount,targets:indices.map(index=>teams[index].id)});
   playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease);
@@ -681,8 +705,6 @@ function openManagementModal() {
 }
 function closeAndSaveManagement() {
   syncFromStorage();
-  const oldCount = count;
-  const oldTotal = totalTeamScore();
   const newMain = parseInt(document.getElementById('manage-main-score').value, 10);
   const nextCount = Number.isNaN(newMain) ? count : Math.max(minScore, Math.min(newMain, maxScore));
   const newTeams = [];
@@ -709,8 +731,6 @@ function closeAndSaveManagement() {
   count = nextCount;
   teams = newTeams;
   renderClassNumber(count);
-  checkForGoalAchievement('class',oldCount,count);
-  checkForGoalAchievement('team', oldTotal, totalTeamScore());
   renderTeams(); saveToStorage(null,managementBase);
   managementModal.style.display = 'none'; playSound(sounds.confirm);
 }
@@ -726,95 +746,6 @@ document.getElementById('add-team-btn').addEventListener('click', () => {
   list.appendChild(item); item.querySelector('.manage-name').focus();
 });
 
-function openGoalManagementView() {
-  setSettingsOpen(false);
-  syncFromStorage(); goalsBase = sharedScore?.version; renderGoalLists(); goalManagementView.style.display = 'flex';
-}
-function closeAndSaveGoalManagementView() {
-  syncFromStorage();
-  const readGoals = type => {
-    const result = [];
-    document.querySelectorAll(`#${type}-goals-list .goal-row`).forEach(row => {
-      const score = parseInt(row.querySelector('.goal-score').value, 10);
-      const message = row.querySelector('.goal-message').value.trim();
-      if (!isNaN(score) && message) {
-        result.push({ score, message, completed: row.dataset.completed === 'true' });
-      }
-    });
-    return result;
-  };
-  lastScoreChange = null;
-  renderBatchControls();
-  classGoals = readGoals('class'); teamGoals = readGoals('team');
-  activeGoalRef = null; currentActiveGoal = null;
-  renderActiveGoal();
-  saveToStorage(null,goalsBase); goalManagementView.style.display = 'none'; playSound(sounds.confirm);
-}
-function renderGoalLists() {
-  const classList = document.getElementById('class-goals-list');
-  const teamList = document.getElementById('team-goals-list');
-  classList.innerHTML = ''; teamList.innerHTML = '';
-  classGoals.forEach(g => addGoalRowToDOM('class', g.score, g.message, g.completed));
-  teamGoals.forEach(g => addGoalRowToDOM('team', g.score, g.message, g.completed));
-}
-function addGoalRowToDOM(type, score = '', message = '', completed = false) {
-  const row = document.createElement('div'); row.className = 'goal-row';
-  row.dataset.completed = completed ? 'true' : 'false';
-  row.innerHTML = '<input type="number" class="goal-score" placeholder="점수"> <input type="text" class="goal-message" placeholder="문구"> <button class="delete-row-btn">×</button>';
-  row.querySelector('.goal-score').value = score;
-  row.querySelector('.goal-message').value = message;
-  document.getElementById(`${type}-goals-list`).appendChild(row);
-}
-goalManagementView.querySelectorAll('.add-row-btn').forEach(btn => {
-  btn.onclick = () => addGoalRowToDOM(btn.dataset.type);
-});
-goalManagementView.addEventListener('click', e => {
-  if (e.target.classList.contains('delete-row-btn')) e.target.closest('.goal-row').remove();
-});
-function checkForGoalAchievement(type, oldScore, newScore) {
-  const goals = type === 'class' ? classGoals : teamGoals;
-  goals.forEach((goal, index) => {
-    if (!goal.completed && oldScore < goal.score && newScore >= goal.score) {
-      showGoalPanel(goal, type, index);
-    }
-    if (currentActiveGoal === goal && newScore < goal.score) hideGoalPanel(false);
-  });
-}
-function renderActiveGoal() {
-  if (currentActiveGoal) {
-    document.getElementById('goal-panel-message').textContent = currentActiveGoal.message;
-    document.getElementById('goal-complete-checkbox').checked = false;
-    document.body.classList.add('goal-active');
-  } else document.body.classList.remove('goal-active');
-}
-function showGoalPanel(goal, type, index) {
-  currentActiveGoal = goal;
-  activeGoalRef = { type, index };
-  renderActiveGoal();
-  playSound(sounds.success);
-  // 점수 변경 함수의 saveToStorage()가 목표판 상태를 함께 전송합니다.
-}
-function hideGoalPanel(persist = true) {
-  currentActiveGoal = null; activeGoalRef = null;
-  renderActiveGoal();
-  if (persist) saveToStorage();
-}
-document.getElementById('goal-complete-checkbox').addEventListener('change', e => {
-  if (e.target.checked && currentActiveGoal) {
-    currentActiveGoal.completed = true;
-    if (lastScoreChange) lastScoreChange.activeGoalRef = null;
-    hideGoalPanel();
-  }
-});
-document.getElementById('goal-close-btn').addEventListener('click', () => {
-  if (lastScoreChange) lastScoreChange.activeGoalRef = null;
-  hideGoalPanel();
-});
-function showGoalAlert(message) {
-  document.getElementById('goal-alert-message').textContent = message;
-  goalAlert.classList.add('show'); playSound(sounds.success);
-  setTimeout(() => goalAlert.classList.remove('show'), 4000);
-}
 function validLinkPoints(value) { return Number.isSafeInteger(value) && value >= 1; }
 function renderLinkSettings() {
   linkMode.checked = linkEnabled;
@@ -891,8 +822,7 @@ document.getElementById('reset-teams-btn').onclick = () => {
 document.getElementById('open-management-modal-btn').onclick = openManagementModal;
 document.getElementById('save-management-btn').onclick = closeAndSaveManagement;
 document.getElementById('close-management-btn').onclick = closeManagementModal;
-document.getElementById('open-goal-modal-btn').onclick = openGoalManagementView;
-document.getElementById('close-goal-view-btn').onclick = closeAndSaveGoalManagementView;
+document.getElementById('open-goal-modal-btn').onclick = ()=>{setSettingsOpen(false);syncFromStorage();goalUI.openSettings();};
 function setSettingsOpen(open) {
   settingsPanel.classList.toggle('open', open);
   settingsPanel.inert = !open;
@@ -953,6 +883,7 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('load', () => {
   loadFromStorage();
+  localBaseline={count,teams:structuredClone(teams)};
   renderCurrentState();
   initialized = true;
   syncFromStorage();
@@ -965,6 +896,3 @@ document.getElementById('confirm-team-setup').onclick=createTeams;
 
 document.getElementById('close-team-setup').onclick=hideTeamSetupModal;
 document.getElementById('close-management-dialog').onclick=closeManagementModal;
-const hideGoalManagement=()=>{goalManagementView.style.display='none';};
-document.getElementById('cancel-goal-view').onclick=hideGoalManagement;
-document.getElementById('cancel-goal-edit').onclick=hideGoalManagement;

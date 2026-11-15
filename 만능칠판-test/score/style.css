@@ -731,3 +731,35 @@ button, .main-scoreboard, .team-card, #batch-score {
 .score-conflict-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,11rem),1fr)); gap: .7rem; }
 .score-conflict-options section { padding: .5rem; border: 1px solid #bfd4dd; border-radius: .55rem; }
 .score-conflict-options ul { padding-inline-start: 1.3rem; overflow-wrap: anywhere; }
+
+.class-goal-heading, #class-goal-gifts, .goal-tabs {display:flex;align-items:baseline;gap:.35rem;min-width:0}
+.goal-tabs {flex-wrap:wrap;padding:.5rem}
+.team-goal-gifts {
+  position:absolute;z-index:2;inset-inline-start:min(calc(100% - 2.1rem),calc(50% + min(40px,34cqh,25cqw) * var(--score-digits,1) * .28 + 2px));
+  top:50%;transform:translateY(-5%);max-width:calc(50% - 2px);
+}
+#class-goal-gifts button,.team-goal-gifts button {
+  padding:.15em .25em;color:#174866;background:#ecf7ff;border:1px solid #afccdf;
+  border-radius:.35rem;font-size:clamp(.65rem,8cqw,1rem);white-space:nowrap;
+}
+#class-goal-gifts button {background:#fff0c3;border-color:#d8af56}
+#goal-celebration {
+  position:fixed;z-index:14000;top:.6rem;left:50%;transform:translateX(-50%);
+  width:min(calc(100% - 1rem),26rem);max-height:calc(100% - 1.2rem);overflow:auto;
+  padding:.7rem;background:#fff8e2;color:#463019;border:1px solid #e0bb61;
+  border-radius:.7rem;box-shadow:0 4px 16px #26344438;pointer-events:none;
+}
+#goal-celebration[data-type="team"] {background:#eaf7ff;color:#154565;border-color:#83bbd9}
+#goal-celebration header {display:flex;align-items:flex-start;justify-content:space-between;gap:.3rem}
+#goal-celebration p {white-space:pre-wrap;overflow-wrap:anywhere;margin:.35rem 0}
+#goal-celebration button {pointer-events:auto;min-height:1.9rem}
+#goal-settings,#goal-records {overflow:auto;padding:.5rem}
+#goal-management-view:has(#goal-settings[hidden]) {pointer-events:none;background:transparent;justify-content:flex-end}
+#goal-management-view:has(#goal-settings[hidden]) .dialog-sheet {pointer-events:auto;max-height:75%;max-width:min(100%,34rem)}
+#goal-record-list article {padding:.45rem;border-bottom:1px solid #c8dce7;overflow-wrap:anywhere}
+#goal-record-list article p {margin:.2rem 0}
+.goal-edit-row {display:flex;flex-wrap:wrap}
+.goal-edit-row input.goal-message {min-width:8rem;flex:1}
+#goal-edit-error {color:#9d3027}
+#score-volume {width:min(8rem,45%);}
+#score-unlock-audio {align-self:flex-end}

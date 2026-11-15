@@ -1,6 +1,6 @@
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=shared-score-1';
-import {applyScoreOperation} from './shared-score.js';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=goal-records-1';
+import {applyScoreOperation} from './shared-score.js?v=goal-records-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
