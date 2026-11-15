@@ -2,6 +2,13 @@ const clone = value => structuredClone(value);
 export const freshGoals = () => ({goals:[],records:[],revision:null});
 export const readGoals = value => value ? clone(value) : freshGoals();
 
+export function parseGoalScore(value) {
+  const number = value.trim().normalize('NFKC').replace(/^−/,'-');
+  if (!/^[+-]?\d+$/.test(number)) return null;
+  const score = Number(number);
+  return score>=-10000 && score<=10000 ? score : null;
+}
+
 function targets(state, goal) {
   return goal.type === 'class' ? [{id:null,score:state.count}] : state.teams;
 }
@@ -29,8 +36,9 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
       if (!includeExisting && (previousScores.get(team.id) ?? -Infinity) >= threshold) continue;
       const entry = record || {
         id,goalId:goal.id,teamId:team.id,type:goal.type,score:goal.score,message:goal.message,
-        teamName:team.name || null,reward:goal.reward,automatic:goal.automatic
+        teamName:team.name || null
       };
+      entry.achievedScore = team.score;
       entry.automatic = goal.automatic;
       entry.status = entry.automatic ? 'done' : 'pending';
       entry.reached = event.key;

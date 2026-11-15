@@ -1,4 +1,4 @@
-import {changeGoals,readGoals,reconcileGoals} from '../score/goal-model.js';
+import {changeGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=celebration-1';
 const min = -10000, max = 10000;
 const empty = () => ({count:0,teams:[],scoreLink:{enabled:true,points:3}});
 const copy = value => structuredClone(value);

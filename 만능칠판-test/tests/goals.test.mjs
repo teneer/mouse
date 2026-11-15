@@ -60,3 +60,24 @@ test('an automatically completed goal can be cancelled and completes again only 
   assert.equal(record.status,'done');
   assert.equal(record.reached,'up');
 });
+
+test('records retain the actual score at the time of crossing, distinct from the threshold',()=>{
+  const {score,send}=scenario();
+  send('score-goals','new',{base:null,goals});
+  send('score-delta','one',{group:'g',amount:4,targets:['a']});
+  const found=score().records.find(row=>row.teamId==='a');
+  assert.equal(found.score,3);
+  assert.equal(found.achievedScore,6);
+  send('score-delta','more',{group:'later',amount:1,targets:['a']});
+  assert.equal(score().records.find(row=>row.teamId==='a').achievedScore,6);
+});
+
+test('goal scores accept signed integer text and keep the existing score limits',async()=>{
+  const {parseGoalScore}=await import('../score/goal-model.js');
+  assert.equal(parseGoalScore('  -10 '),-10);
+  assert.equal(parseGoalScore('３０'),30);
+  assert.equal(parseGoalScore('0'),0);
+  for (const invalid of ['','한글','5점','1.5','1e3','10001','-10001']) {
+    assert.equal(parseGoalScore(invalid),null);
+  }
+});

@@ -765,18 +765,10 @@ body.score-goal-modal #scoreFrame {background:transparent}
 #viewSyncMenu {display:none;position:fixed;overflow-y:auto;z-index:1900;padding:.6rem;background:#f7fbfd;border:1px solid #b9d1de;border-radius:.6rem;box-shadow:0 4px 18px #21445634;max-width:calc(100vw - 16px)}
 #viewSyncMenu [data-view-tabs] {display:grid;gap:.35rem;max-height:min(55vh,22rem);overflow:auto;margin-top:.45rem}
 #viewSyncMenu label {display:flex;align-items:center;gap:.45rem}
-#appCelebration {position:fixed;z-index:2900;top:50%;left:50%;transform:translate(-50%,-50%);width:min(calc(100% - 1rem),30rem);padding:1rem;background:#fff8e2;color:#463019;border:1px solid #e0bb61;border-radius:.7rem;box-shadow:0 4px 16px #26344438;pointer-events:none}
-#appCelebration[data-type="team"] {background:#eaf7ff;color:#154565;border-color:#83bbd9}
-#appCelebration header {display:flex;justify-content:space-between;align-items:flex-start}
-#appCelebration p {white-space:pre-wrap;overflow-wrap:anywhere}
-#appCelebration button {pointer-events:auto}
 
-#viewSyncMenu :is([data-view-all],[data-view-none]),
-#appCelebration :is(#appCelebrationClose,#appCelebrationUse) {
+#viewSyncMenu :is([data-view-all],[data-view-none]) {
   min-height:34px;padding:.35rem .65rem;border:1px solid #b9d1de;border-radius:8px;
   background:#edf5f7;color:#123c4b;font:inherit;line-height:1.2;cursor:pointer;
 }
-#viewSyncMenu :is([data-view-all],[data-view-none]):hover,#appCelebrationClose:hover {background:#dcecf1}
+#viewSyncMenu :is([data-view-all],[data-view-none]):hover {background:#dcecf1}
 #viewSyncMenu input[type=checkbox] {accent-color:#18536e}
-#appCelebration #appCelebrationUse {background:#18536e;color:#fff;border-color:#18536e}
-#appCelebration #appCelebrationClose {min-width:34px;padding:.2rem;font-size:1.25rem}

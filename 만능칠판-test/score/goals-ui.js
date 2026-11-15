@@ -1,3 +1,6 @@
+import {parseGoalScore} from './goal-model.js?v=celebration-1';
+import {mountGoalCelebration} from './goal-celebration.js';
+
 const $ = id => document.getElementById(id);
 const button = (label,action,classes='dialog-action') => {
   const item = document.createElement('button');
@@ -5,8 +8,10 @@ const button = (label,action,classes='dialog-action') => {
   return item;
 };
 
-export function wireGoals({submit,teamList,celebrate}) {
+export function wireGoals({submit,teamList,teamAccent,celebrate,confirmSave}) {
   const view = $('goal-management-view'), popup = $('goal-celebration');
+  const showLocalPopup=mountGoalCelebration(popup);
+  const saveButton=$('close-goal-view-btn');
   const queue = [];
   let system, active, timer, editingRevision, previous;
   const modalState = open => {
@@ -18,24 +23,30 @@ export function wireGoals({submit,teamList,celebrate}) {
   central.onchange=()=>{try {localStorage.setItem('whiteboard.goal-central',central.checked?'1':'0');} catch {}};
   const emitPopup = detail => window.frameElement?.dispatchEvent(new CustomEvent('score-celebration',{detail}));
   const visible = () => !window.frameElement?.closest('[aria-hidden="true"]');
-  const gifts = {class:'🎁',team:'📦'};
-
-  function message(record) {
-    return record.type === 'team' ? record.teamName + ' ' + record.message : record.message;
-  }
   function show(record, replay) {
     if (!visible() && !(central.checked && window.frameElement)) return;
     active=record;
-    $('goal-celebration-title').textContent = record.type === 'class' ? '학급 목표 달성' : '모둠 목표 달성';
-    $('goal-celebration-message').textContent = message(record);
-    const use=$('goal-celebration-use');
-    use.hidden=record.status!=='pending';
-    use.textContent=record.reward?'보상 사용 처리':'확인 완료';
-    popup.dataset.type=record.type;
-    const useAction=use.hidden?null:()=>change([record],true);
-    const outside=central.checked && window.frameElement;
-    popup.hidden=!!outside;
-    if (outside) emitPopup({type:record.type,title:$('goal-celebration-title').textContent,message:message(record),close,use:useAction,label:use.textContent});
+    const complete=record.status==='pending'?async ()=>{
+      const accepted=await change([record],true);
+      if (accepted && active===record) close();
+      return accepted;
+    }:null;
+    const score=String(record.achievedScore??record.score)+'점';
+    const detail={
+      type:record.type,
+      title:record.type==='class'?'학급 목표 달성':'모둠 목표 달성',
+      achievement:record.type==='team'?(record.teamName||'모둠')+' · '+score:score,
+      message:record.message,
+      accent:record.type==='team'?teamAccent(record.teamId):null,
+      close,complete
+    };
+    if (central.checked && window.frameElement) {
+      showLocalPopup(null);
+      emitPopup(detail);
+    } else {
+      emitPopup(null);
+      showLocalPopup(detail);
+    }
     clearTimeout(timer);timer=setTimeout(close,4000);
     if (!replay) celebrate();
   }
@@ -47,13 +58,13 @@ export function wireGoals({submit,teamList,celebrate}) {
     }
   }
   function close() {
-    clearTimeout(timer);active=null;popup.hidden=true;emitPopup(null);advance();
+    clearTimeout(timer);active=null;showLocalPopup(null);emitPopup(null);advance();
   }
   function update(model, announce) {
     system=model;
     if (active) {
       const latest=system.records.find(row=>row.id===active.id);
-      if (!latest || latest.status==='withdrawn' || active.status==='pending' && latest.status==='done') close();
+      if (!latest || latest.reached!==active.reached || latest.status==='withdrawn' || active.status==='pending' && latest.status==='done') close();
     }
     if (announce && previous) {
       const seen=new Map(previous.records.map(row=>[row.id,row.reached]));
@@ -67,50 +78,52 @@ export function wireGoals({submit,teamList,celebrate}) {
   }
   function change(records,complete) {
     if (!records.length) return;
-    submit({kind:'score-records',records:records.map(({id,reached})=>({id,reached})),complete});
+    return submit({kind:'score-records',records:records.map(({id,reached})=>({id,reached})),complete});
   }
   document.addEventListener('pointerdown',event=>{
     window.frameElement?.dispatchEvent(new Event('score-frame-pointer'));
     if (active && !popup.contains(event.target)) close();
   },true);
   window.frameElement?.addEventListener('score-dismiss-celebration',()=>{if (active) close();});
-  $('goal-celebration-close').onclick=close;
-  $('goal-celebration-use').onclick=()=>{if (active) {const current=active;change([current],true);if (active===current)close();}};
-
   function giftGroup(parent,teamId=null) {
     if (!parent) return;
     parent.replaceChildren();
     const records=system?.records.filter(row=>row.teamId===teamId && row.status==='pending') || [];
     parent.hidden=!records.length;
-    const type=teamId===null?'class':'team', icon=gifts[type];
     if (!records.length) return;
-    const add=(label,title,action)=>{
-      const control=button(label,action,'');control.title=title;control.setAttribute('aria-label',title);
+    const add=(quantity,title,action)=>{
+      const control=button(teamId===null?'🎁':'',action,'');
+      control.title=title;control.setAttribute('aria-label',title);
+      if (teamId!==null) {
+        const gift=document.createElement('span');
+        gift.className='team-gift-mark';gift.setAttribute('aria-hidden','true');
+        gift.innerHTML='<span class="team-gift-bow"></span>';
+        control.append(gift);
+      }
+      if (quantity>1) control.append(document.createTextNode('×'+quantity));
       parent.append(control);
     };
-    if (type==='class' && records.length<=2) {
-      for (const record of records) add(icon,record.message,()=>show(record,true));
-    } else if (records.length===1) add(icon,records[0].message,()=>show(records[0],true));
-    else add(icon+'×'+records.length,`달성 기록 ${records.length}개`,()=>openRecords(teamId));
+    if (teamId===null && records.length<=2) {
+      for (const record of records) add(1,record.message,()=>show(record,true));
+    } else if (records.length===1) add(1,records[0].message,()=>show(records[0],true));
+    else add(records.length,`달성 기록 ${records.length}개`,()=>openRecords(teamId));
   }
   function addRow(type,goal={}) {
     const row=document.createElement('div');row.className='goal-row goal-edit-row';
     row.dataset.goal=goal.id || crypto.randomUUID();
     row.innerHTML=`
       <div class="goal-fields">
-        <label class="goal-field"><span>목표 점수</span><input type="number" class="goal-score" min="-10000" max="10000" aria-label="목표 점수"></label>
+        <label class="goal-field"><span>목표 점수</span><input type="text" class="goal-score" autocomplete="off" spellcheck="false" aria-label="목표 점수"></label>
         <label class="goal-field"><span>축하 메시지</span><input class="goal-message" maxlength="240" aria-label="축하 메시지"></label>
         <label class="goal-auto"><input class="goal-completion" type="checkbox" aria-label="자동 완료"><span>자동 완료</span></label>
         <button type="button" class="dialog-action goal-status" aria-expanded="false"><span class="goal-status-text">새 목표</span></button>
       </div>
       <div class="goal-progress" hidden>
         <div class="goal-progress-body"></div>
-        <label class="goal-reward-option"><input class="goal-reward" type="checkbox"> 보상 있음</label>
       </div>`;
     row.querySelector('.goal-score').value=goal.score??'';
     row.querySelector('.goal-message').value=goal.message??'';
     row.querySelector('.goal-completion').checked=!!goal.automatic;
-    row.querySelector('.goal-reward').checked=!!goal.reward;
     const remove=button('×',()=>row.remove(),'dialog-action dialog-danger goal-remove');
     remove.title='목표 삭제';
     remove.setAttribute('aria-label','목표 삭제');
@@ -152,21 +165,26 @@ export function wireGoals({submit,teamList,celebrate}) {
     editingRevision=undefined;
     modalState(false);
   }
-  function saveGoals() {
+  async function saveGoals() {
+    if (saveButton.disabled) return;
     const goals=[];
     for (const type of ['class','team']) for (const row of $(type+'-goals-list').children) {
-      const input=row.querySelector('.goal-score'), score=input.valueAsNumber;
+      const input=row.querySelector('.goal-score'), score=parseGoalScore(input.value);
       const message=row.querySelector('.goal-message').value.trim();
-      if (!input.value && !message) continue;
-      if (!Number.isInteger(score) || score < -10000 || score > 10000 || !message) {
-        $('goal-edit-error').textContent='기준 점수와 축하 문구를 입력해 주세요.';return;
+      if (!input.value.trim() && !message) continue;
+      if (score===null || !message) {
+        $('goal-edit-error').textContent='목표 점수는 -10000~10000 사이의 정수로 입력하고 축하 메시지를 작성해 주세요.';return;
       }
-      goals.push({id:row.dataset.goal,type,score,message,automatic:row.querySelector('.goal-completion').checked,
-        reward:row.querySelector('.goal-reward').checked});
+      goals.push({id:row.dataset.goal,type,score,message,automatic:row.querySelector('.goal-completion').checked});
     }
     $('goal-edit-error').textContent='';
-    submit({kind:'score-goals',base:editingRevision,goals,includeExisting:$('goal-include-existing').checked});
-    closeView();
+    saveButton.disabled=true;
+    try {
+      if (await submit({kind:'score-goals',base:editingRevision,goals,includeExisting:$('goal-include-existing').checked})) {
+        confirmSave();
+        closeView();
+      } else $('goal-edit-error').textContent='목표를 저장하지 못했습니다. 현재 설정을 확인한 뒤 다시 시도해 주세요.';
+    } finally {saveButton.disabled=false;}
   }
   function refreshRows() {
     for (const row of view.querySelectorAll('.goal-edit-row')) {
@@ -215,7 +233,7 @@ export function wireGoals({submit,teamList,celebrate}) {
     }
   }
   $('goal-management-view').querySelectorAll('.add-row-btn').forEach(control=>{control.onclick=()=>addRow(control.dataset.type);});
-  $('close-goal-view-btn').onclick=saveGoals;
+  saveButton.onclick=saveGoals;
   $('cancel-goal-view').onclick=$('cancel-goal-edit').onclick=closeView;
   return {openSettings,update,giftGroup,reset(){queue.length=0;close();previous=null;closeView();}};
 }

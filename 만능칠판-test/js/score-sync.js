@@ -32,15 +32,17 @@ export function wireScoreSync(frame, cloud, store, notify) {
     });
   }
   function send(data) {
-    if (!cloud.options || cloud.detaching) return;
+    if (!cloud.options || cloud.detaching) return false;
+    if (data.kind==='score-goals' && data.base!==(cloud.projectedScore(drafts.values())?.state.goalSystem?.revision??null)) return false;
     const operation = structuredClone(data);
     drafts.set(operation.key,operation);
     refresh();
     write = write.then(async ()=>{
-      try {await cloud.enqueue(operation);}
-      catch (error) {previous = null;notify(error.message);}
+      try {await cloud.enqueue(operation);return true;}
+      catch (error) {previous = null;notify(error.message);return false;}
       finally {drafts.delete(operation.key);refresh();}
     });
+    return write;
   }
   frame?.addEventListener('score-sync-ready',()=>{
     previous = null;

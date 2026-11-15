@@ -1,5 +1,5 @@
-import {freshGoals,readGoals,changeGoals,reconcileGoals} from './goal-model.js';
-import {wireGoals} from './goals-ui.js?v=goal-design-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals} from './goal-model.js?v=celebration-1';
+import {wireGoals} from './goals-ui.js?v=celebration-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
 
@@ -64,14 +64,26 @@ const sharedMessage = document.getElementById('shared-score-message');
 const conflictsButton = document.getElementById('score-conflicts');
 const conflictsDialog = document.getElementById('score-conflict-dialog');
 const bodyControls = document.querySelector('.container');
-const goalUI = wireGoals({submit:submitGoal,teamList:()=>teams,celebrate:()=>playSound(sounds.success)});
+const goalUI = wireGoals({
+  submit:submitGoal,teamList:()=>teams,celebrate:()=>playSound(sounds.success),confirmSave:()=>playSound(sounds.confirm),
+  teamAccent(id) {
+    const index=teams.findIndex(team=>team.id===id), card=scoreboard.children[index];
+    return card ? getComputedStyle(card).getPropertyValue('--card-accent').trim() : null;
+  }
+});
 const ownScoreEvents = new Set();
 function submitGoal(operation) {
-  if (sharedMode) {sendScore(operation);return;}
-  if (changeGoals({count,teams,goalSystem}, {...operation,key:crypto.randomUUID(),authoredAt:Date.now()})) {
-    saveToStorage();
+  if (sharedMode) return sendScore(operation);
+  syncFromStorage();
+  const previous=goalSystem;
+  goalSystem=readGoals(previous);
+  if (changeGoals({count,teams,goalSystem}, {...operation,key:crypto.randomUUID(),authoredAt:Date.now()}) && saveToStorage()) {
     renderCurrentState();
+    return true;
   }
+  goalSystem=previous;
+  renderCurrentState();
+  return false;
 }
 function speakEffect(effect) {
   if (effect?.kind==='team') playSound(effect.amount>0?sounds.teamIncrease:sounds.teamDecrease);
@@ -147,7 +159,7 @@ function sendScore(operation) {
   const key = crypto.randomUUID();
   ownScoreEvents.add(key);
   if (ownScoreEvents.size>128) ownScoreEvents.delete(ownScoreEvents.values().next().value);
-  sharedSend({...operation,key,authoredAt:Date.now()});
+  return sharedSend({...operation,key,authoredAt:Date.now()});
 }
 function sharedDelta(amount, targets = null) {
   const signature = JSON.stringify([amount,targets]), now = performance.now();
@@ -254,6 +266,7 @@ function saveToStorage(effect = null, base = sharedScore?.version) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     lastAppliedVersion = version;
+    return true;
   } catch (error) {
     console.error('상태 저장 실패:', error);
     // 저장에 실패했다면 다른 탭에 성공한 것처럼 알리지 않습니다.
