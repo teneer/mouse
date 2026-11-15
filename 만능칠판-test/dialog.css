@@ -13,7 +13,7 @@ body {
 :is(button, summary, label:has(input[type="checkbox"]), input[type="checkbox"]) {cursor:pointer}
 button:disabled {cursor:default}
 :is(.modal, .modal-background, .fullscreen-view) {
-  --dialog-border:#cbdce3;
+  --dialog-border:#c5dae3;
   --dialog-text:#123447;
   --dialog-accent:#125771;
   background:rgb(17 42 54 / 36%);
@@ -50,7 +50,7 @@ button:disabled {cursor:default}
   outline:2px solid var(--dialog-accent);outline-offset:2px;
 }
 :is(.modal-content, .modal-box, .dialog-sheet) :is(.action-btn,.dialog-action) {
-  min-height:36px;height:auto;border-radius:8px;border:1px solid var(--dialog-border);padding:6px 10px;
+  min-height:36px;height:auto;border-radius:9px;border:1px solid var(--dialog-border);padding:6px 10px;
   background:#edf5f7;color:var(--dialog-text);
 }
 :is(.modal-content, .modal-box, .dialog-sheet) :is(.dialog-primary,button[type="submit"],#confirmSaveBtn,#passwordModalOkBtn) {
@@ -73,7 +73,7 @@ button:disabled {cursor:default}
 :is(.modal-content, .modal-box):has(> .dialog-close) > :is(h2,h3) {padding-right:36px}
 
 :is(.modal-content,.modal-box,.dialog-sheet) {
-  --dialog-header:#e6f1f4;
+  --dialog-header:#eaf4f7;
   --dialog-padding:18px;
 }
 :is(.modal > .modal-content,.modal-background > .modal-box,.fullscreen-view > .dialog-sheet) {

@@ -1,4 +1,4 @@
-import {applyOperation,boardPages,newBoard} from './js/cloud-model.js?v=celebration-1';
+import {applyOperation,boardPages,newBoard} from './js/cloud-model.js?v=goal-status-1';
 import {reorderPages} from './js/board-navigation.js';
 import {uid, clone} from './js/constants.js';
 import {resolvePageWrite} from './js/conflicts.js';
@@ -199,8 +199,9 @@ export async function readLegacy() {
   } finally {db.close();}
 }
 export class TabSync {
-  constructor(onChange,onView) {
-    this.id=uid();
+  constructor({id,opened},onChange,onView) {
+    this.id=id;
+    this.opened=opened;
     let lastView;
     const receive=message=>{
       if(!message || message.sender===this.id)return;

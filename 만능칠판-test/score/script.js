@@ -1,5 +1,5 @@
-import {freshGoals,readGoals,changeGoals,reconcileGoals} from './goal-model.js?v=celebration-1';
-import {wireGoals} from './goals-ui.js?v=celebration-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=goal-status-1';
+import {wireGoals} from './goals-ui.js?v=goal-status-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
 
@@ -65,7 +65,7 @@ const conflictsButton = document.getElementById('score-conflicts');
 const conflictsDialog = document.getElementById('score-conflict-dialog');
 const bodyControls = document.querySelector('.container');
 const goalUI = wireGoals({
-  submit:submitGoal,teamList:()=>teams,celebrate:()=>playSound(sounds.success),confirmSave:()=>playSound(sounds.confirm),
+  submit:submitGoal,teamList:()=>teams,classScore:()=>count,celebrate:()=>playSound(sounds.success),confirmSave:()=>playSound(sounds.confirm),
   teamAccent(id) {
     const index=teams.findIndex(team=>team.id===id), card=scoreboard.children[index];
     return card ? getComputedStyle(card).getPropertyValue('--card-accent').trim() : null;
@@ -236,6 +236,7 @@ function applyStateFields(state) {
   count = Number.isFinite(state.count) ? state.count : 0;
   teams = normalizeTeams(state.teams);
   goalSystem = readGoals(state.goalSystem);
+  completeReachedAutomaticGoals({count,teams,goalSystem});
   localBaseline = {count,teams:structuredClone(teams)};
   linkEnabled = state.scoreLink?.enabled !== false;
   linkPoints = validLinkPoints(state.scoreLink?.points) ? state.scoreLink.points : defaultLinkPoints;
@@ -413,7 +414,6 @@ function renderTeams() {
     const gifts=document.createElement('div');
     gifts.className='team-goal-gifts';gifts.dataset.teamGifts=team.id;
     goalUI.giftGroup(gifts,team.id);card.appendChild(gifts);
-    gifts.style.setProperty('--score-digits',String(team.score).length);
     const changeEl = document.createElement('div');
     changeEl.id = `team-change-${idx}`; changeEl.className = 'team-change';
     card.appendChild(changeEl);
@@ -516,7 +516,6 @@ function changeTeamScores(indices, amount, undoKey = null) {
     const numberEl = document.getElementById(`team-number-${index}`);
     if (numberEl) {
       renderTeamNumber(numberEl, next);
-      numberEl.closest('.team-card').querySelector('.team-goal-gifts')?.style.setProperty('--score-digits',String(next).length);
       numberEl.className = 'team-number ' + (amount > 0 ? 'team-increase' : 'team-decrease');
       setTimeout(() => { numberEl.className = 'team-number'; }, 200);
     }
@@ -715,6 +714,8 @@ function openManagementModal() {
     list.appendChild(item);
   });
   managementModal.style.display = 'flex';
+  scoreModalState(true);
+  document.getElementById('manage-main-score').focus();
 }
 function closeAndSaveManagement() {
   syncFromStorage();
@@ -745,9 +746,16 @@ function closeAndSaveManagement() {
   teams = newTeams;
   renderClassNumber(count);
   renderTeams(); saveToStorage(null,managementBase);
-  managementModal.style.display = 'none'; playSound(sounds.confirm);
+  closeManagementModal(); playSound(sounds.confirm);
 }
-function closeManagementModal() { managementModal.style.display = 'none'; }
+function scoreModalState(open) {
+  document.body.classList.toggle('score-modal-open',open);
+  window.frameElement?.dispatchEvent(new CustomEvent('score-management-modal',{detail:open}));
+}
+function closeManagementModal() {
+  managementModal.style.display = 'none';
+  scoreModalState(false);
+}
 document.getElementById('team-management-list').addEventListener('click', e => {
   if (e.target.classList.contains('delete-team-btn')) e.target.closest('.team-manage-item').remove();
 });

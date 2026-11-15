@@ -1,4 +1,4 @@
-import {changeGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=celebration-1';
+import {changeGoals,completeReachedAutomaticGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=goal-status-1';
 const min = -10000, max = 10000;
 const empty = () => ({count:0,teams:[],scoreLink:{enabled:true,points:3}});
 const copy = value => structuredClone(value);
@@ -48,6 +48,7 @@ export function applyScoreOperation(board, operation) {
   const score = board.score;
   if (!score) return;
   score.state.goalSystem ??= readGoals();
+  completeReachedAutomaticGoals(score.state);
   const before = {count:score.state.count,teams:copy(score.state.teams)};
   if (kind === 'score-goals' || kind === 'score-records') {
     if (!changeGoals(score.state,operation)) score.notice = {key,text:'다른 기기에서 목표나 달성 기록이 변경되었습니다. 다시 확인해 주세요.'};

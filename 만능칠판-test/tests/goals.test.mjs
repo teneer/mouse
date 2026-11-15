@@ -81,3 +81,25 @@ test('goal scores accept signed integer text and keep the existing score limits'
     assert.equal(parseGoalScore(invalid),null);
   }
 });
+
+test('automatic goals already reached at setup complete silently and remain completed after a decrease',()=>{
+  const {score,send}=scenario();
+  send('score-goals','new',{base:null,goals:[{...goals[0],score:8}],includeExisting:false});
+  assert.deepEqual(score().records.map(({status,silent})=>({status,silent})),[{status:'done',silent:true}]);
+  send('score-delta','down',{group:'down',amount:-5});
+  assert.equal(score().records[0].status,'done');
+});
+
+test('a reached manual goal with no historical record can be completed and cancelled',async()=>{
+  const {goalStatus}=await import('../score/goal-model.js');
+  const {score,send}=scenario();
+  const goal={...goals[0],score:8,automatic:false};
+  send('score-goals','new',{base:null,goals:[goal],includeExisting:false});
+  assert.equal(goalStatus(goal,9,null),'reached');
+  const target={id:JSON.stringify([goal.id,null]),reached:null,goalId:goal.id,teamId:null};
+  send('score-records','done',{complete:true,records:[target]});
+  const [record]=score().records;
+  assert.equal(goalStatus(goal,3,record),'done');
+  send('score-records','cancel',{complete:false,records:[{id:record.id,reached:record.reached}]});
+  assert.equal(goalStatus(goal,9,record),'reached');
+});

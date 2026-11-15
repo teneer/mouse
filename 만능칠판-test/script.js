@@ -1,18 +1,19 @@
 import {mountGoalCelebration} from './score/goal-celebration.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=above-toolbar-1';
+import {acquireTabIdentity} from './js/tab-identity.js';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=goal-status-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
-import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=celebration-1';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-status-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js';
 import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=celebration-1';
+import {CloudBoard} from './js/cloud.js?v=goal-status-1';
 import {wireScoreSync} from './js/score-sync.js?v=celebration-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=celebration-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=goal-status-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=goal-records-1';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
@@ -48,7 +49,7 @@ function updateFeedbackPosition(){
 }
 function fail(error) {console.error(error);notify(error?.message || String(error));}
 let tabViews, scoreFull=false;
-function modalOpen() {return document.body.classList.contains('score-goal-modal') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
+function modalOpen() {return document.body.classList.contains('score-modal-open') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
 function isTextEditing() {
   return !!c?.getActiveObject()?.isEditing;
 }
@@ -92,8 +93,8 @@ async function publishView(toggle,changeTargets){
   if(cloud?.options){
     await cloud.sendSharedView(state,toggle,changeTargets);
   }else{
-    const old=shared?.targets||[];
-    const targets=changeTargets?[...new Set(changeTargets(old))]:old;
+    const old=shared?.targets;
+    const targets=changeTargets?[...new Set(changeTargets(old))]:(old||[]);
     const enabled=targets.length>0&&(toggle??(!!changeTargets||shared?.enabled===true));
     localView={...(changeTargets && !targets.includes(sync.id) && shared?.pageId ? shared:state),epoch,enabled,targets};
     sync.sendView(localView);
@@ -1251,9 +1252,9 @@ function setupIntegratedScorePanel(){
   frame.addEventListener('score-toggle-full',()=>{
     scoreFull=!scoreFull;scoreOpen=true;update();updateToolbarHeight();save();rememberView(true);
   });
-  frame.addEventListener('score-goals-modal',event=>{
+  frame.addEventListener('score-management-modal',event=>{
     if(event.detail){closePopups();closeContext();finishText();}
-    document.body.classList.toggle('score-goal-modal',event.detail);
+    document.body.classList.toggle('score-modal-open',event.detail);
     for (const element of [$('canvas-container'),$('toolbarScaleWrap'),splitter]) element.inert=event.detail;
     if (!event.detail) {
       if(cloudActive())requestCloudRefresh();else applyLocalView().catch(fail);
@@ -1311,7 +1312,8 @@ async function boot() {
   store=new BoardStore();await store.open();
   boardFiles=new BoardFiles(store);boardFiles.installFabric();
   await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
-  sync=new TabSync(refreshRemote,view=>{
+  const tabIdentity=await acquireTabIdentity(SESSION_KEY+':identity');
+  sync=new TabSync(tabIdentity,refreshRemote,view=>{
     if(!validViewState(view))return;
     localView=view;
     if(!cloudActive()){

@@ -1,6 +1,7 @@
+import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=goal-status-1';
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=celebration-1';
-import {applyScoreOperation} from './shared-score.js?v=celebration-1';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=goal-status-1';
+import {applyScoreOperation} from './shared-score.js?v=goal-status-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
@@ -289,6 +290,7 @@ export class CloudBoard {
 
   projectedScore(drafts = []) {
     const board = {score:structuredClone(this.state.score)};
+    if (board.score) completeReachedAutomaticGoals(board.score.state);
     const seen = new Set();
     for (const operation of this.pending.values()) {
       if (operation.kind.startsWith('score-')) {
@@ -438,8 +440,8 @@ export class CloudBoard {
     const ref=this.ref('control','view');
     return this.fs.runTransaction(this.db,async tx=>{
       const before=(await tx.get(ref)).data();
-      const existing=Array.isArray(before?.targets)?before.targets:[];
-      const targets=changeTargets?[...new Set(changeTargets(existing))]:existing;
+      const existing=Array.isArray(before?.targets)?before.targets:undefined;
+      const targets=changeTargets?[...new Set(changeTargets(existing))]:(existing||[]);
       if (toggle===undefined && !changeTargets &&
         (!before?.enabled || before.epoch!==state.epoch || !targets.includes(state.sourceTab))) return false;
       const enabled=targets.length>0 && (toggle??(changeTargets?true:before?.enabled));
