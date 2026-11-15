@@ -1,4 +1,4 @@
-import {setBoardIcon} from './js/board-icons.js';
+import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js';

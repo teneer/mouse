@@ -712,13 +712,19 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 #backgroundModal .setting-row label {margin:0}
 
 .board-icon {
-  width:18px;height:18px;flex:none;vertical-align:middle;
-  stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;
+  display:inline-block;
+  flex:none;
+  min-width:1.15em;
+  line-height:1.2;
+  text-align:center;
+  vertical-align:middle;
+  font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif;
 }
 #toolbar :is(.action-btn,.mode-btn) {gap:4px}
 #toolbar :is(.action-btn,.mode-btn), #toolbarHideBtn, #moreSettings .action-btn {color:#123c4b}
 #toolbar .view-sync > span {display:inline-flex;align-items:center;gap:4px}
 #moreSettings .action-btn {justify-content:flex-start;gap:7px}
+#objectContextMenu > button {display:flex;align-items:center;gap:7px}
 #sharedSettingsModal > .modal-content {width:min(810px,calc(100vw - 24px));max-width:none}
 #textPropsModal > .modal-content {width:min(590px,calc(100vw - 24px));max-width:none}
 .appearance-overview {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
