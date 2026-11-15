@@ -637,6 +637,9 @@ body.score-resizing #canvas-container canvas,body.score-resizing #scoreFrame{poi
   font: inherit;
 }
 .cloud-buttons { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .65rem; }
+#deviceInviteQR { display: block; width: min(15rem,100%); height: auto; margin: .75rem auto; image-rendering: pixelated; }
+#deviceInviteQR[hidden] { display: none; }
+.device-remove { margin-inline-start: .5rem; }
 #devicePairCode { display: block; margin-block: 1rem; font: bold 1.15rem monospace; overflow-wrap: anywhere; }
 #devicePairCode[hidden] { display: none; }
 #managedFiles { list-style: none; margin: 0; padding: 0; }

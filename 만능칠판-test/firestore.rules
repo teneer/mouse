@@ -28,14 +28,24 @@ service cloud.firestore {
 
       match /devices/{uid} {
         allow read: if member(board) || (authenticated() && request.auth.uid == uid);
-        allow create: if request.resource.data.keys().hasOnly(['label', 'joined', 'requestCode'])
+        allow create: if request.resource.data.keys().hasOnly(['label', 'joined', 'requestCode', 'inviteToken'])
           && request.resource.data.label is string && request.resource.data.label.size() <= 50
           && request.resource.data.joined == request.time
-          && ((authenticated() && request.auth.uid == uid && !exists(boardPath(board))
+          && ((authenticated() && request.auth.uid == uid
+              && !('requestCode' in request.resource.data) && !('inviteToken' in request.resource.data)
+              && !exists(boardPath(board))
               && getAfter(boardPath(board)).data.owner == uid)
-            || (member(board) && request.resource.data.requestCode is string
+            || (authenticated() && request.auth.uid == uid && exists(boardPath(board))
+              && !('requestCode' in request.resource.data)
+              && 'inviteToken' in request.resource.data && request.resource.data.inviteToken is string
+              && request.resource.data.inviteToken.matches('[0-9a-f]{48}')
+              && getAfter(/databases/$(database)/documents/wbBoards/$(board)/control/deviceInvite).data.token
+                == request.resource.data.inviteToken)
+            || (member(board) && !('inviteToken' in request.resource.data)
+              && 'requestCode' in request.resource.data && request.resource.data.requestCode is string
               && getAfter(/databases/$(database)/documents/wbBoards/$(board)/requests/$(request.resource.data.requestCode)).data.approved == true
               && getAfter(/databases/$(database)/documents/wbBoards/$(board)/requests/$(request.resource.data.requestCode)).data.deviceId == uid));
+        allow delete: if member(board) && request.auth.uid != uid;
       }
 
       match /requests/{code} {
@@ -69,6 +79,13 @@ service cloud.firestore {
       match /receipts/{receipt} {
         allow get: if member(board);
         allow create: if member(board) && request.resource.data.revision == getAfter(boardPath(board)).data.head;
+      }
+      match /control/deviceInvite {
+        allow get, delete: if member(board);
+        allow create: if member(board)
+          && request.resource.data.keys().hasOnly(['token'])
+          && request.resource.data.token is string
+          && request.resource.data.token.matches('[0-9a-f]{48}');
       }
       match /control/view {
         allow read: if member(board);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyOperation, boardPages, newBoard, pagePatch, validView} from '../js/cloud-model.js';
-import {parseFirebaseConfig, readInvite} from '../js/cloud-config.js';
+import {deviceInviteURL, encodeDeviceKey, parseFirebaseConfig, readDeviceKey, readInvite} from '../js/cloud-config.js';
 import {validateContent} from '../js/validation.js';
 
 const text = (id, value) => ({id,type:'i-text',text:value});
@@ -66,4 +66,18 @@ test('local file references pass validation without storing PDF bytes in the boa
   const file={type:'wb-file',id:'placement',wbAsset:asset,wbPage:500,width:200,height:300};
   assert.deepEqual(validateContent(content(file)).canvas.objects[0].wbAsset,asset);
   assert.throws(()=>validateContent(content({...file,wbPage:0})));
+});
+
+test('a reusable invitation round-trips as a copied key or QR URL independently of the legacy link', () => {
+  const config = {apiKey:'abcdef',authDomain:'a.firebaseapp.com',projectId:'test',appId:'1:12:web:abc'};
+  const boardId = 'a'.repeat(30), token = 'ab'.repeat(24);
+  const settings = {config,boardId};
+  const key = encodeDeviceKey(settings,token);
+  const url = deviceInviteURL(key,'https://example.org/board/?mode=teacher#previous');
+  assert.equal(new URL(url).search,'?mode=teacher');
+  assert.deepEqual(readDeviceKey(key),{...settings,token});
+  assert.deepEqual(readDeviceKey(url),{...settings,token});
+  assert.throws(()=>readDeviceKey('WB5.invalid'));
+  assert.throws(()=>readInvite(url));
+  assert.throws(()=>encodeDeviceKey(settings,'short'));
 });

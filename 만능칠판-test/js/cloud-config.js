@@ -36,3 +36,31 @@ export function readInvite(value) {
   if (!/^[a-z0-9_-]{20,128}$/i.test(input?.boardId)) throw Error('연결 링크를 확인해주세요.');
   return {config:parseFirebaseConfig(input.config), boardId:input.boardId};
 }
+
+const deviceKeyPrefix = 'WB5.';
+const deviceInvitePattern = /^[0-9a-f]{48}$/;
+
+export function encodeDeviceKey(settings, token) {
+  if (!deviceInvitePattern.test(token)) throw Error('연결 키를 확인해주세요.');
+  const {config, boardId} = settings;
+  const encoded = btoa(JSON.stringify({config:parseFirebaseConfig(config), boardId, token}));
+  return deviceKeyPrefix + encoded.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+export function deviceInviteURL(key, pageURL = location.href) {
+  const link = new URL(pageURL);
+  link.hash = key;
+  return link.href;
+}
+
+export function readDeviceKey(source) {
+  try {
+    const value = source.trim();
+    const key = value.startsWith(deviceKeyPrefix) ? value : new URL(value).hash.slice(1);
+    if (!/^WB5\.[a-z\d_-]{1,1500}$/i.test(key) || !key.startsWith(deviceKeyPrefix)) throw Error();
+    const input = JSON.parse(atob(key.slice(deviceKeyPrefix.length).replaceAll('-', '+').replaceAll('_', '/')));
+    if (typeof input.boardId !== 'string' || !/^[a-z0-9_-]{20,128}$/i.test(input.boardId)
+      || typeof input.token !== 'string' || !deviceInvitePattern.test(input.token)) throw Error();
+    return {config:parseFirebaseConfig(input.config), boardId:input.boardId, token:input.token};
+  } catch {throw Error('연결 키나 QR 링크를 확인해주세요.');}
+}

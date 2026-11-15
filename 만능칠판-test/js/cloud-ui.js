@@ -1,5 +1,6 @@
 import {assetReferences} from './files.js';
-import {encodeInvite, parseFirebaseConfig, readInvite} from './cloud-config.js';
+import {deviceInviteURL, encodeDeviceKey, encodeInvite, parseFirebaseConfig, readDeviceKey, readInvite} from './cloud-config.js';
+import {drawDeviceQR} from './device-qr.js';
 import {FileTransfer} from './file-transfer.js';
 
 const $ = id => document.getElementById(id);
@@ -18,7 +19,8 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   const localFiles = new Set(), messages = new Map();
   const modalOpen = id => $(id).style.display === 'flex';
   let reconnectOptions=null;
-  let redraw, manuallyChanged = false, previousOnline = false, guideOpen = false;
+  let redraw, manuallyChanged = false, previousOnline = false;
+  let activeStage = 'start', renderedKey = null, deviceListSignature;
   const transfer = new FileTransfer(cloud,files,id=>{
     const label = transfer.incoming.get(id)?.label;
     if (label) files.transfers.set(id,label);
@@ -28,11 +30,62 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   });
 
   function stage(name) {
-    guideOpen = name === 'guide';
+    activeStage = name;
+    const guideOpen = name === 'guide';
     const shown = guideOpen ? 'first' : name;
     $('deviceSetupControls').hidden = guideOpen;
     for (const item of $('deviceModal').querySelectorAll('[data-stage]')) item.hidden = item.dataset.stage !== shown;
     text('deviceMessage','');
+    if (name === 'invite') drawInvite();
+  }
+
+  function drawInvite() {
+    const {options, deviceInvite, inviteError, online} = cloud;
+    const show = online && !!deviceInvite;
+    const key = show ? encodeDeviceKey(options, deviceInvite) : null;
+    $('deviceStartInvite').hidden = !online || deviceInvite !== null;
+    $('deviceInviteDetails').hidden = !show;
+    text('deviceInviteStatus',inviteError
+      ? '초대 상태를 확인할 수 없습니다. Firebase에 최신 보안 규칙이 게시되었는지 확인해주세요.'
+      : !online || deviceInvite === undefined ? '초대 상태를 확인하는 중…'
+      : show ? '초대는 직접 종료할 때까지 계속 사용할 수 있습니다.'
+      : '열려 있는 초대가 없습니다.');
+    if (key === renderedKey) return;
+    renderedKey = key;
+    const canvas = $('deviceInviteQR');
+    if (key) {
+      try {drawDeviceQR(canvas,deviceInviteURL(key));canvas.hidden = false;}
+      catch {canvas.hidden = true;text('deviceInviteStatus','QR을 표시할 수 없습니다. 연결 키를 복사해 주세요.');}
+    } else canvas.width = canvas.height = 0;
+  }
+
+  function drawDevices() {
+    const canRemove = cloud.online && cloud.deviceInvite !== undefined;
+    const signature = JSON.stringify([canRemove, cloud.deviceId, cloud.devices]);
+    if (signature === deviceListSignature) return;
+    deviceListSignature = signature;
+    const entries = cloud.devices.map(device => {
+      const li = document.createElement('li');
+      const own = device.id === cloud.deviceId;
+      li.textContent = device.label + (own ? ' (이 기기)' : '');
+      if (canRemove && !own) {
+        const remove = document.createElement('button');
+        remove.type = 'button';remove.className = 'action-btn device-remove';
+        remove.textContent = '연결 해제';
+        remove.setAttribute('aria-label',device.label + ' 연결 해제');
+        remove.onclick = async () => {
+          const prompt = device.label + '의 칠판 연결을 해제할까요?'
+            + (cloud.deviceInvite ? '\n열려 있는 초대의 키로 다시 등록할 수 있습니다.' : '');
+          if (!confirm(prompt)) return;
+          remove.disabled = true;
+          try {await cloud.removeDevice(device.id);}
+          catch (error) {text('deviceMessage',message(error));remove.disabled = false;}
+        };
+        li.append(remove);
+      }
+      return li;
+    });
+    $('deviceList').replaceChildren(...entries);
   }
 
   function action(id, handler) {
@@ -50,23 +103,23 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   function status() {
     const linked = !!cloud.options;
     text('deviceStatus',linked
-      ? cloud.online ? cloud.pending.size ? `연결됨 · 전송 대기 ${cloud.pending.size}건` : '연결됨' : '연결 대기 중'
+      ? cloud.revoked ? '이 기기의 연결이 해제되었습니다' : cloud.online
+        ? cloud.pending.size ? `연결됨 · 전송 대기 ${cloud.pending.size}건` : '연결됨' : '연결 대기 중'
       : '이 기기의 칠판을 사용 중');
     $('deviceResume').hidden = linked || !reconnectOptions;
     if (linked) {
-      if ($('deviceConnected').hidden && !guideOpen) stage('connected');
-      $('deviceInvite').value = encodeInvite(cloud.options);
-      const entries = cloud.devices.map(device => {
-        const li = document.createElement('li');
-        li.textContent = device.label + (device.id === cloud.deviceId ? ' (이 기기)' : '');
-        return li;
-      });
-      $('deviceList').replaceChildren(...entries);
+      if (!['connected','guide','invite','legacy'].includes(activeStage)
+        || (cloud.revoked && activeStage !== 'connected')) stage('connected');
+      $('deviceShowInvite').hidden = cloud.revoked;
+      $('deviceLegacy').hidden = cloud.revoked;
+      $('deviceInvite').value = cloud.revoked ? '' : encodeInvite(cloud.options);
+      drawDevices();
+      if (activeStage === 'invite') drawInvite();
     }
     if (cloud.online) {
       transfer.start();
       if (!previousOnline) boardChanged().catch(error=>notify(message(error)));
-    } else if (!linked) transfer.stop();
+    } else if (!linked || cloud.revoked) transfer.stop();
     if (cloud.online !== previousOnline) queueFiles();
     previousOnline = cloud.online;
   }
@@ -161,7 +214,10 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     await drawFiles().catch(error=>notify(message(error)));
   };
   $('deviceFirst').onclick = () => {manuallyChanged = true;stage('first');};
-  $('deviceAdd').onclick = () => {manuallyChanged = true;stage('join');};
+  $('deviceAdd').onclick = () => {manuallyChanged = true;stage('key');};
+  $('deviceShowInvite').onclick = () => stage('invite');
+  $('deviceLegacy').onclick = () => stage('legacy');
+  $('deviceLegacyJoin').onclick = () => stage('join');
   $('deviceGuide').onclick = () => stage('guide');
   for (const button of $('deviceModal').querySelectorAll('[data-device-back]')) {
     button.onclick = () => stage(cloud.options ? 'connected' : 'start');
@@ -179,6 +235,26 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     await cloud.create(parseFirebaseConfig($('firebaseConfig').value),
       $('deviceFirstName').value.trim() || '교실 PC',await prepareSeed());
     stage('connected');status();
+  });
+  action('deviceStartInvite',async ()=>{
+    await cloud.changeDeviceInvite();
+  });
+  action('deviceEndInvite',async ()=>{
+    if (!cloud.deviceInvite) return;
+    await cloud.changeDeviceInvite(cloud.deviceInvite);
+  });
+  action('deviceCopyKey',async ()=>{
+    if (!cloud.online || !cloud.deviceInvite) throw Error('열려 있는 초대가 없습니다.');
+    await navigator.clipboard.writeText(encodeDeviceKey(cloud.options,cloud.deviceInvite));
+    text('deviceMessage','연결 키를 복사했습니다.');
+  });
+  action('deviceJoinWithKey',async ()=>{
+    const invite = readDeviceKey($('deviceJoinKey').value);
+    await flush();
+    await cloud.joinDevice(invite,$('deviceKeyName').value.trim() || '새 기기');
+    $('deviceJoinKey').value = '';
+    manuallyChanged = false;stage('connected');status();
+    text('deviceMessage','칠판에 연결했습니다.');
   });
   action('deviceRequest',async ()=>{
     const code = await cloud.request(readInvite($('deviceJoinLink').value.trim()),$('deviceJoinName').value.trim() || '새 기기');
@@ -199,20 +275,28 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   });
   action('deviceDisconnect',async ()=>{
     await flush();
-    const previous=cloud.options;
+    const previous=cloud.revoked ? null : cloud.options;
     await cloud.disconnect();
     await cloud.store.setMeta('cloudPrevious',previous);reconnectOptions=previous;status();
     stage('start');await useLocal();
   });
   function approved() {stage('connected');notify('기기 승인 완료 · 칠판을 불러오는 중입니다.');}
   function waiting(code) {
+    if (activeStage === 'key') return;
     manuallyChanged = true;
     stage('join');
     text('devicePairCode',code.match(/.{1,5}/g).join(' '));
     $('devicePairCode').hidden = false;
     text('deviceMessage','먼저 연결한 기기에서 이 코드를 10분 안에 승인해 주세요.');
   }
-  if (location.hash) {
+  if (location.hash.startsWith('#WB5.')) {
+    try {
+      readDeviceKey(location.href);
+      $('deviceJoinKey').value = location.hash.slice(1);
+      history.replaceState(history.state,'',location.pathname + location.search);
+      manuallyChanged = true;stage('key');openModal('deviceModal');
+    } catch {}
+  } else if (location.hash) {
     try {
       readInvite(location.href);
       $('deviceJoinLink').value = location.href;

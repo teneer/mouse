@@ -16,6 +16,9 @@ export class CloudBoard {
     this.options = null;
     this.subscriptions = [];
     this.devices = [];
+    this.deviceInvite = undefined;
+    this.inviteError = null;
+    this.revoked = false;
     this.latestView = null;
     this.boardReady = false;
     this.online = false;
@@ -58,6 +61,62 @@ export class CloudBoard {
     await this.start(options);
   }
 
+  async changeDeviceInvite(expectedToken = null) {
+    if (!this.online) throw Error('기기가 온라인일 때 초대를 관리할 수 있습니다.');
+    const {fs, db} = this;
+    const ref = this.ref('control', 'deviceInvite');
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte => byte.toString(16).padStart(2, '0')).join('');
+    await fs.runTransaction(db, async tx => {
+      const current = (await tx.get(ref)).data()?.token;
+      if (expectedToken) {
+        if (current === expectedToken) tx.delete(ref);
+      } else if (!current) tx.set(ref, {token});
+    });
+  }
+
+  async joinDevice({config, boardId, token}, label) {
+    if (this.options || this.connecting) throw Error('현재 연결을 먼저 확인해주세요.');
+    const previousRequest = this.approvalRequest;
+    this.cancelApproval();
+    this.connecting = true;
+    try {
+      await this.authenticate(parseFirebaseConfig(config));
+      const {fs, db, deviceId} = this;
+      const device = fs.doc(db, 'wbBoards', boardId, 'devices', deviceId);
+      await fs.runTransaction(db, async tx => {
+        if (!(await tx.get(device)).exists()) {
+          tx.set(device, {label, joined:fs.serverTimestamp(), inviteToken:token});
+        }
+      });
+      const options = {config:this.config, boardId, label};
+      await this.store.setMeta('cloudConnection', options);
+      await this.store.setMeta('cloudRequest', null);
+      await this.start(options);
+    } catch (error) {
+      if (!this.options && previousRequest) {
+        try {
+          await this.authenticate(previousRequest.options.config);
+          this.waitForApproval(previousRequest);
+        } catch (restoreError) {this.events.error(restoreError);}
+      }
+      if (error.code === 'permission-denied') {
+        throw Error('유효한 초대를 찾을 수 없습니다. 초대 상태 또는 Firebase 보안 규칙을 확인해 주세요.');
+      }
+      throw error;
+    } finally {this.connecting = false;}
+  }
+
+  async removeDevice(id) {
+    if (!this.online) throw Error('기기가 온라인일 때 연결을 해제할 수 있습니다.');
+    await this.fs.deleteDoc(this.ref('devices', id));
+  }
+
+  cancelApproval() {
+    this.stopApproval?.();
+    this.stopApproval = null;
+    this.approvalRequest = null;
+  }
+
   async request(options, label) {
     await this.authenticate(parseFirebaseConfig(options.config));
     const {fs, db, deviceId} = this;
@@ -71,17 +130,21 @@ export class CloudBoard {
   }
 
   waitForApproval(request) {
-    this.stopApproval?.();
+    this.cancelApproval();
+    this.approvalRequest = request;
     const {fs, db, deviceId} = this;
     this.stopApproval = fs.onSnapshot(fs.doc(db, 'wbBoards', request.options.boardId, 'requests', request.code), {includeMetadataChanges:true}, async snapshot => {
-      if (isReady(snapshot) && snapshot.data().approved === true && snapshot.data().deviceId === deviceId) {
+      if (!this.connecting && this.approvalRequest === request && isReady(snapshot)
+        && snapshot.data().approved === true && snapshot.data().deviceId === deviceId) {
         try {
-          this.stopApproval?.();
+          this.connecting = true;
+          this.cancelApproval();
           await this.store.setMeta('cloudConnection', request.options);
           await this.store.setMeta('cloudRequest', null);
           this.events.approved();
           await this.start(request.options);
         } catch (error) {this.events.error(error);}
+        finally {this.connecting = false;}
       }
     }, this.events.error);
   }
@@ -105,8 +168,9 @@ export class CloudBoard {
     const options = await this.store.getMeta('cloudConnection');
     if (options) {await this.start(options);return;}
     const request = await this.store.getMeta('cloudRequest');
-    if (request) {
+    if (request && !this.connecting && !this.options) {
       await this.authenticate(parseFirebaseConfig(request.options.config));
+      if (this.connecting || this.options) return;
       this.waitForApproval(request);
       this.events.waiting(request.code);
     }
@@ -129,6 +193,7 @@ export class CloudBoard {
         this.events.status();
         return;
       }
+      if (this.revoked) return;
       this.online = true;
       this.head = Math.max(this.head || 0,snapshot.data().head);
       this.events.status();
@@ -144,6 +209,23 @@ export class CloudBoard {
         this.events.view(this.latestView);
       }
     }, this.events.error));
+    this.subscriptions.push(fs.onSnapshot(this.ref('control', 'deviceInvite'), {includeMetadataChanges:true}, snapshot => {
+      if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
+      this.inviteError = null;
+      this.deviceInvite = snapshot.data()?.token ?? null;
+      this.events.status();
+    }, error => {
+      this.inviteError = error;
+      this.deviceInvite = undefined;
+      this.events.status();
+    }));
+    this.subscriptions.push(fs.onSnapshot(this.ref('devices', this.deviceId), {includeMetadataChanges:true}, snapshot => {
+      if (snapshot.exists() || snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
+      this.revoked = true;
+      this.online = false;
+      this.devices = [];
+      this.events.status();
+    }, this.events.error));
     if (options.initial && this.pending.size && !this.state.revision) {
       this.boardReady = boardPages(this.projected()).length > 0;
       this.events.board();
@@ -156,15 +238,18 @@ export class CloudBoard {
   }
 
   async disconnect() {
-    if (this.pulling || this.pushing || this.pending.size) throw Error('서버에 보낼 변경이 남아 있습니다. 동기화를 마친 뒤 연결을 해제해주세요.');
+    if (this.pulling || this.pushing || (!this.revoked && this.pending.size)) throw Error('서버에 보낼 변경이 남아 있습니다. 동기화를 마친 뒤 연결을 해제해주세요.');
     clearTimeout(this.retryTimer);
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
-    this.stopApproval?.();
+    this.cancelApproval();
     this.options = null;
     this.boardReady = false;
     this.online = false;
     this.head = 0;
     this.devices = [];
+    this.deviceInvite = undefined;
+    this.inviteError = null;
+    this.revoked = false;
     this.latestView = null;
     this.state = newBoard();
     await this.store.setMeta('cloudConnection', null);

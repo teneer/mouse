@@ -88,14 +88,36 @@
       <div class="cloud-buttons"><button class="action-btn" id="deviceRequest">연결 코드 발급</button><button class="action-btn" data-device-back>돌아가기</button></div>
       <output id="devicePairCode" hidden></output>
     </section>
+    <section data-stage="key" hidden>
+      <p>기존 칠판의 QR을 스캔하거나 연결 키를 붙여넣으세요. 이 기기의 이전 칠판은 로컬에 보관됩니다.</p>
+      <label for="deviceJoinKey">연결 키</label>
+      <input id="deviceJoinKey" type="password" autocomplete="off" spellcheck="false"/>
+      <label for="deviceKeyName">이 기기 이름</label>
+      <input id="deviceKeyName" maxlength="50" placeholder="태블릿"/>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceJoinWithKey">칠판에 연결</button><button class="action-btn" id="deviceLegacyJoin">다른 연결 방법</button><button class="action-btn" data-device-back>돌아가기</button></div>
+    </section>
     <section id="deviceConnected" data-stage="connected" hidden>
       <h3>연결된 기기</h3><ul id="deviceList"></ul>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceShowInvite">기기 추가</button><button class="action-btn" id="deviceLegacy">다른 연결 방법</button><button class="action-btn" id="deviceGuide">연결 방법</button><button class="action-btn" id="deviceDisconnect">로컬 칠판으로 돌아가기</button></div>
+    </section>
+    <section data-stage="invite" hidden>
+      <h3>기기 추가</h3>
+      <p id="deviceInviteStatus" role="status"></p>
+      <div id="deviceInviteDetails" hidden>
+        <p>새 기기로 QR을 스캔하거나 ‘연결 키 복사’를 눌러 새 기기에 붙여넣으세요.</p>
+        <canvas id="deviceInviteQR" role="img" aria-label="이 칠판에 연결하는 QR 코드"></canvas>
+        <div class="cloud-buttons"><button class="action-btn" id="deviceCopyKey">연결 키 복사</button><button class="action-btn" id="deviceEndInvite">초대 종료</button></div>
+      </div>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceStartInvite" hidden>초대 만들기</button><button class="action-btn" data-device-back>돌아가기</button></div>
+    </section>
+    <section data-stage="legacy" hidden>
+      <h3>연결 코드로 승인</h3>
       <label for="deviceInvite">기기 추가 링크</label>
       <input id="deviceInvite" readonly/>
       <div class="cloud-buttons"><button class="action-btn" id="deviceCopyLink">링크 복사</button></div>
       <label for="deviceApprovalCode">새 기기에서 발급한 연결 코드</label>
       <input id="deviceApprovalCode" maxlength="25" autocomplete="off" spellcheck="false"/>
-      <div class="cloud-buttons"><button class="action-btn" id="deviceApprove">새 기기 승인</button><button class="action-btn" id="deviceGuide">연결 방법</button><button class="action-btn" id="deviceDisconnect">로컬 칠판으로 돌아가기</button></div>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceApprove">새 기기 승인</button><button class="action-btn" data-device-back>돌아가기</button></div>
     </section>
     <p id="deviceMessage" role="status" aria-live="polite"></p>
   </div>
