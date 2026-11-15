@@ -287,13 +287,14 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
 #display-area {flex:1;min-height:0;gap:0;max-width:none;padding-bottom:0}
 #top-row, #bottom-row, #class-area {min-width:0;max-width:100%}
 #top-row {flex:none}
-#class-area {max-width:none}
+#class-area {max-width:none;transition:none}
 .main-scoreboard {
+  box-sizing:border-box;
   container-type:inline-size;
   width:100%;
   max-width:none;
   margin:0;
-  padding:10px clamp(5px, 4vw, 24px) 15px;
+  padding:clamp(6px, 1.4dvh, 14px) clamp(3px, 4vw, 24px) clamp(8px, 1.8dvh, 16px);
   border:0;
   border-bottom:1px solid var(--panel-line);
   border-radius:0;
@@ -301,7 +302,8 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
   box-shadow:none;
 }
 .class-heading, .team-heading {display:flex;align-items:center;justify-content:space-between;gap:8px}
-.class-heading {flex-wrap:wrap}
+.class-heading {gap:min(8px, 4cqw)}
+.class-heading h1 {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .class-heading h1, .team-heading h2 {
   margin:0;
   color:var(--text-color);
@@ -313,7 +315,7 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
 }
 #settings-toggle-btn, .main-btn {
   min-width:0;
-  width:min(44px, 28cqw);
+  width:min(44px, 24cqw);
   min-height:36px;
   padding:0;
   color:var(--text-color);
@@ -322,24 +324,22 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
   border-radius:10px;
   cursor:pointer;
 }
-#settings-toggle-btn {width:min(44px, 100%);min-height:36px;font-size:21px;line-height:1}
-.main-controls {gap:min(14px, 4cqw);margin:2px 0 0;min-width:0}
+#settings-toggle-btn {flex:none;width:min(44px, 42cqw);min-height:36px;font-size:clamp(12px, 12cqw, 21px);line-height:1}
+.main-controls {gap:min(12px, 3cqw);margin:clamp(4px, 1dvh, 10px) 0 0;min-width:0}
 .main-btn {flex:0 0 auto;font-size:clamp(13px, 8cqw, 23px)}
 #number {
   min-width:0;
   margin:0;
   color:var(--text-color);
-  font-size:clamp(17px, calc(15cqw * var(--score-scale, 1)), 76px);
+  font-size:var(--class-score-size, 76px);
   font-weight:750;
   line-height:1;
   letter-spacing:-.04em;
-  overflow-wrap:anywhere;
+  white-space:nowrap;
   font-variant-numeric:tabular-nums;
 }
-#number[data-long-score] {font-size:clamp(12px, calc(12cqw * var(--score-scale, 1)), 60px)}
-.main-controls:has(#number[data-long-score]) .main-btn {width:min(44px, 20cqw)}
 #change {font-size:clamp(13px, 5cqw, 23px)}
-.score-progress-group {width:min(100%, 360px);margin:17px auto 0}
+.score-progress-group {width:min(100%, 360px);margin:clamp(8px, 2.2dvh, 17px) auto 0}
 .conversion-line {
   display:flex;
   flex-wrap:wrap;
@@ -625,11 +625,6 @@ button, .main-scoreboard, .team-card, #batch-score {
   user-select:none;
 }
 #batch-delta {user-select:text;-webkit-user-select:text}
-#number, #number[data-long-score] {
-  font-size:var(--class-score-size, 76px);
-  white-space:nowrap;
-  overflow-wrap:normal;
-}
 .team-card {display:block}
 .team-select-btn {
   position:absolute;
@@ -664,37 +659,6 @@ button, .main-scoreboard, .team-card, #batch-score {
 #batch-score .batch-actions {padding:0}
 #batch-score .batch-actions > * {box-sizing:border-box}
 #score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
-
-/* Reserve the full class area up front so the team grid and class card do not resize each other. */
-#class-area {
-  display:grid;
-  justify-items:center;
-  background:var(--summary-bg);
-  border-bottom:1px solid var(--panel-line);
-  box-sizing:border-box;
-  height:clamp(145px, 30vh, 220px);
-  transition:none;
-  padding:6px 0;
-}
-.main-scoreboard {
-  box-sizing:border-box;
-  width:min(100%, var(--class-card-width, 275px));
-  aspect-ratio:var(--score-card-ratio, 4 / 3);
-  align-self:center;
-  /* One reservation for both ratios prevents changes in team columns feeding back into this area. */
-  height:auto;
-  min-height:min-content;
-  padding:6px clamp(3px, 2vw, 10px);
-  border:0;
-  border-radius:10px;
-}
-.main-btn, .main-controls:has(#number[data-long-score]) .main-btn {width:min(44px, 19cqw)}
-.main-controls {gap:min(12px, 3cqw)}
-@media(max-width:230px) {
-  #class-area {height:clamp(130px, 28vh, 205px)}
-  .main-scoreboard {padding-inline:3px}
-  .score-progress-group {margin-top:10px}
-}
 
 .fullscreen-view > .dialog-sheet {width:min(700px,100%);padding:14px}
 .dialog-sheet .goal-header {position:static;border:0;background:transparent;padding:0 38px 4px 0}

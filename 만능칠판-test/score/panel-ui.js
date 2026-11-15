@@ -11,7 +11,6 @@ import { measureTeamLayout } from './team-layout.js?v=3';
   const scoreboard = document.getElementById('scoreboard');
   const classScore = document.getElementById('number');
   const classControls = classScore.parentElement;
-  const classCard = document.querySelector('.main-scoreboard');
   const classButtons = [...classControls.querySelectorAll('button')];
   const measure = document.createElement('canvas').getContext('2d');
   const modeSelect = document.getElementById('score-layout-mode');
@@ -53,15 +52,12 @@ import { measureTeamLayout } from './team-layout.js?v=3';
       scoreboard.style.setProperty('--team-columns', String(columns));
       scoreboard.style.setProperty('--team-card-width', `${widthPx}px`);
       scoreboard.style.setProperty('--team-gap', `${gap}px`);
-      classCard.style.setProperty('--class-card-width',Math.max(128,widthPx*1.25)+'px');
-    } else if (!scoreboard.childElementCount) {
-      classCard.style.removeProperty('--class-card-width');
     }
 
     const style = getComputedStyle(classControls);
     const preferred = 76 * scale / 100;
     const font = getComputedStyle(classScore);
-    const space = classControls.clientWidth-classButtons.reduce((width,button)=>width+button.getBoundingClientRect().width,0)-2*(parseFloat(style.columnGap)||0);
+    const space = classControls.clientWidth-classButtons.reduce((width,button)=>width+button.offsetWidth,0)-2*(parseFloat(style.columnGap)||0);
     if (measure && classControls.clientWidth > 0) {
       measure.font = `${font.fontWeight} ${preferred}px ${font.fontFamily}`;
       const size=fitScoreFont(preferred,space,measure.measureText(classScore.textContent).width+2);
