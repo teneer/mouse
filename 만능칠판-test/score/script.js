@@ -279,10 +279,10 @@ function renderTeams() {
     const remove=document.createElement('button');
     remove.type='button';remove.className='team-remove';remove.textContent='×';
     remove.setAttribute('aria-label',team.name+' 삭제');
-    remove.onclick=()=>{
+    remove.onclick=async()=>{
       const name=team.name;
       const version=lastAppliedVersion;
-      if(!confirm(`“${name}” 모둠을 삭제할까요?`))return;
+      if(!await confirmTeamDelete(name))return;
       syncFromStorage();
       if(lastAppliedVersion!==version || teams[idx]?.name!==name)return;
       teams.splice(idx,1);
@@ -294,6 +294,16 @@ function renderTeams() {
   });
   renderBatchControls();
   if(!conversionPlayer)updateScoreProgress();
+}
+function confirmTeamDelete(name) {
+  const dialog=document.getElementById('team-delete-dialog');
+  if(dialog.open)return Promise.resolve(false);
+  document.getElementById('team-delete-message').textContent=`“${name}” 모둠을 삭제할까요?`;
+  dialog.returnValue='cancel';
+  return new Promise(resolve=>{
+    dialog.addEventListener('close',()=>resolve(dialog.returnValue==='delete'),{once:true});
+    dialog.showModal();
+  });
 }
 function renderTeamNumber(element, score) {
   const text = String(score);
@@ -763,6 +773,7 @@ function setSettingsOpen(open) {
   settingsToggleBtn.setAttribute('aria-expanded', String(open));
 }
 settingsToggleBtn.onclick = () => setSettingsOpen(settingsPanel.inert);
+document.getElementById('close-score-settings').onclick=()=>{setSettingsOpen(false);settingsToggleBtn.focus();};
 document.addEventListener('pointerdown', event => {
   if (!settingsPanel.inert && !settingsPanel.contains(event.target) && !settingsToggleBtn.contains(event.target)) {
     setSettingsOpen(false);
@@ -781,7 +792,7 @@ document.addEventListener('keydown', e => {
   const target = e.target;
   if (target instanceof Element &&
       (target.closest('input, textarea, select, [contenteditable]') || target.isContentEditable)) return;
-  if (getComputedStyle(teamSetupModal).display !== 'none' ||
+  if (document.getElementById('team-delete-dialog').open || getComputedStyle(teamSetupModal).display !== 'none' ||
       getComputedStyle(managementModal).display !== 'none' ||
       getComputedStyle(goalManagementView).display !== 'none' ||
       settingsPanel.classList.contains('open') ||

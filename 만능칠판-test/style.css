@@ -710,3 +710,37 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 .modal #favoriteSizes label {display:grid;grid-template-columns:minmax(64px,1fr) minmax(55px,6rem);align-items:center;margin:2px 0}
 #favoriteSizes input {width:100%}
 #backgroundModal .setting-row label {margin:0}
+
+.board-icon {
+  width:18px;height:18px;flex:none;vertical-align:middle;
+  stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;
+}
+#toolbar :is(.action-btn,.mode-btn) {gap:4px}
+#toolbar :is(.action-btn,.mode-btn), #toolbarHideBtn, #moreSettings .action-btn {color:#123c4b}
+#toolbar .view-sync > span {display:inline-flex;align-items:center;gap:4px}
+#moreSettings .action-btn {justify-content:flex-start;gap:7px}
+#sharedSettingsModal > .modal-content {width:min(810px,calc(100vw - 24px));max-width:none}
+#textPropsModal > .modal-content {width:min(590px,calc(100vw - 24px));max-width:none}
+.appearance-overview {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.appearance-overview strong {display:block;margin-bottom:7px}
+.appearance-overview :is(.quick-colors,.quick-sizes) {gap:6px}
+.appearance-overview :is(.quick-colors,.quick-sizes) > span {
+  display:grid;place-items:center;box-sizing:border-box;
+  width:34px;height:34px;border-radius:8px;border:1px solid #c5dce5;
+  background:#e6f1f4;color:#123447;font-weight:650;
+}
+.appearance-overview .selected {outline:2px solid #125771;outline-offset:2px}
+.appearance-overview .favorite {border-style:dashed}
+.favorite-color-picker {display:flex;align-items:center;gap:8px}
+#sharedSettingsModal #favoriteSizes {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#sharedSettingsModal #favoriteSizes label {display:grid;grid-template-columns:minmax(0,1fr);gap:4px;margin:0;font-size:.9rem}
+#sharedSettingsModal #favoriteSizes input {width:100%;min-width:0}
+#backgroundObjects .fixed-object-row {
+  display:grid;grid-template-columns:auto 56px minmax(0,1fr);align-items:center;gap:9px;
+  border:1px solid #cbdce3;border-radius:8px;padding:5px;margin:6px 0;
+}
+.fixed-object-row img {width:56px;height:42px;object-fit:contain;border-radius:4px;background:#e6f1f4}
+.fixed-object-row small {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:540px) {.appearance-overview {grid-template-columns:minmax(0,1fr)}}
+
+:is(.quick-colors,.quick-sizes) button.favorite {border-style:dashed}

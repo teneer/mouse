@@ -71,3 +71,47 @@ button:disabled {cursor:default}
 .setting-row label {margin:0}
 .background-swatch {display:inline-block;width:1rem;height:1rem;margin-right:6px;border:1px solid #55748460;border-radius:50%}
 :is(.modal-content, .modal-box):has(> .dialog-close) > :is(h2,h3) {padding-right:36px}
+
+:is(.modal-content,.modal-box,.dialog-sheet) {
+  --dialog-header:#e6f1f4;
+  --dialog-padding:18px;
+}
+:is(.modal > .modal-content,.modal-background > .modal-box,.fullscreen-view > .dialog-sheet) {
+  padding:var(--dialog-padding);
+  overflow:auto;
+}
+.dialog-header {
+  box-sizing:border-box;
+  position:relative;
+  display:flex;
+  align-items:center;
+  min-height:58px;
+  border-bottom:1px solid var(--dialog-border);
+  background:var(--dialog-header);
+  padding:12px 52px 12px var(--dialog-padding);
+  margin:calc(-1 * var(--dialog-padding)) calc(-1 * var(--dialog-padding)) 14px;
+}
+.dialog-header :is(h2,h3) {
+  color:var(--dialog-text,#123447);
+  text-align:left;
+  font-size:1.2rem;
+  line-height:1.25;
+  margin:0;
+}
+:is(.modal-content,.modal-box,.dialog-sheet) .dialog-header .dialog-close {
+  right:var(--dialog-padding);top:50%;transform:translateY(-50%);
+  background:#fff;
+}
+:is(.modal-content,.modal-box,.dialog-sheet) :is(input[type="number"],input[type="color"],select) {
+  background:var(--dialog-header);
+}
+.appearance-cards {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+}
+.appearance-cards > .setting-section {margin:0}
+.setting-card-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.setting-card-heading h3 {font-size:1rem;margin:0}
+@media(max-width:540px) {
+  .appearance-cards {grid-template-columns:minmax(0,1fr)}
+  .dialog-header {min-height:52px}
+}

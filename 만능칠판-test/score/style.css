@@ -695,3 +695,25 @@ button, .main-scoreboard, .team-card, #batch-score {
 }
 .class-score-delta.gain {color:var(--secondary-color)}
 .class-score-delta.loss {color:var(--accent-color)}
+
+.settings-panel {--dialog-padding:clamp(5px, 4vw, 12px);--dialog-header:#e6f1f4;--dialog-border:#cbdce3;--dialog-text:#123447}
+.settings-panel .dialog-header {margin-bottom:0}
+.settings-panel .dialog-close,.score-delete-dialog .dialog-close {
+  position:absolute;right:var(--dialog-padding);top:50%;transform:translateY(-50%);
+  min-width:34px;min-height:34px;padding:0;line-height:1;font-size:20px;
+  background:white;color:#123447;border:1px solid #cbdce3;border-radius:8px;
+}
+.score-delete-dialog {
+  --dialog-padding:18px;--dialog-header:#e6f1f4;--dialog-border:#cbdce3;--dialog-text:#123447;
+  box-sizing:border-box;width:min(360px,calc(100% - 16px));border:1px solid var(--dialog-border);
+  border-radius:16px;padding:var(--dialog-padding);color:var(--dialog-text);box-shadow:0 16px 48px #12344733;
+}
+.score-delete-dialog::backdrop {background:#112a365c}
+.score-delete-dialog .dialog-action {
+  min-height:36px;padding:6px 10px;border:1px solid #cbdce3;border-radius:8px;
+  background:#edf5f7;color:#123447;
+}
+.score-delete-dialog .dialog-danger {background:#fbece9;color:#922c25;border-color:#ecc5be}
+.dialog-sheet .dialog-header {padding-right:52px}
+
+#team-setup-modal .modal-box, .fullscreen-view > .dialog-sheet {--dialog-padding:14px}
