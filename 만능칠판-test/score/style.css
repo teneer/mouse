@@ -695,3 +695,12 @@ button, .main-scoreboard, .team-card, #batch-score {
   .main-scoreboard {padding-inline:3px}
   .score-progress-group {margin-top:10px}
 }
+
+.fullscreen-view > .dialog-sheet {width:min(700px,100%);padding:14px}
+.dialog-sheet .goal-header {position:static;border:0;background:transparent;padding:0 38px 4px 0}
+.dialog-sheet .goal-header h2 {font-size:1.2rem}
+.dialog-sheet :is(.management-content,.goal-container) {width:100%;overflow:visible;padding:0}
+.dialog-sheet .dialog-footer {margin-top:12px}
+#team-setup-modal .modal-box {padding:14px;width:min(360px,100%)}
+#team-setup-modal .modal-content {padding:6px 0 12px}
+#team-setup-modal .modal-footer {justify-content:flex-end}

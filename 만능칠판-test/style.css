@@ -692,9 +692,21 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 .page-tile-wrap .page-tile {width:100%;height:100%;min-width:0;padding-top:28px;grid-template-columns:minmax(0,1fr);color:inherit}
 .page-tile-name {width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
 .page-tile-menu {position:absolute;top:3px;right:4px;z-index:1}
-.page-tile-menu[open] {z-index:2}
-.page-tile-menu summary {list-style:none;cursor:pointer;border-radius:4px;min-width:28px;min-height:24px;text-align:center;background:#e4edf6;color:#193752}
-.page-tile-menu summary::-webkit-details-marker {display:none}
+.page-tile-menu > button {border:0;cursor:pointer;border-radius:4px;min-width:28px;min-height:24px;text-align:center;background:#e4edf6;color:#193752}
 .page-tile-menu .action-btn {position:absolute;right:0;top:100%;height:32px;min-height:32px}
 #pageNameInput {display:block;width:100%;box-sizing:border-box;margin-top:6px}
 .history-group .icon-only {font-size:1.35em}
+
+#pageList {max-width:min(92vw, 360px)}
+#pageTiles {grid-template-columns:repeat(auto-fill,minmax(72px,1fr));width:min(73vw, 320px);padding-bottom:4px}
+.page-tile-wrap .page-tile {padding-top:23px;font-size:12px}
+.page-tile-menu > button {min-width:28px;min-height:22px;line-height:22px}
+.page-tile-actions:popover-open {display:grid;position:fixed;inset:auto;margin:0;padding:4px;gap:2px;border:1px solid #cbdce3;background:#fff;border-radius:8px;box-shadow:0 4px 14px #12344724}
+.page-tile-menu .action-btn {position:static;justify-content:flex-start;height:32px;min-height:32px}
+.page-tile-menu .action-btn:last-child {color:#922c25}
+.page-tile-add {min-height:56px}
+#backgroundColors button {border-width:1px}
+#favoriteSizes {display:grid;gap:5px}
+.modal #favoriteSizes label {display:grid;grid-template-columns:minmax(64px,1fr) minmax(55px,6rem);align-items:center;margin:2px 0}
+#favoriteSizes input {width:100%}
+#backgroundModal .setting-row label {margin:0}

@@ -14,7 +14,7 @@ const message = error => ({
 const fileSize = size => size < 1024 ? size + ' B' : size < 1048576 ? (size/1024).toFixed(1) + ' KB'
   : (size/1048576).toFixed(1) + ' MB';
 
-export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,changeView,useLocal,renderFiles,goTo,prepareSeed,startView}) {
+export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,useLocal,renderFiles,goTo,prepareSeed}) {
   const localFiles = new Set(), messages = new Map();
   const modalOpen = id => $(id).style.display === 'flex';
   let reconnectOptions=null;
@@ -26,7 +26,6 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,ch
     renderFiles();
     queueFiles();
   });
-  try {$('viewSync').checked = sessionStorage.getItem('wb42.viewSync') === 'true';} catch {}
 
   function stage(name) {
     guideOpen = name === 'guide';
@@ -167,11 +166,6 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,ch
   for (const button of $('deviceModal').querySelectorAll('[data-device-back]')) {
     button.onclick = () => stage(cloud.options ? 'connected' : 'start');
   }
-  $('viewSync').onchange = () => {
-    try {sessionStorage.setItem('wb42.viewSync',String($('viewSync').checked));}catch{}
-    if ($('viewSync').checked) startView();
-    changeView();
-  };
   action('deviceCheck',async ()=>{
     const config = parseFirebaseConfig($('firebaseConfig').value);
     await cloud.authenticate(config);

@@ -25,7 +25,8 @@ let currentActiveGoal = null;
 let activeGoalRef = null;
 const defaultLinkPoints = 3;
 const undoWindow = 2000;
-let conversionAnimation=null, queuedConversion=null, conversionFlight=null;
+let conversionAnimation=null, conversionFlight=null;
+const queuedConversions=[];
 let linkEnabled = true;
 let linkPoints = defaultLinkPoints;
 let lastScoreChange = null;
@@ -140,9 +141,8 @@ function syncFromStorage(effect = null, expectedVersion = null) {
   lastScoreChange = null;
   applyStateFields(state);
   lastAppliedVersion = state.version;
-  renderCurrentState();
-  // 늦게 도착한 메시지는 현재 저장 상태에 해당하는 경우에만 연출합니다.
-  if (effect && expectedVersion === state.version) queueScoreEffect(effect);
+  const matchingEffect=effect && expectedVersion===state.version ? effect : null;
+  renderCurrentState(matchingEffect);
 }
 if (syncChannel) {
   syncChannel.onmessage = event => {
@@ -159,12 +159,12 @@ window.addEventListener('storage', event => {
   else syncFromStorage();
 });
 
-function renderCurrentState() {
-  resetConversion();
-  renderClassNumber(count);
+function renderCurrentState(effect) {
+  if(!effect){resetConversion();renderClassNumber(count);}
   renderLinkSettings();
   renderTeams();
   renderActiveGoal();
+  if(effect)queueScoreEffect(effect);
   if (getComputedStyle(goalManagementView).display !== 'none') renderGoalLists();
   // 관리 모달에 입력 중인 값은 원격 수신으로 덮어쓰지 않습니다.
 }
@@ -374,7 +374,6 @@ function changeTeamScores(indices, amount, undoKey = null) {
     displayFloatingNumber(document.getElementById(`team-change-${index}`), amount, '20px', '10px');
   });
   count += classDiff;
-  updateScoreProgress();
   renderBatchControls();
   if (classDiff) checkForGoalAchievement('class', oldCount, count);
   checkForGoalAchievement('team', oldTotal, newTotal);
@@ -423,7 +422,8 @@ function resetConversion() {
   clearTimeout(conversionFlight);
   conversionAnimation?.cancel();
   conversionAnimation=null;
-  queuedConversion=null;
+  queuedConversions.length=0;
+  document.querySelectorAll('.score-sync-fly').forEach(node=>node.remove());
   progress.removeAttribute('data-converting');
 }
 function queueScoreEffect(effect) {
@@ -433,7 +433,10 @@ function queueScoreEffect(effect) {
     renderClassNumber(count);updateScoreProgress();return;
   }
   if(conversionAnimation){
-    queuedConversion=mergeConversions(queuedConversion,effect);
+    const last=queuedConversions.at(-1);
+    if(last && !last.classDiff && !effect.classDiff && last.rate===effect.rate && Math.sign(last.amount)===Math.sign(effect.amount)){
+      queuedConversions[queuedConversions.length-1]=mergeConversions(last,effect);
+    }else queuedConversions.push(effect);
     return;
   }
   const teamNode=document.getElementById(`team-number-${effect.idx}`);
@@ -442,30 +445,34 @@ function queueScoreEffect(effect) {
   const from=100*scoreRemainder(effect.oldTotal,effect.rate)/effect.rate;
   const to=100*scoreRemainder(effect.newTotal,effect.rate)/effect.rate;
   const fill=progress.firstElementChild;
-  if(!effect.classDiff || !fill?.animate){
-    renderClassNumber(count);updateScoreProgress();return;
-  }
+  if(!fill?.animate){renderClassNumber(count);updateScoreProgress();return;}
+  const crossing=effect.classDiff!==0;
   const forward=effect.classDiff>0;
-  const animation=fill.animate([
+  const boundary=forward?'100%':'0%';
+  const keys=crossing ? [
     {width:from+'%',offset:0},
-    {width:forward?'100%':'0%',offset:.55},
-    {width:forward?'100%':'0%',offset:.72},
-    {width:forward?'0%':'100%',offset:.73},
+    {width:boundary,offset:.3},
+    {width:boundary,offset:.77},
+    {width:forward?'0%':'100%',offset:.78},
     {width:to+'%',offset:1}
-  ],{duration:475,fill:'forwards',easing:'linear'});
+  ] : [{width:from+'%'},{width:to+'%'}];
+  const animation=fill.animate(keys,{duration:crossing?950:200,fill:'forwards',easing:'linear'});
   conversionAnimation=animation;
-  renderClassNumber(count-effect.classDiff);
-  progress.setAttribute('data-converting','');
-  conversionFlight=setTimeout(()=>{
-    if(conversionAnimation===animation)flyLabel(`${forward?'+':'−'}${Math.abs(effect.classDiff)}`,bar,centerOf(numberElement));
-  },300);
+  const remaining=()=>queuedConversions.reduce((sum,event)=>sum+event.classDiff,0);
+  renderClassNumber(count-effect.classDiff-remaining());
+  if(crossing){
+    progress.setAttribute('data-converting','');
+    conversionFlight=setTimeout(()=>{
+      if(conversionAnimation===animation)flyLabel(`${forward?'+':'−'}${Math.abs(effect.classDiff)}`,centerOf(progress),centerOf(numberElement));
+    },430);
+  }
   animation.onfinish=()=>{
     if(conversionAnimation!==animation)return;
-    const next=queuedConversion;
-    conversionAnimation=null;queuedConversion=null;
     clearTimeout(conversionFlight);
+    conversionAnimation=null;
     animation.cancel();progress.removeAttribute('data-converting');
-    renderClassNumber(count-(next?.classDiff||0));
+    renderClassNumber(count-remaining());
+    const next=queuedConversions.shift();
     if(next)queueScoreEffect(next);
     else updateScoreProgress();
   };
@@ -763,3 +770,9 @@ window.addEventListener('load', () => {
 document.getElementById('create-teams-btn').onclick=showTeamSetupModal;
 document.getElementById('cancel-team-setup').onclick=hideTeamSetupModal;
 document.getElementById('confirm-team-setup').onclick=createTeams;
+
+document.getElementById('close-team-setup').onclick=hideTeamSetupModal;
+document.getElementById('close-management-dialog').onclick=closeManagementModal;
+const hideGoalManagement=()=>{goalManagementView.style.display='none';};
+document.getElementById('cancel-goal-view').onclick=hideGoalManagement;
+document.getElementById('cancel-goal-edit').onclick=hideGoalManagement;

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fitScoreFont, mergeConversions, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
-import {applyOperation, boardPages, newBoard, pagePatch, validView} from '../js/cloud-model.js';
+import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
 import {movePageId} from '../js/board-navigation.js';
 import {normalizeFavoriteSize, scaleFavoriteSize} from '../js/board-options.js';
 import {validateContent} from '../js/validation.js';
@@ -75,4 +75,12 @@ test('shared views support valid scoreboard sizes and older messages without siz
   assert.equal(validView({...view,scoreShare:90,scoreScale:150}),true);
   assert.equal(validView({...view,scoreShare:95}),false);
   assert.equal(validView({...view,scoreScale:0}),false);
+});
+
+test('shared screen state supports a global off signal and a full on snapshot', () => {
+  assert.equal(validViewState({enabled:false,epoch:'off'}),true);
+  assert.equal(validViewState({enabled:true,epoch:'on'}),false);
+  const view={enabled:true,epoch:'on',pageId:'p',zoom:1,x:0,y:0,scoreOpen:false,scoreShare:70,scoreScale:100};
+  assert.equal(validViewState(view),true);
+  assert.equal(validViewState({...view,scoreOpen:'false'}),false);
 });

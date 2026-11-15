@@ -111,3 +111,8 @@ export function validView(view) {
     (view.scoreShare===undefined || Number.isFinite(view.scoreShare) && view.scoreShare>=20 && view.scoreShare<=90) &&
     (view.scoreScale===undefined || Number.isFinite(view.scoreScale) && view.scoreScale>=60 && view.scoreScale<=150);
 }
+
+export function validViewState(value) {
+  return typeof value?.enabled==='boolean' && typeof value.epoch==='string' &&
+    (!value.enabled || validView(value)) && (value.scoreOpen===undefined || typeof value.scoreOpen==='boolean');
+}

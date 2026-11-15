@@ -1,5 +1,5 @@
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView} from './cloud-model.js';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js';
 import {parseFirebaseConfig} from './cloud-config.js';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
@@ -139,7 +139,7 @@ export class CloudBoard {
       this.events.status();
     }, this.events.error));
     this.subscriptions.push(fs.onSnapshot(this.ref('control','view'), {includeMetadataChanges:true}, snapshot => {
-      if (isReady(snapshot) && validView(snapshot.data())) {
+      if (isReady(snapshot) && (validViewState(snapshot.data()) || validView(snapshot.data()))) {
         this.latestView = snapshot.data();
         this.events.view(this.latestView);
       }
@@ -282,6 +282,21 @@ export class CloudBoard {
       if (this.online) this.pull().catch(next=>this.retrySync(next));
     },this.retryDelay);
     this.retryDelay=Math.min(this.retryDelay*2,60000);
+  }
+
+  async sendSharedView(state,toggle) {
+    if(!this.online || !this.boardReady){
+      if(toggle)throw Error('기기가 온라인일 때 화면 동기화를 변경할 수 있습니다.');
+      return false;
+    }
+    const ref=this.ref('control','view');
+    const value={...state,device:this.deviceId,at:this.fs.serverTimestamp()};
+    if(toggle){await this.fs.setDoc(ref,value);return true;}
+    return this.fs.runTransaction(this.db,async tx=>{
+      const before=(await tx.get(ref)).data();
+      if(!before?.enabled || before.epoch!==state.epoch)return false;
+      tx.set(ref,value);return true;
+    });
   }
 
   async sendView(view) {
