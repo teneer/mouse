@@ -1,4 +1,4 @@
-import {activeView,wireViewTabs} from './js/view-tabs.js';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=above-toolbar-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
@@ -775,6 +775,7 @@ function togglePopup(id,button) {
   const was=openedPopup===id;closePopups();if(was)return;
   const p=$(id);p.style.display='block';openedPopup=id;button.setAttribute('aria-expanded','true');
   if(id==='pageList')renderPageTiles();
+  if(id==='viewSyncMenu')return;
   const rect=button.getBoundingClientRect();p.style.left=Math.max(8,Math.min(window.innerWidth-p.offsetWidth-8,rect.left+rect.width/2-p.offsetWidth/2))+'px';
   p.style.top=Math.max(8,rect.top-p.offsetHeight-8)+'px';
 }

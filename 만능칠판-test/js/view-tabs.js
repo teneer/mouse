@@ -4,6 +4,19 @@ const heartbeat=25_000;
 export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopups,publish,readState,fail}) {
   const root=document.getElementById('viewSyncMenu'), control=document.getElementById('viewSync');
   const list=root.querySelector('[data-view-tabs]');
+  const toolbar=document.getElementById('toolbar'), opener=document.getElementById('viewSyncTrigger');
+
+  function positionMenu() {
+    if (root.style.display!=='block') return;
+    const margin=8;
+    const edge=toolbar.getBoundingClientRect().top-margin;
+    const trigger=opener.getBoundingClientRect();
+    root.style.top='auto';
+    root.style.bottom=(window.innerHeight-edge)+'px';
+    root.style.maxHeight=Math.max(0,edge-margin)+'px';
+    root.style.left=Math.max(margin,Math.min(window.innerWidth-root.offsetWidth-margin,
+      trigger.left+(trigger.width-root.offsetWidth)/2))+'px';
+  }
   const prefix='whiteboard.view-tab:'+new URL('.',location.href).pathname+':';
   const localKey=prefix+sync.id;
   let members=[], scope, unsubscribe, timer, long=false, startPoint, generation=0;
@@ -48,6 +61,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       list.append(label);
       if (focused===row.id) input.focus({preventScroll:true});
     }
+    positionMenu();
   }
   function announce() {
     const desired=cloud.options?.boardId||null;
@@ -86,7 +100,8 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const call=++generation;
     changes=changes.then(()=>publish(undefined,makeTargets)).catch(error=>{if (call===generation) fail(error);}).finally(render);
   };
-  const opener=document.getElementById('viewSyncTrigger');
+  window.addEventListener('resize',positionMenu);
+  if (typeof ResizeObserver!=='undefined') new ResizeObserver(positionMenu).observe(toolbar);
   function show(){togglePopup('viewSyncMenu',opener);announce();}
   opener.addEventListener('pointerdown',event=>{
     if(event.button!==0)return;
