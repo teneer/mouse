@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fitScoreFont, conversionSteps, scoreRemainder} from '../score/score-display.js';
+import {fitScoreFont, conversionFrame, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
 import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
 import {movePageId} from '../js/board-navigation.js';
@@ -19,35 +19,23 @@ test('automatic narrow-panel cap preserves one column and leaves fixed mode avai
   assert.equal(measureTeamLayout({...view,fixedColumns:2}).columns,2);
 });
 
-test('rapid increments from 2/3 produce two separate arrivals and leave 1/3', () => {
+test('rapid increments and bulk deductions each produce one combined conversion', () => {
   const inputs=[2,3,4,5,6,7];
-  const steps=inputs.slice(1).flatMap((total,index)=>[...conversionSteps(inputs[index],total,3)]);
-  assert.deepEqual(steps.filter(step=>step.delta),[
-    {from:2,to:3,delta:1,rest:0},
-    {from:2,to:3,delta:1,rest:0},
-  ]);
-  assert.deepEqual(steps.at(-1),{from:0,to:1,delta:0});
+  const changes=inputs.slice(1).map((total,index)=>({oldTotal:inputs[index],newTotal:total,rate:3}));
+  const grouped=changes.reduce(mergeTeamEffects);
+  assert.deepEqual(conversionFrame(grouped.oldTotal,grouped.newTotal,3),{from:2,to:3,delta:2,rest:1});
+  assert.deepEqual(conversionFrame(0,16,3),{from:0,to:3,delta:5,rest:1});
+  assert.deepEqual(conversionFrame(16,1,3),{from:1,to:0,delta:-5,rest:1});
 });
 
-test('bulk and mixed direction conversions preserve every class step and remainder', () => {
-  for(const rate of [1,3,6,20,21]){
-    for(let from=-15;from<=15;from++){
-      for(let to=-15;to<=15;to++){
-        const steps=[...conversionSteps(from,to,rate)];
-        const crossings=steps.filter(step=>step.delta);
-        const expected=Math.floor(to/rate)-Math.floor(from/rate);
-        assert.equal(crossings.length,Math.abs(expected));
-        assert.equal(crossings.reduce((sum,step)=>sum+step.delta,0),expected);
-        const last=steps.at(-1);
-        assert.equal(last ? last.rest??last.to : scoreRemainder(from,rate),scoreRemainder(to,rate));
-      }
-    }
-  }
-  assert.deepEqual([...conversionSteps(0,7,3)],[
-    {from:0,to:3,delta:1,rest:0},
-    {from:0,to:3,delta:1,rest:0},
-    {from:0,to:1,delta:0},
-  ]);
+test('conversion grouping respects direction, rate and consecutive totals', () => {
+  const first={oldTotal:2,newTotal:6,rate:3};
+  assert.equal(mergeTeamEffects(first,{oldTotal:6,newTotal:4,rate:3}),null);
+  assert.equal(mergeTeamEffects(first,{oldTotal:6,newTotal:8,rate:4}),null);
+  assert.equal(mergeTeamEffects(first,{oldTotal:7,newTotal:8,rate:3}),null);
+  assert.deepEqual(conversionFrame(5,4,3),{from:2,to:1,delta:0,rest:1});
+  assert.deepEqual(conversionFrame(0,-1,3),{from:0,to:0,delta:-1,rest:2});
+  assert.equal(scoreRemainder(-1,3),2);
 });
 
 test('page reorder synchronizes without deleting pages added by another device', () => {

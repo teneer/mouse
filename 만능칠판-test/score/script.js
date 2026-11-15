@@ -1,4 +1,4 @@
-import {conversionSteps,scoreRemainder} from './score-display.js';
+import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
 // 점수는 즉시 확정하고, 애니메이션은 확정된 점수를 설명하는 시각 효과로만 사용합니다.
@@ -447,7 +447,7 @@ function showClassDelta(delta,audible,reduced) {
   if(audible)playSound(delta>0?sounds.mainIncrease:sounds.mainDecrease);
   const label=document.createElement('span');
   label.className=delta>0?'class-score-delta gain':'class-score-delta loss';
-  label.textContent=delta>0?'+1':'−1';
+  label.textContent=(delta>0?'+':'−')+Math.abs(delta);
   label.setAttribute('aria-hidden','true');
   const {left,top,width}=numberElement.getBoundingClientRect();
   label.style.left=(left+width/2)+'px';
@@ -470,6 +470,16 @@ function showClassDelta(delta,audible,reduced) {
   }).finally(()=>label.remove());
 }
 
+function collectPendingConversions(group) {
+  for(let next=queuedConversions[0];next;next=queuedConversions[0]){
+    const merged=mergeTeamEffects(group.effect,next.effect);
+    if(!merged)break;
+    queuedConversions.shift();
+    group={effect:merged,audible:group.audible||next.audible};
+  }
+  return group;
+}
+
 function presentScoreEffect(effect,audible=false) {
   if(!['class','team'].includes(effect?.kind) || !Number.isSafeInteger(effect.oldCount)){
     resetConversion();renderClassNumber(count);updateScoreProgress();return;
@@ -486,21 +496,28 @@ function presentScoreEffect(effect,audible=false) {
   void (async()=>{
     try{
       while(queuedConversions.length){
-        const {effect:next,audible}=queuedConversions.shift();
+        let group=queuedConversions.shift();
+        const rate=group.effect.rate;
+        if(!rate)continue;
+        // A brief collection window lets rapid button presses share one visual update.
+        await waitForEffect(120,signal);
+        group=collectPendingConversions(group);
+        let frame=conversionFrame(group.effect.oldTotal,group.effect.newTotal,rate);
         const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        if(!next.rate)continue;
-        for(const step of conversionSteps(next.oldTotal,next.newTotal,next.rate)){
-          await moveProgress(step.from,step.to,next.rate,reduced,signal);
-          if(!step.delta)continue;
-          progress.setAttribute('data-converting','');
-          await waitForEffect(300,signal);
-          await sendStars(next.rate,step.delta,reduced,signal);
-          progress.removeAttribute('data-converting');
-          showClassDelta(step.delta,audible,reduced);
-          if(step.delta<0)await moveProgress(next.rate,step.rest,next.rate,reduced,signal);
-          else renderProgress(step.rest,next.rate);
-          await waitForEffect(320,signal);
-        }
+        await moveProgress(frame.from,frame.to,rate,reduced,signal);
+        if(!frame.delta)continue;
+        progress.setAttribute('data-converting','');
+        await waitForEffect(300,signal);
+        await sendStars(rate,frame.delta,reduced,signal);
+        // Include same-direction input that arrived before the stars landed.
+        group=collectPendingConversions(group);
+        frame=conversionFrame(group.effect.oldTotal,group.effect.newTotal,rate);
+        progress.removeAttribute('data-converting');
+        showClassDelta(frame.delta,group.audible,reduced);
+        if(frame.delta<0)await moveProgress(rate,frame.rest,rate,reduced,signal);
+        else if(frame.rest)await moveProgress(0,frame.rest,rate,reduced,signal);
+        else renderProgress(0,rate);
+        await waitForEffect(320,signal);
       }
     }catch(error){
       if(!signal.aborted){

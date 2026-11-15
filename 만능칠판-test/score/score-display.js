@@ -8,16 +8,17 @@ export function scoreRemainder(total, rate) {
   return ((total % rate) + rate) % rate;
 }
 
-// Yield one class point for each crossed boundary, including negative totals.
-export function* conversionSteps(oldTotal,newTotal,rate) {
-  const direction=Math.sign(newTotal-oldTotal);
-  let total=oldTotal;
-  const nextBoundary=()=>Math.floor(total/rate)*rate+(direction>0?rate:-1);
-  const crosses=boundary=>direction>0?boundary<=newTotal:boundary>=newTotal;
-  if(!direction)return;
-  for(let boundary=nextBoundary();crosses(boundary);boundary=nextBoundary()){
-    yield {from:scoreRemainder(total,rate),to:direction>0?rate:0,delta:direction,rest:scoreRemainder(boundary,rate)};
-    total=boundary;
-  }
-  if(total!==newTotal)yield {from:scoreRemainder(total,rate),to:scoreRemainder(newTotal,rate),delta:0};
+// Consecutive changes can share a visual conversion when their totals join
+// and their direction and conversion rate match.
+export function mergeTeamEffects(first,next) {
+  if(!next || first.rate!==next.rate || first.newTotal!==next.oldTotal ||
+    Math.sign(first.newTotal-first.oldTotal)!==Math.sign(next.newTotal-next.oldTotal))return null;
+  return {...first,newTotal:next.newTotal};
+}
+
+export function conversionFrame(oldTotal,newTotal,rate) {
+  const from=scoreRemainder(oldTotal,rate);
+  const rest=scoreRemainder(newTotal,rate);
+  const delta=Math.floor(newTotal/rate)-Math.floor(oldTotal/rate);
+  return {from,to:delta>0?rate:delta<0?0:rest,delta,rest};
 }
