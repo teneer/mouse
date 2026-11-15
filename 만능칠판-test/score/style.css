@@ -640,7 +640,14 @@ button, .main-scoreboard, .team-card, #batch-score {
 .team-number {font-size:min(40px, 34cqh, 25cqw)}
 .team-number[data-long-score] {font-size:min(40px, 34cqh, 24cqw)}
 .team-steps {position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;padding:0;pointer-events:none}
-.team-steps button {width:min(46px, 46cqw);min-height:min(44px, 32cqh);pointer-events:auto}
+/* Keep the entire hit target below the centered score, including its pop effect. */
+.team-steps button {
+  width:min(46px, 31cqw);
+  height:min(44px, 25cqh);
+  min-height:0;
+  font-size:min(23px, 22cqh, 25cqw);
+  pointer-events:auto;
+}
 .team-remove {
   position:absolute;
   top:0;
