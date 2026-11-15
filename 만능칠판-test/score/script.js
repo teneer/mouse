@@ -1,5 +1,5 @@
 import {freshGoals,readGoals,changeGoals,reconcileGoals} from './goal-model.js';
-import {wireGoals} from './goals-ui.js';
+import {wireGoals} from './goals-ui.js?v=goal-design-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
 
@@ -900,14 +900,14 @@ document.getElementById('close-management-dialog').onclick=closeManagementModal;
 const maximizeScore = document.getElementById('score-maximize');
 maximizeScore.hidden = !window.frameElement;
 maximizeScore.onclick = ()=>window.frameElement?.dispatchEvent(new Event('score-toggle-full'));
-window.frameElement?.addEventListener('score-full-changed',event=>{
-  maximizeScore.setAttribute('aria-pressed',String(event.detail));
-  maximizeScore.textContent=event.detail?'분할 화면':'전체 화면';
-});
-if (window.frameElement?.dataset.scoreFull==='true') {
-  maximizeScore.setAttribute('aria-pressed','true');
-  maximizeScore.textContent='분할 화면';
+function setMaximizeState(full) {
+  const label=full?'분할 화면으로 돌아가기':'전체 화면';
+  maximizeScore.setAttribute('aria-pressed',String(full));
+  maximizeScore.setAttribute('aria-label',label);
+  maximizeScore.title=label;
 }
+window.frameElement?.addEventListener('score-full-changed',event=>setMaximizeState(event.detail));
+setMaximizeState(window.frameElement?.dataset.scoreFull==='true');
 
 for (const dialog of document.querySelectorAll('dialog')) {
   dialog.addEventListener('cancel',event=>event.preventDefault());

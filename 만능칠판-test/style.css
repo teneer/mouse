@@ -770,3 +770,13 @@ body.score-goal-modal #scoreFrame {background:transparent}
 #appCelebration header {display:flex;justify-content:space-between;align-items:flex-start}
 #appCelebration p {white-space:pre-wrap;overflow-wrap:anywhere}
 #appCelebration button {pointer-events:auto}
+
+#viewSyncMenu :is([data-view-all],[data-view-none]),
+#appCelebration :is(#appCelebrationClose,#appCelebrationUse) {
+  min-height:34px;padding:.35rem .65rem;border:1px solid #b9d1de;border-radius:8px;
+  background:#edf5f7;color:#123c4b;font:inherit;line-height:1.2;cursor:pointer;
+}
+#viewSyncMenu :is([data-view-all],[data-view-none]):hover,#appCelebrationClose:hover {background:#dcecf1}
+#viewSyncMenu input[type=checkbox] {accent-color:#18536e}
+#appCelebration #appCelebrationUse {background:#18536e;color:#fff;border-color:#18536e}
+#appCelebration #appCelebrationClose {min-width:34px;padding:.2rem;font-size:1.25rem}

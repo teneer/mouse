@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
-const button = (label,action) => {
+const button = (label,action,classes='dialog-action') => {
   const item = document.createElement('button');
-  item.type = 'button';item.textContent = label;item.onclick = action;
+  item.type = 'button';item.className=classes;item.textContent = label;item.onclick = action;
   return item;
 };
 
@@ -85,7 +85,7 @@ export function wireGoals({submit,teamList,celebrate}) {
     const type=teamId===null?'class':'team', icon=gifts[type];
     if (!records.length) return;
     const add=(label,title,action)=>{
-      const control=button(label,action);control.title=title;control.setAttribute('aria-label',title);
+      const control=button(label,action,'');control.title=title;control.setAttribute('aria-label',title);
       parent.append(control);
     };
     if (type==='class' && records.length<=2) {
@@ -96,18 +96,34 @@ export function wireGoals({submit,teamList,celebrate}) {
   function addRow(type,goal={}) {
     const row=document.createElement('div');row.className='goal-row goal-edit-row';
     row.dataset.goal=goal.id || crypto.randomUUID();
-    row.innerHTML='<input type="number" class="goal-score" min="-10000" max="10000" aria-label="기준 점수"><input class="goal-message" maxlength="240" aria-label="축하 문구"><select class="goal-completion" aria-label="완료 방식"><option value="manual">교사가 직접 완료</option><option value="auto">자동 완료</option></select><label><input class="goal-reward" type="checkbox"> 보상 있음</label>';
+    row.innerHTML=`
+      <div class="goal-fields">
+        <label class="goal-field"><span>목표 점수</span><input type="number" class="goal-score" min="-10000" max="10000" aria-label="목표 점수"></label>
+        <label class="goal-field"><span>축하 메시지</span><input class="goal-message" maxlength="240" aria-label="축하 메시지"></label>
+        <label class="goal-auto"><input class="goal-completion" type="checkbox" aria-label="자동 완료"><span>자동 완료</span></label>
+        <button type="button" class="dialog-action goal-status" aria-expanded="false"><span class="goal-status-text">새 목표</span></button>
+      </div>
+      <div class="goal-progress" hidden>
+        <div class="goal-progress-body"></div>
+        <label class="goal-reward-option"><input class="goal-reward" type="checkbox"> 보상 있음</label>
+      </div>`;
     row.querySelector('.goal-score').value=goal.score??'';
     row.querySelector('.goal-message').value=goal.message??'';
-    row.querySelector('.goal-completion').value=goal.automatic?'auto':'manual';
+    row.querySelector('.goal-completion').checked=!!goal.automatic;
     row.querySelector('.goal-reward').checked=!!goal.reward;
-    row.append(button('삭제',()=>row.remove()));
-    const progress = document.createElement('details');
-    progress.className='goal-progress';
-    progress.innerHTML='<summary></summary><div class="goal-progress-body"></div>';
-    row.append(progress);
-    if (!goal.id) progress.hidden=true;
+    const remove=button('×',()=>row.remove(),'dialog-action dialog-danger goal-remove');
+    remove.title='목표 삭제';
+    remove.setAttribute('aria-label','목표 삭제');
+    row.querySelector('.goal-fields').append(remove);
+    const progress=row.querySelector('.goal-progress'), status=row.querySelector('.goal-status');
+    progress.id='goal-details-'+row.dataset.goal;
+    status.setAttribute('aria-controls',progress.id);
+    status.onclick=()=>setExpanded(row,progress.hidden);
     $(type+'-goals-list').append(row);
+  }
+  function setExpanded(row,expanded) {
+    row.querySelector('.goal-progress').hidden=!expanded;
+    row.querySelector('.goal-status').setAttribute('aria-expanded',String(expanded));
   }
   function openSettings() {
     if (!system) return;
@@ -127,7 +143,7 @@ export function wireGoals({submit,teamList,celebrate}) {
     if (!record) return;
     const row=[...view.querySelectorAll('.goal-edit-row')].find(item=>item.dataset.goal===record.goalId);
     if (row) {
-      row.querySelector('details').open=true;
+      setExpanded(row,true);
       row.scrollIntoView({block:'nearest'});
     } else show(record,true);
   }
@@ -145,7 +161,7 @@ export function wireGoals({submit,teamList,celebrate}) {
       if (!Number.isInteger(score) || score < -10000 || score > 10000 || !message) {
         $('goal-edit-error').textContent='기준 점수와 축하 문구를 입력해 주세요.';return;
       }
-      goals.push({id:row.dataset.goal,type,score,message,automatic:row.querySelector('.goal-completion').value==='auto',
+      goals.push({id:row.dataset.goal,type,score,message,automatic:row.querySelector('.goal-completion').checked,
         reward:row.querySelector('.goal-reward').checked});
     }
     $('goal-edit-error').textContent='';
@@ -156,11 +172,11 @@ export function wireGoals({submit,teamList,celebrate}) {
     for (const row of view.querySelectorAll('.goal-edit-row')) {
       const goal=system.goals.find(item=>item.id===row.dataset.goal);
       if (!goal) continue;
-      const root=row.querySelector('details'), body=root.querySelector('.goal-progress-body');
+      const body=row.querySelector('.goal-progress-body');
       const found=new Map(system.records.filter(rec=>rec.goalId===goal.id).map(rec=>[rec.teamId,rec]));
       const teams=goal.type==='class'?[{id:null,name:'학급'}]:teamList();
       const finished=teams.filter(team=>found.get(team.id)?.status==='done').length;
-      root.querySelector('summary').textContent=goal.type==='class'
+      row.querySelector('.goal-status-text').textContent=goal.type==='class'
         ? (finished?'✓ 완료':found.get(null)?.status==='pending'?'달성 · 완료 대기':'미달성')
         : (finished && finished===teams.length?'✓ ':'')+finished+'/'+teams.length+' 완료';
       const selected=new Set([...body.querySelectorAll('input:checked')].map(input=>input.value));
@@ -171,15 +187,21 @@ export function wireGoals({submit,teamList,celebrate}) {
         const item=document.createElement('div');
         item.className='goal-team-progress';
         if (done) item.dataset.done='true';
-        if (done||pending) {
-          const check=document.createElement('input');
-          check.type='checkbox';check.value=record.id;check.checked=selected.has(record.id);
-          check.setAttribute('aria-label',team.name+' 선택');
-          checks.push({check,record});item.append(check);
+        const check=document.createElement('input');
+        check.type='checkbox';check.disabled=!(done||pending);
+        if (!check.disabled) {
+          check.value=record.id;check.checked=selected.has(record.id);
+          checks.push({check,record});
         }
-        item.append(document.createTextNode(team.name+' · '+(done?'✓ 완료':pending?'달성 · 완료 대기':'미달성')));
-        if (done||pending) item.append(button(done?'완료 취소':'완료 처리',()=>change([record],!done)));
-        if (pending) item.append(button('메시지',()=>show(record,true)));
+        check.setAttribute('aria-label',team.name+' 선택');
+        const name=document.createElement('strong'), state=document.createElement('span'), actions=document.createElement('div');
+        name.textContent=team.name;
+        state.textContent=done?'✓ 완료':pending?'완료 대기':'미달성';
+        actions.className='goal-team-actions';
+        if (done||pending) actions.append(button(done?'완료 취소':'완료 처리',()=>change([record],!done),
+          done?'dialog-action':'dialog-action dialog-primary'));
+        if (pending) actions.append(button('메시지 보기',()=>show(record,true)));
+        item.append(check,name,state,actions);
         body.append(item);
       }
       if (goal.type==='team' && checks.length) {
@@ -187,7 +209,7 @@ export function wireGoals({submit,teamList,celebrate}) {
         actions.append(button('완료 대기 전체선택',()=>checks.forEach(({check,record})=>{check.checked=record.status==='pending';})));
         for (const complete of [true,false]) actions.append(button(complete?'선택 완료':'선택 완료 취소',()=>{
           change(checks.filter(({check,record})=>check.checked && record.status===(complete?'pending':'done')).map(({record})=>record),complete);
-        }));
+        },complete?'dialog-action dialog-primary':'dialog-action'));
         body.append(actions);
       }
     }

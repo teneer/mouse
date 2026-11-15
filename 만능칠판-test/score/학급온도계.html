@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=view-tabs-1">
+    <link rel="stylesheet" href="style.css?v=goal-design-1">
     <link rel="stylesheet" href="../dialog.css?v=appearance-1">
 </head>
 
@@ -21,8 +21,11 @@
                 <section id="class-area" aria-labelledby="class-score-title">
                     <div class="main-scoreboard">
                         <header class="class-heading">
-                            <div class="class-goal-heading"><h1 id="class-score-title">학급 점수</h1><button type="button" id="score-maximize" aria-pressed="false">전체 화면</button><div id="class-goal-gifts" hidden></div></div>
-                            <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
+                            <div class="class-goal-heading"><h1 id="class-score-title">학급 점수</h1><div id="class-goal-gifts" hidden></div></div>
+                            <div class="score-header-actions">
+                                <button type="button" id="score-maximize" aria-label="전체 화면" title="전체 화면" aria-pressed="false"><span class="score-screen-icon" aria-hidden="true"></span></button>
+                                <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
+                            </div>
                         </header>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
@@ -177,11 +180,11 @@
 
     <div id="goal-management-view" class="fullscreen-view" role="dialog" aria-labelledby="goal-manage-title">
       <div class="dialog-sheet">
-        <header class="dialog-header"><h2 id="goal-manage-title">목표·달성 기록</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
+        <header class="dialog-header"><h2 id="goal-manage-title">목표 설정</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
         <div id="goal-settings">
           <div class="goal-container">
-            <section class="goal-column"><h3>학급 목표</h3><div id="class-goals-list"></div><button class="add-row-btn" data-type="class">+ 학급 목표 추가</button></section>
-            <section class="goal-column"><h3>개별 모둠 목표</h3><div id="team-goals-list"></div><button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button></section>
+            <section class="goal-column"><h3>학급 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="class-goals-list"></div><button class="add-row-btn" data-type="class">+ 학급 목표 추가</button></section>
+            <section class="goal-column"><h3>모둠 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="team-goals-list"></div><button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button></section>
           </div>
           <label><input type="checkbox" id="goal-include-existing"> 새 목표를 이미 달성한 대상의 기록도 만들기</label>
           <p id="goal-edit-error" role="status"></p>
@@ -191,9 +194,9 @@
     </div>
 
     <aside id="goal-celebration" hidden aria-labelledby="goal-celebration-title">
-      <header><strong id="goal-celebration-title"></strong><button id="goal-celebration-close" aria-label="축하 메시지 닫기">×</button></header>
+      <header><strong id="goal-celebration-title"></strong><button id="goal-celebration-close" class="score-secondary" type="button" aria-label="축하 메시지 닫기">×</button></header>
       <p id="goal-celebration-message" role="status"></p>
-      <button id="goal-celebration-use" type="button">확인 완료</button>
+      <button id="goal-celebration-use" class="score-secondary score-primary" type="button">확인 완료</button>
     </aside>
 
     <dialog class="score-delete-dialog" id="team-delete-dialog" aria-labelledby="team-delete-title">
@@ -218,6 +221,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=view-tabs-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
+    <script type="module" src="script.js?v=goal-design-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
 </body>
 </html>
