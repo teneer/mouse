@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=class-summary-1">
+    <link rel="stylesheet" href="style.css?v=score-conversion-1">
     <link rel="stylesheet" href="../dialog.css?v=5">
 </head>
 
@@ -70,18 +70,16 @@
 
         <form id="batch-score" hidden>
             <button type="button" id="select-all-teams">전체선택</button>
-            <div class="batch-actions">
-                <button type="button" id="undo-score" disabled>되돌리기</button>
-                <div class="batch-amount">
-                    <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
-                    <button type="button" id="batch-reset" aria-label="입력한 점수 지우기" hidden>×</button>
-                    <div class="batch-stepper">
-                        <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
-                        <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
-                    </div>
+            <button type="button" id="undo-score" disabled>되돌리기</button>
+            <div class="batch-amount">
+                <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
+                <button type="button" id="batch-reset" aria-label="입력한 점수 지우기" hidden>×</button>
+                <div class="batch-stepper">
+                    <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
+                    <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
                 </div>
-                <button type="submit" id="apply-batch" disabled>반영</button>
             </div>
+            <button type="submit" id="apply-batch" disabled>반영</button>
         </form>
 
         <div id="settings-panel" class="settings-panel" aria-labelledby="score-settings-title" inert>
@@ -213,6 +211,6 @@
 
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script type="module" src="script.js?v=whiteboard-5"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
+    <script type="module" src="script.js?v=score-conversion-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
 </body>
 </html>

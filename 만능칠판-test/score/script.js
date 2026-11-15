@@ -1,4 +1,4 @@
-import {mergeConversions,scoreRemainder} from './score-display.js';
+import {conversionSteps,scoreRemainder} from './score-display.js';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
 // 점수는 즉시 확정하고, 애니메이션은 확정된 점수를 설명하는 시각 효과로만 사용합니다.
@@ -25,7 +25,7 @@ let currentActiveGoal = null;
 let activeGoalRef = null;
 const defaultLinkPoints = 3;
 const undoWindow = 2000;
-let conversionAnimation=null, conversionFlight=null;
+let conversionPlayer=null;
 const queuedConversions=[];
 let linkEnabled = true;
 let linkPoints = defaultLinkPoints;
@@ -33,7 +33,6 @@ let lastScoreChange = null;
 const selectedTeams = new Set();
 
 const numberElement = document.getElementById('number');
-const changeElement = document.getElementById('change');
 const scoreboard = document.getElementById('scoreboard');
 const selectedTeamCount = document.getElementById('selected-team-count');
 const createTeamsBtnWrap = document.getElementById('create-teams-btn-wrap');
@@ -56,9 +55,6 @@ const undoButton = document.getElementById('undo-score');
 const applyBatchButton = document.getElementById('apply-batch');
 
 const STORAGE_KEY = 'classThermometerStateV2';
-const CHANNEL_NAME = 'class-thermometer-v2';
-const syncChannel = typeof BroadcastChannel !== 'undefined'
-  ? new BroadcastChannel(CHANNEL_NAME) : null;
 const tabId = typeof crypto !== 'undefined' && crypto.randomUUID
   ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random();
 let serial = 0;
@@ -120,7 +116,7 @@ function snapshot(version) {
 }
 function saveToStorage(effect = null) {
   const version = tabId + ':' + (++serial);
-  const state = snapshot(version);
+  const state = {...snapshot(version),effect};
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     lastAppliedVersion = version;
@@ -129,10 +125,8 @@ function saveToStorage(effect = null) {
     // 저장에 실패했다면 다른 탭에 성공한 것처럼 알리지 않습니다.
     return;
   }
-  if (syncChannel) syncChannel.postMessage({ type: 'STATE_CHANGED', version, effect });
 }
-function syncFromStorage(effect = null, expectedVersion = null) {
-  const state = readStoredState();
+function syncFromStorage(state = readStoredState()) {
   if (!state || !state.version || state.version === lastAppliedVersion) return;
   const remoteTeams = Array.isArray(state.teams) ? state.teams : [];
   if (teams.length !== remoteTeams.length || teams.some((team, index) => team.name !== remoteTeams[index].name)) {
@@ -141,22 +135,17 @@ function syncFromStorage(effect = null, expectedVersion = null) {
   lastScoreChange = null;
   applyStateFields(state);
   lastAppliedVersion = state.version;
-  const matchingEffect=effect && expectedVersion===state.version ? effect : null;
-  renderCurrentState(matchingEffect);
-}
-if (syncChannel) {
-  syncChannel.onmessage = event => {
-    if (event.data?.type !== 'STATE_CHANGED') return;
-    if (!initialized) return;
-    syncFromStorage(event.data.effect, event.data.version);
-  };
+  renderCurrentState(state.effect);
 }
 window.addEventListener('storage', event => {
-  if (event.key !== STORAGE_KEY || !initialized) return;
-  // BroadcastChannel에 포함된 연출 정보가 먼저 도착할 기회를 줍니다.
-  // 채널이 없으면 storage 이벤트만으로 동기화합니다.
-  if (syncChannel) setTimeout(() => syncFromStorage(), 80);
-  else syncFromStorage();
+  if (event.key !== STORAGE_KEY || !event.newValue || !initialized) return;
+  try {
+    const next=JSON.parse(event.newValue);
+    const previous=event.oldValue ? JSON.parse(event.oldValue) : null;
+    // Use each event's own snapshot so a burst does not collapse into its final score.
+    if(previous?.version===lastAppliedVersion || !previous?.version && !lastAppliedVersion)syncFromStorage(next);
+    else if(readStoredState()?.version===next.version)syncFromStorage(next);
+  } catch(error) {console.error('점수 동기화 실패:',error);}
 });
 
 function renderCurrentState(effect) {
@@ -165,6 +154,7 @@ function renderCurrentState(effect) {
   renderTeams();
   renderActiveGoal();
   if(effect)queueScoreEffect(effect);
+  else updateScoreProgress();
   if (getComputedStyle(goalManagementView).display !== 'none') renderGoalLists();
   // 관리 모달에 입력 중인 값은 원격 수신으로 덮어쓰지 않습니다.
 }
@@ -182,14 +172,6 @@ function renderClassNumber(score) {
   numberElement.textContent = text;
   numberElement.toggleAttribute('data-long-score', text.length >= 5);
 }
-function updateNumber(className = '', oldScore, newScore) {
-  renderClassNumber(newScore);
-  if (className) {
-    numberElement.className = className;
-    setTimeout(() => { numberElement.className = ''; }, 200);
-  }
-  checkForGoalAchievement('class', oldScore, newScore);
-}
 function recordScoreChange(key = null) {
   const now = performance.now();
   if (key && lastScoreChange?.key === key && now - lastScoreChange.time <= undoWindow) {
@@ -203,12 +185,9 @@ function undoScore() {
   if (!lastScoreChange) return;
   const previous = lastScoreChange;
   lastScoreChange = null;
-  resetConversion();
   count = previous.count;
   teams.forEach((team, index) => { team.score = previous.scores[index]; });
   restoreActiveGoal(previous.activeGoalRef);
-  document.querySelectorAll('.score-sync-fly').forEach(label => label.remove());
-  changeElement.style.opacity = 0;
   numberElement.className = '';
   renderCurrentState();
   saveToStorage();
@@ -217,15 +196,14 @@ function changeClassScore(amount) {
   syncFromStorage();
   const next = count + amount;
   if (next < minScore || next > maxScore) return;
-  resetConversion();updateScoreProgress();
   recordScoreChange(`class:${amount}`);
   const old = count;
   count = next;
-  updateNumber(amount > 0 ? 'increase' : 'decrease', old, count);
-  displayFloatingNumber(changeElement, amount, '0px', '-20px');
-  playSound(amount > 0 ? sounds.mainIncrease : sounds.mainDecrease);
+  checkForGoalAchievement('class',old,count);
+  const effect={kind:'class',oldCount:old,classDiff:amount};
+  queueScoreEffect(effect,true);
   renderBatchControls();
-  saveToStorage();
+  saveToStorage(effect);
 }
 function increment() { changeClassScore(step); }
 function decrement() { changeClassScore(-step); }
@@ -312,7 +290,7 @@ function renderTeams() {
     scoreboard.appendChild(card);
   });
   renderBatchControls();
-  updateScoreProgress();
+  if(!conversionPlayer)updateScoreProgress();
 }
 function renderTeamNumber(element, score) {
   const text = String(score);
@@ -377,105 +355,149 @@ function changeTeamScores(indices, amount, undoKey = null) {
   renderBatchControls();
   if (classDiff) checkForGoalAchievement('class', oldCount, count);
   checkForGoalAchievement('team', oldTotal, newTotal);
-  const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
+  const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldCount,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
   saveToStorage(effect);
   playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease);
-  if (classDiff) playSound(classDiff > 0 ? sounds.mainIncrease : sounds.mainDecrease);
-  queueScoreEffect(effect);
+  queueScoreEffect(effect,true);
 }
-// 모든 효과는 JS에서 만들어서 기존 CSS 파일을 수정할 필요가 없습니다.
-function installEffectStyle() {
-  const style = document.createElement('style');
-  style.textContent = `
-    .score-sync-fly {
-      position: fixed; z-index: 2147483647; pointer-events: none;
-      padding: 3px 9px; border-radius: 8px;
-      background: var(--secondary-color, #2563eb); color: #fff;
-      font-weight: 700; font-size: 19px; white-space: nowrap;
-    }
-  `;
-  document.head.appendChild(style);
-}
-function centerOf(element) {
-  if (!element) return null;
-  const rect = element.getBoundingClientRect();
-  if (!rect.width || !rect.height) return null;
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-}
-function flyLabel(label, from, to, delay = 0) {
-  if (!from || !to) return;
-  const node = document.createElement('div');
-  node.className = 'score-sync-fly'; node.textContent = label;
-  node.style.left = `${from.x}px`; node.style.top = `${from.y}px`;
-  node.style.transform = 'translate(-50%, -50%)';
-  document.body.appendChild(node);
-  if (typeof node.animate !== 'function') { node.remove(); return; }
-  const animation = node.animate([
-    { transform: 'translate(-50%, -50%) scale(.75)', opacity: 0, offset: 0 },
-    { transform: `translate(calc(-50% + ${Math.round((to.x - from.x) * .5)}px), calc(-50% + ${Math.round((to.y - from.y) * .5)}px)) scale(1.15)`, opacity: 1, offset: .45 },
-    { transform: `translate(calc(-50% + ${Math.round(to.x - from.x)}px), calc(-50% + ${Math.round(to.y - from.y)}px)) scale(.85)`, opacity: 0, offset: 1 }
-  ], { duration: 500, delay, easing: 'ease-in-out' });
-  animation.onfinish = () => node.remove();
-  animation.oncancel = () => node.remove();
-}
+
 function resetConversion() {
-  clearTimeout(conversionFlight);
-  conversionAnimation?.cancel();
-  conversionAnimation=null;
   queuedConversions.length=0;
-  document.querySelectorAll('.score-sync-fly').forEach(node=>node.remove());
+  conversionPlayer?.abort();
+  conversionPlayer=null;
   progress.removeAttribute('data-converting');
+  document.getElementById('class-conversion-delta')?.remove();
 }
-function queueScoreEffect(effect) {
-  if(!effect || effect.kind!=='team')return;
-  const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if(reduced || !effect.rate || !Number.isFinite(effect.oldTotal) || !linkEnabled){
-    renderClassNumber(count);updateScoreProgress();return;
+
+function waitForEffect(ms,signal) {
+  return new Promise((resolve,reject)=>{
+    signal.throwIfAborted();
+    const abort=()=>{clearTimeout(timer);reject(signal.reason);};
+    const timer=setTimeout(()=>{signal.removeEventListener('abort',abort);resolve();},ms);
+    signal.addEventListener('abort',abort,{once:true});
+  });
+}
+
+async function animateEffect(element,keyframes,options,signal) {
+  signal.throwIfAborted();
+  if(!element.animate){await waitForEffect(options.duration,signal);return;}
+  const animation=element.animate(keyframes,options);
+  const abort=()=>animation.cancel();
+  signal.addEventListener('abort',abort,{once:true});
+  try{await animation.finished;}
+  finally{signal.removeEventListener('abort',abort);animation.cancel();}
+}
+
+function renderProgress(value,rate) {
+  progress.style.setProperty('--filled',`${100*value/rate}%`);
+  progress.setAttribute('aria-valuenow',value);
+  progress.setAttribute('aria-valuetext',`${value}점 / ${rate}점`);
+  conversionProgress.textContent=`${value} / ${rate}`;
+}
+
+async function moveProgress(from,to,rate,reduced,signal) {
+  renderProgress(from,rate);
+  if(!reduced && from!==to)await animateEffect(progress.firstElementChild,
+    [{width:`${100*from/rate}%`},{width:`${100*to/rate}%`}],{duration:220,easing:'ease-out'},signal);
+  renderProgress(to,rate);
+}
+
+async function sendStars(rate,direction,reduced,signal) {
+  const bar=progress.getBoundingClientRect(), score=numberElement.getBoundingClientRect();
+  if(reduced || !bar.width || !score.width){await waitForEffect(200,signal);return;}
+  // The continuous bar (rates above 20) has no visual segments.
+  const segments=rate<=20?rate:1;
+  const target={x:score.left+score.width/2,y:score.top+score.height/2};
+  const stars=Array.from({length:segments},async (_,index)=>{
+    const start={x:bar.left+bar.width*(index+.5)/segments,y:bar.top+bar.height/2};
+    const [from,to]=direction>0?[start,target]:[target,start];
+    const node=document.createElement('span');
+    node.className='score-conversion-star';
+    node.textContent='★';
+    node.setAttribute('aria-hidden','true');
+    node.style.left=from.x+'px';node.style.top=from.y+'px';
+    document.body.append(node);
+    try{
+      await animateEffect(node,[
+        {transform:'translate(-50%, -50%) scale(.7)',opacity:0},
+        {transform:'translate(-50%, -85%) scale(1.12)',opacity:1,offset:.22},
+        {transform:`translate(calc(-50% + ${to.x-from.x}px), calc(-50% + ${to.y-from.y}px)) scale(.35)`,opacity:.8}
+      ],{duration:420,delay:Math.min(70,260/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
+    }finally{node.remove();}
+  });
+  await Promise.all(stars);
+}
+
+async function showClassDelta(value,delta,audible,reduced,signal) {
+  renderClassNumber(value);
+  if(audible)playSound(delta>0?sounds.mainIncrease:sounds.mainDecrease);
+  const label=document.createElement('span');
+  label.id='class-conversion-delta';label.textContent=delta>0?'+1':'−1';
+  label.setAttribute('aria-hidden','true');
+  const {left,top,width}=numberElement.getBoundingClientRect();
+  const labelX=Math.min(window.innerWidth-18,left+width+10);
+  label.style.left=labelX+'px';
+  label.style.top=top+'px';
+  document.body.append(label);
+  try{
+    await Promise.all([
+      reduced ? waitForEffect(340,signal) : animateEffect(label,[
+        {opacity:1,transform:'translate(-50%, 0)'},
+        {opacity:1,transform:'translate(-50%, -5px)',offset:.65},
+        {opacity:0,transform:'translate(-50%, -10px)'}
+      ],{duration:340,fill:'both'},signal),
+      reduced ? Promise.resolve() : animateEffect(numberElement,[
+        {transform:'scale(1)'},{transform:'scale(1.16)'},{transform:'scale(1)'}
+      ],{duration:280},signal)
+    ]);
+  }finally{label.remove();}
+}
+
+function queueScoreEffect(effect,audible=false) {
+  if(!['class','team'].includes(effect?.kind) || !Number.isSafeInteger(effect.oldCount)){
+    resetConversion();renderClassNumber(count);updateScoreProgress();return;
   }
-  if(conversionAnimation){
-    const last=queuedConversions.at(-1);
-    if(last && !last.classDiff && !effect.classDiff && last.rate===effect.rate && Math.sign(last.amount)===Math.sign(effect.amount)){
-      queuedConversions[queuedConversions.length-1]=mergeConversions(last,effect);
-    }else queuedConversions.push(effect);
-    return;
-  }
-  const teamNode=document.getElementById(`team-number-${effect.idx}`);
-  const bar=centerOf(progress);
-  if(bar)flyLabel(`${effect.amount>0?'+':'−'}${Math.abs(effect.amount)}`,centerOf(teamNode),bar);
-  const from=100*scoreRemainder(effect.oldTotal,effect.rate)/effect.rate;
-  const to=100*scoreRemainder(effect.newTotal,effect.rate)/effect.rate;
-  const fill=progress.firstElementChild;
-  if(!fill?.animate){renderClassNumber(count);updateScoreProgress();return;}
-  const crossing=effect.classDiff!==0;
-  const forward=effect.classDiff>0;
-  const boundary=forward?'100%':'0%';
-  const keys=crossing ? [
-    {width:from+'%',offset:0},
-    {width:boundary,offset:.3},
-    {width:boundary,offset:.77},
-    {width:forward?'0%':'100%',offset:.78},
-    {width:to+'%',offset:1}
-  ] : [{width:from+'%'},{width:to+'%'}];
-  const animation=fill.animate(keys,{duration:crossing?950:200,fill:'forwards',easing:'linear'});
-  conversionAnimation=animation;
-  const remaining=()=>queuedConversions.reduce((sum,event)=>sum+event.classDiff,0);
-  renderClassNumber(count-effect.classDiff-remaining());
-  if(crossing){
-    progress.setAttribute('data-converting','');
-    conversionFlight=setTimeout(()=>{
-      if(conversionAnimation===animation)flyLabel(`${forward?'+':'−'}${Math.abs(effect.classDiff)}`,centerOf(progress),centerOf(numberElement));
-    },430);
-  }
-  animation.onfinish=()=>{
-    if(conversionAnimation!==animation)return;
-    clearTimeout(conversionFlight);
-    conversionAnimation=null;
-    animation.cancel();progress.removeAttribute('data-converting');
-    renderClassNumber(count-remaining());
-    const next=queuedConversions.shift();
-    if(next)queueScoreEffect(next);
-    else updateScoreProgress();
-  };
+  queuedConversions.push({effect,audible});
+  if(conversionPlayer)return;
+  const player=new AbortController();
+  conversionPlayer=player;
+  const {signal}=player;
+  void (async()=>{
+    try{
+      while(queuedConversions.length){
+        const {effect:next,audible}=queuedConversions.shift();
+        const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        let visibleCount=next.oldCount;
+        if(next.kind==='class'){
+          await showClassDelta(visibleCount+next.classDiff,next.classDiff,audible,reduced,signal);
+          continue;
+        }
+        if(!next.rate)continue;
+        for(const step of conversionSteps(next.oldTotal,next.newTotal,next.rate)){
+          await moveProgress(step.from,step.to,next.rate,reduced,signal);
+          if(!step.delta)continue;
+          progress.setAttribute('data-converting','');
+          await waitForEffect(300,signal);
+          await sendStars(next.rate,step.delta,reduced,signal);
+          progress.removeAttribute('data-converting');
+          renderProgress(step.rest,next.rate);
+          visibleCount+=step.delta;
+          await showClassDelta(visibleCount,step.delta,audible,reduced,signal);
+        }
+      }
+    }catch(error){
+      if(!signal.aborted){
+        queuedConversions.length=0;
+        console.error('점수 환산 연출 실패:',error);
+      }
+    }finally{
+      if(conversionPlayer===player){
+        conversionPlayer=null;
+        progress.removeAttribute('data-converting');
+        renderClassNumber(count);updateScoreProgress();
+      }
+    }
+  })();
 }
 
 function openManagementModal() {
@@ -513,9 +535,11 @@ function closeAndSaveManagement() {
   } else if (nextCount !== count || newTeams.some((team, index) => team.score !== teams[index].score)) {
     recordScoreChange();
   }
+  resetConversion();
   count = nextCount;
   teams = newTeams;
-  updateNumber('', oldCount, count);
+  renderClassNumber(count);
+  checkForGoalAchievement('class',oldCount,count);
   checkForGoalAchievement('team', oldTotal, totalTeamScore());
   renderTeams(); saveToStorage();
   managementModal.style.display = 'none'; playSound(sounds.confirm);
@@ -630,14 +654,11 @@ function renderLinkSettings() {
 function updateScoreProgress() {
   const remainder = scoreRemainder(totalTeamScore(),linkPoints);
   progress.hidden = !linkEnabled;
-  progress.style.setProperty('--filled', `${100 * remainder / linkPoints}%`);
   progress.style.setProperty('--division', `${100 / linkPoints}%`);
-  // 작은 막대의 구분선이 채워진 부분 전체를 가리지 않도록 합니다.
   progress.toggleAttribute('data-continuous', linkPoints === 1 || linkPoints > 20);
   progress.setAttribute('aria-valuemax', linkPoints);
-  progress.setAttribute('aria-valuenow', remainder);
-  progress.setAttribute('aria-valuetext', `${remainder}점 / ${linkPoints}점`);
-  conversionProgress.textContent = linkEnabled ? `${remainder} / ${linkPoints}` : '';
+  if(linkEnabled)renderProgress(remainder,linkPoints);
+  else conversionProgress.textContent='';
   conversionRule.textContent = linkEnabled ? `모둠 ${linkPoints}점 = 학급 1점` : '점수 연동 안 함';
 }
 function setScoreLink(enabled, points) {
@@ -760,7 +781,6 @@ document.addEventListener('keydown', e => {
   changeTeamScore(teamIndex, e.shiftKey ? -step : step);
 });
 window.addEventListener('load', () => {
-  installEffectStyle();
   loadFromStorage();
   renderCurrentState();
   initialized = true;

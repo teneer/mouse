@@ -476,11 +476,11 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
 .team-steps button:hover {background:color-mix(in srgb, var(--card-bg) 52%, transparent)}
 [hidden] {display:none !important}
 #batch-score {
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:space-between;
+  display:grid;
+  grid-template-columns:60px minmax(0, 1fr) 60px 89px 60px;
+  grid-template-areas:"select . undo amount apply";
   align-items:center;
-  gap:6px;
+  gap:4px;
   flex:none;
   position:relative;
   z-index:5;
@@ -489,19 +489,10 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
   border-top:1px solid var(--panel-line);
   background:var(--card-bg);
 }
-.batch-actions {
-  display:flex;
-  flex:0 0 auto;
-  width:max-content;
-  justify-content:flex-end;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:4px;
-  max-width:100%;
-  margin-left:auto;
-  padding:2px;
-}
-.batch-actions > * {flex:none;max-width:100%}
+#select-all-teams {grid-area:select}
+#undo-score {grid-area:undo}
+.batch-amount {grid-area:amount}
+#apply-batch {grid-area:apply}
 #batch-score button {
   min-height:42px;
   padding:0 6px;
@@ -514,14 +505,18 @@ body {height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
   cursor:pointer;
 }
 #batch-score #select-all-teams, #batch-score #undo-score, #batch-score #apply-batch {
-  width:60px;
-  max-width:100%;
+  width:100%;
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
 }
 #batch-score #apply-batch {background:var(--primary-color);color:#fff}
 #batch-score button:disabled {opacity:.55;cursor:default}
-.batch-amount {display:flex;width:71px;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
+.batch-amount {display:flex;min-width:0;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
 #batch-delta {
-  width:42px;
+  flex:1;
+  width:0;
   min-width:0;
   padding:2px;
   border:0;
@@ -655,9 +650,20 @@ button, .main-scoreboard, .team-card, #batch-score {
 }
 .team-remove:hover {background:#a933271f}
 #batch-score #batch-reset {width:18px;min-height:0;padding:0;background:#fff;font-size:15px}
-.batch-amount:has(#batch-reset:not([hidden])) {width:89px}
-#batch-score .batch-actions {padding:0}
-#batch-score .batch-actions > * {box-sizing:border-box}
+@media(max-width:304px) {
+  #batch-score {
+    grid-template-columns:minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas:"select undo" "amount apply";
+  }
+  #batch-score #select-all-teams, #batch-score #undo-score {width:min(84px,100%)}
+  #undo-score {justify-self:end}
+}
+@media(max-width:150px) {
+  #batch-score {padding-inline:3px;gap:3px}
+  #batch-score button {font-size:clamp(9px, 10vw, 12px);padding-inline:0}
+  #batch-score #batch-reset {width:min(14px, 15vw)}
+  #batch-score .batch-stepper button {width:min(20px, 17vw)}
+}
 #score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
 
 .fullscreen-view > .dialog-sheet {width:min(700px,100%);padding:14px}
@@ -668,3 +674,13 @@ button, .main-scoreboard, .team-card, #batch-score {
 #team-setup-modal .modal-box {padding:14px;width:min(360px,100%)}
 #team-setup-modal .modal-content {padding:6px 0 12px}
 #team-setup-modal .modal-footer {justify-content:flex-end}
+
+.score-conversion-star {
+  position:fixed;z-index:2147483647;pointer-events:none;
+  color:#fdd835;font-size:clamp(13px, 6vw, 28px);line-height:1;
+  text-shadow:0 1px 3px #65440080;
+}
+#class-conversion-delta {
+  position:fixed;z-index:2147483647;pointer-events:none;color:#925900;font-weight:800;
+  transform:translateX(-50%);white-space:nowrap;
+}

@@ -8,9 +8,16 @@ export function scoreRemainder(total, rate) {
   return ((total % rate) + rate) % rate;
 }
 
-// Combine input that arrives during the animation without delaying its score changes.
-export function mergeConversions(previous, next) {
-  if (!previous || previous.rate!==next.rate) return next;
-  return {...next, oldTotal:previous.oldTotal, amount:previous.amount+next.amount,
-    classDiff:previous.classDiff+next.classDiff};
+// Yield one class point for each crossed boundary, including negative totals.
+export function* conversionSteps(oldTotal,newTotal,rate) {
+  const direction=Math.sign(newTotal-oldTotal);
+  let total=oldTotal;
+  const nextBoundary=()=>Math.floor(total/rate)*rate+(direction>0?rate:-1);
+  const crosses=boundary=>direction>0?boundary<=newTotal:boundary>=newTotal;
+  if(!direction)return;
+  for(let boundary=nextBoundary();crosses(boundary);boundary=nextBoundary()){
+    yield {from:scoreRemainder(total,rate),to:direction>0?rate:0,delta:direction,rest:scoreRemainder(boundary,rate)};
+    total=boundary;
+  }
+  if(total!==newTotal)yield {from:scoreRemainder(total,rate),to:scoreRemainder(newTotal,rate),delta:0};
 }
