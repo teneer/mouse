@@ -1,3 +1,4 @@
+import {uid} from './constants.js';
 import {assetReferences} from './files.js';
 import {deviceInviteURL, encodeDeviceKey, encodeInvite, parseFirebaseConfig, readDeviceKey, readInvite} from './cloud-config.js';
 import {drawDeviceQR} from './device-qr.js';
@@ -15,7 +16,7 @@ const message = error => ({
 const fileSize = size => size < 1024 ? size + ' B' : size < 1048576 ? (size/1024).toFixed(1) + ' KB'
   : (size/1048576).toFixed(1) + ' MB';
 
-export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,useLocal,renderFiles,goTo,prepareSeed}) {
+export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,useLocal,renderFiles,goTo,prepareSeed,scoreSync,finishEdits}) {
   const localFiles = new Set(), messages = new Map();
   const modalOpen = id => $(id).style.display === 'flex';
   let reconnectOptions=null;
@@ -102,10 +103,17 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
 
   function status() {
     const linked = !!cloud.options;
-    text('deviceStatus',linked
-      ? cloud.revoked ? '이 기기의 연결이 해제되었습니다' : cloud.online
-        ? cloud.pending.size ? `연결됨 · 전송 대기 ${cloud.pending.size}건` : '연결됨' : '연결 대기 중'
-      : '이 기기의 칠판을 사용 중');
+    const waiting = cloud.pending.size;
+    const label = linked
+      ? cloud.revoked ? '이 기기의 연결이 해제되었습니다'
+      : cloud.online ? waiting ? `동기화 중 · 전송 대기 ${waiting}건` : '연결됨'
+      : `오프라인 · 전송 대기 ${waiting}건`
+      : '로컬 모드';
+    text('deviceStatus',label);
+    if ($('cloudSyncStatus').textContent !== label) text('cloudSyncStatus',label);
+    $('cloudSyncStatus').dataset.offline = String(linked && !cloud.online);
+    $('deviceSeedScore').hidden = !linked || !cloud.boardReady || !cloud.online ||
+      cloud.state.revision < cloud.head || !!cloud.projectedScore();
     $('deviceResume').hidden = linked || !reconnectOptions;
     if (linked) {
       if (!['connected','guide','invite','legacy'].includes(activeStage)
@@ -233,8 +241,14 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     await flush();
     text('deviceMessage','이 기기의 칠판을 준비하는 중…');
     await cloud.create(parseFirebaseConfig($('firebaseConfig').value),
-      $('deviceFirstName').value.trim() || '교실 PC',await prepareSeed());
+      $('deviceFirstName').value.trim() || '교실 PC',await prepareSeed(),scoreSync.snapshot());
     stage('connected');status();
+  });
+  action('deviceSeedScore',async ()=>{
+    if (!cloud.options || !cloud.online || cloud.state.revision < cloud.head || cloud.projectedScore()) return;
+    if (!confirm('이 기기의 현재 학급·모둠 점수를 공유 칠판의 시작값으로 사용할까요? 교실 PC에서 한 번만 실행하세요.')) return;
+    await cloud.enqueue({kind:'score-seed',key:uid(),snapshot:scoreSync.snapshot()});
+    text('deviceMessage','이 기기의 점수를 공유 시작값으로 등록합니다.');
   });
   action('deviceStartInvite',async ()=>{
     await cloud.changeDeviceInvite();
@@ -270,14 +284,14 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     text('deviceMessage','연결 링크를 복사했습니다.');
   });
   action('deviceResume',async ()=>{
-    await flush();await cloud.start(reconnectOptions);await cloud.store.setMeta('cloudConnection',reconnectOptions);
+    await flush();await cloud.store.setMeta('cloudConnection',reconnectOptions);await cloud.start(reconnectOptions);
     stage('connected');status();
   });
   action('deviceDisconnect',async ()=>{
-    await flush();
+    if (!confirm('현재 칠판과 점수를 이 기기에 저장한 뒤 로컬에서 이어서 사용할까요?')) return;
     const previous=cloud.revoked ? null : cloud.options;
-    await cloud.disconnect();
-    await cloud.store.setMeta('cloudPrevious',previous);reconnectOptions=previous;status();
+    await cloud.disconnect(async()=>{await finishEdits();await scoreSync.idle();});
+    reconnectOptions=previous;status();
     stage('start');await useLocal();
   });
   function approved() {stage('connected');notify('기기 승인 완료 · 칠판을 불러오는 중입니다.');}

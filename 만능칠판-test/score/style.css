@@ -724,3 +724,10 @@ button, .main-scoreboard, .team-card, #batch-score {
 .dialog-sheet .dialog-header {padding-right:52px}
 
 #team-setup-modal .modal-box, .fullscreen-view > .dialog-sheet {--dialog-padding:14px}
+
+#shared-score-banner { padding: .45rem .7rem; background: #fff4d3; color: #533500; overflow-wrap: anywhere; }
+#shared-score-banner button { margin: .2rem 0; }
+#score-conflict-dialog { max-height: 80dvh; overflow: auto; }
+.score-conflict-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,11rem),1fr)); gap: .7rem; }
+.score-conflict-options section { padding: .5rem; border: 1px solid #bfd4dd; border-radius: .55rem; }
+.score-conflict-options ul { padding-inline-start: 1.3rem; overflow-wrap: anywhere; }

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 5.0 · 점수판 통합 테스트</title><link href="style.css?v=emoji-1" rel="stylesheet"/><link href="dialog.css?v=appearance-1" rel="stylesheet"/></head>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 5.0 · 점수판 통합 테스트</title><link href="style.css?v=shared-score-1" rel="stylesheet"/><link href="dialog.css?v=appearance-1" rel="stylesheet"/></head>
 <body>
 <div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
 <aside id="scorePanel" class="score-panel" aria-label="학급 점수판" aria-hidden="true" inert>
-  <iframe id="scoreFrame" title="학급 점수판" src="./score/학급온도계.html?v=team-step-1"></iframe>
+  <iframe id="scoreFrame" title="학급 점수판" src="./score/학급온도계.html?v=shared-score-1"></iframe>
 </aside>
 <div id="scoreSplitter" role="separator" aria-label="전자칠판과 점수판 경계 조절" aria-orientation="vertical" aria-valuemin="20" aria-valuemax="90" aria-valuenow="70" tabindex="-1"><span class="split-grip"></span></div>
 
@@ -30,6 +30,7 @@
 <div class="toolbar-group"><button aria-label="축소" class="action-btn" id="zoomOutBtn">−</button><span id="zoomLabel">100%</span><button aria-label="확대" class="action-btn" id="zoomInBtn">＋</button></div>
 <div class="toolbar-group"><label class="action-btn view-sync"><input id="viewSync" type="checkbox"/><span data-board-icon="sync">화면 동기화</span></label></div>
 <div class="toolbar-group"><button id="scorePanelToggle" class="action-btn" type="button" aria-controls="scorePanel" aria-expanded="false" title="오른쪽 학급 점수판 표시/숨기기" data-board-icon="score"><span id="scorePanelLabel">점수판 열기</span></button></div>
+<div class="toolbar-group"><output id="cloudSyncStatus" role="status">로컬 모드</output></div>
 <div class="toolbar-group"><button aria-expanded="false" class="action-btn" data-popup="moreSettings" id="moreBtn">더 보기 ▲</button></div>
 </div></div></div>
 
@@ -97,6 +98,7 @@
       <div class="cloud-buttons"><button class="action-btn" id="deviceJoinWithKey">칠판에 연결</button><button class="action-btn" id="deviceLegacyJoin">다른 연결 방법</button><button class="action-btn" data-device-back>돌아가기</button></div>
     </section>
     <section id="deviceConnected" data-stage="connected" hidden>
+      <button class="action-btn" id="deviceSeedScore" hidden>이 기기 점수로 공유 시작</button>
       <h3>연결된 기기</h3><ul id="deviceList"></ul>
       <div class="cloud-buttons"><button class="action-btn" id="deviceShowInvite">기기 추가</button><button class="action-btn" id="deviceLegacy">다른 연결 방법</button><button class="action-btn" id="deviceGuide">연결 방법</button><button class="action-btn" id="deviceDisconnect">로컬 칠판으로 돌아가기</button></div>
     </section>
@@ -162,7 +164,7 @@
 </div>
 <input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
 <div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=emoji-1" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=shared-score-1" type="module"></script>
 <noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
 <div class="context-palette" role="group" aria-label="색상">
   <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>

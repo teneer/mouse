@@ -1,3 +1,4 @@
+import {applyScoreOperation} from './shared-score.js';
 import {reorderPages} from './board-navigation.js';
 import {normalizePattern} from './board-background.js';
 
@@ -57,6 +58,13 @@ export function boardPages(board) {
 export function applyOperation(board, operation, revision) {
   const {kind, pageId} = operation;
   board.revision = revision;
+  if (kind.startsWith('score-')) {
+    applyScoreOperation(board,operation);
+    return;
+  }
+  if (kind === 'seed' && operation.score) {
+    applyScoreOperation(board,{kind:'score-seed',snapshot:operation.score,key:'first-score'});
+  }
   if (kind === 'seed' || kind === 'add') {
     for (const page of operation.pages) {
       if (!Object.hasOwn(board.pages, page.id)) board.pages[page.id] = {...copy(page), version:revision};

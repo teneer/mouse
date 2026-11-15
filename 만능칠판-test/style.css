@@ -753,3 +753,6 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 @media(max-width:540px) {.appearance-overview {grid-template-columns:minmax(0,1fr)}}
 
 :is(.quick-colors,.quick-sizes) button.favorite {border-style:dashed}
+
+#cloudSyncStatus { font-size: .78rem; color: #324d60; white-space: nowrap; }
+#cloudSyncStatus[data-offline="true"] { color: #754100; background: #fff1d0; padding: .3rem .5rem; border-radius: .4rem; }

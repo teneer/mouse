@@ -1,3 +1,4 @@
+import {applyOperation,boardPages,newBoard} from './js/cloud-model.js';
 import {reorderPages} from './js/board-navigation.js';
 import {uid, clone} from './js/constants.js';
 import {resolvePageWrite} from './js/conflicts.js';
@@ -97,7 +98,24 @@ export class BoardStore {
   getAsset(id) {return this.request('assets','readonly',s=>s.get(id));}
   putAsset(asset) {return this.request('assets','readwrite',s=>s.put(asset));}
   deleteAsset(id) {return this.request('assets','readwrite',s=>s.delete(id));}
-  putCloudOperation(operation) {return this.request('cloudOperations','readwrite',s=>s.put(operation));}
+  putCloudOperation(operation, initialConnection) {
+    return new Promise((resolve,reject)=>{
+      const tx = this.db.transaction(['meta','cloudOperations'],'readwrite');
+      const meta = tx.objectStore('meta'), operations = tx.objectStore('cloudOperations');
+      const connection = meta.get('cloudConnection');
+      connection.onsuccess=()=>{
+        if (initialConnection && !connection.result) meta.put(initialConnection,'cloudConnection');
+        else if (connection.result?.boardId !== operation.boardId) {tx.abort();return;}
+        const rows = operations.index('boardId').getAll(operation.boardId);
+        rows.onsuccess=()=>{
+          for (const row of rows.result) operation.time = Math.max(operation.time,row.time+1);
+          operations.put(operation);
+        };
+      };
+      tx.oncomplete=resolve;
+      tx.onabort=tx.onerror=()=>reject(tx.error || Error('기기 연결 상태가 바뀌어 작업을 저장하지 못했습니다.'));
+    });
+  }
   async listCloudOperations(boardId) {
     const rows = await this.request('cloudOperations','readonly',s=>s.index('boardId').getAll(boardId));
     return rows.sort((a,b)=>a.time-b.time);
@@ -105,10 +123,45 @@ export class BoardStore {
   cacheCloudState(boardId,state,confirmed) {
     return new Promise((resolve,reject)=>{
       const tx=this.db.transaction(['meta','cloudOperations'],'readwrite');
-      tx.objectStore('meta').put(state,'cloud-state:'+boardId);
+      const meta = tx.objectStore('meta');
+      const cached = meta.get('cloud-state:'+boardId);
+      cached.onsuccess=()=>{
+        if ((cached.result?.revision ?? 0) <= state.revision) meta.put(state,'cloud-state:'+boardId);
+      };
       for(const id of confirmed)tx.objectStore('cloudOperations').delete(id);
       tx.oncomplete=resolve;
       tx.onabort=tx.onerror=()=>reject(tx.error);
+    });
+  }
+  saveLocalHandoff(boardId, previous) {
+    return new Promise((resolve,reject)=>{
+      const tx = this.db.transaction(['pages','meta','cloudOperations'],'readwrite');
+      const meta = tx.objectStore('meta'), connection = meta.get('cloudConnection');
+      connection.onsuccess=()=>{
+        if (connection.result?.boardId !== boardId) {tx.abort();return;}
+        const cached = meta.get('cloud-state:'+boardId);
+        const operations = tx.objectStore('cloudOperations');
+        const pending = operations.index('boardId').getAll(boardId);
+        pending.onsuccess=()=>{
+          const projected = cached.result || newBoard();
+          let revision = projected.revision;
+          for (const operation of pending.result.sort((a,b)=>a.time-b.time)) {
+            applyOperation(projected,operation,++revision);
+            operations.delete(operation.id);
+          }
+          const pages = boardPages(projected);
+          if (!pages.length) {tx.abort();return;}
+          const local = tx.objectStore('pages');
+          local.clear();
+          pages.forEach(page=>local.put(page));
+          if (projected.score) meta.put(projected.score.state,'localScoreHandoff');
+          meta.put(null,'cloudConnection');
+          meta.put(null,'cloudRequest');
+          meta.put(previous,'cloudPrevious');
+        };
+      };
+      tx.oncomplete=resolve;
+      tx.onabort=tx.onerror=()=>reject(tx.error || Error('현재 칠판을 로컬에 저장하지 못했습니다.'));
     });
   }
   listScreens() { return this.request('screens','readonly',s=>s.getAll()).then(a=>a.sort((x,y)=>y.savedAt-x.savedAt)); }

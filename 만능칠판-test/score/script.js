@@ -62,6 +62,107 @@ const tabId = typeof crypto !== 'undefined' && crypto.randomUUID
 let serial = 0;
 let lastAppliedVersion = null;
 let initialized = false;
+let sharedMode = false, sharedScore = null, sharedSend, sharedNotice, managementBase, goalsBase;
+let scoreGroup, migrationSnapshot;
+const sharedBanner = document.getElementById('shared-score-banner');
+const sharedMessage = document.getElementById('shared-score-message');
+const conflictsButton = document.getElementById('score-conflicts');
+const conflictsDialog = document.getElementById('score-conflict-dialog');
+const bodyControls = document.querySelector('.container');
+
+function applySharedScore(model) {
+  const previous = sharedScore;
+  sharedScore = model;
+  bodyControls.inert = !model;
+  sharedBanner.hidden = !!model && !model.conflicts.length && !model.notice;
+  sharedMessage.textContent = model?.notice?.text || (model ? '' : '공유 점수판을 불러오는 중입니다. 기존 칠판은 교실 PC에서 공유 점수를 시작해 주세요.');
+  conflictsButton.hidden = !model?.conflicts.length;
+  if (model?.conflicts.length) conflictsButton.textContent = `점수 충돌 확인 (${model.conflicts.length})`;
+  if (!model) {
+    applyStateFields({});
+    renderCurrentState();
+    return;
+  }
+  if (teams.length !== model.state.teams.length || teams.some((team,index)=>team.id !== model.state.teams[index].id)) selectedTeams.clear();
+  if (JSON.stringify(snapshot(undefined)) === JSON.stringify(model.state)) {
+    renderBatchControls();
+    return;
+  }
+  const effect = previous && previous.version !== model.version && model.effect?.oldCount === count
+    && (model.effect.kind !== 'team' || model.effect.oldTotal === totalTeamScore()) ? model.effect : null;
+  applyStateFields(structuredClone(model.state));
+  renderCurrentState(effect);
+}
+
+window.whiteboardScore = {
+  localSnapshot: () => initialized
+    ? structuredClone(sharedMode ? readStoredState() || migrationSnapshot : snapshot(undefined)) : null,
+  receive({shared, model, send, notice}) {
+    sharedSend = send;
+    sharedNotice = notice;
+    if (shared) {
+      if (!sharedMode) {
+        migrationSnapshot = structuredClone(snapshot(undefined));
+        selectedTeams.clear();
+        lastScoreChange = null;
+        scoreGroup = null;
+      }
+      sharedMode = true;
+      applySharedScore(model);
+    } else if (sharedMode) {
+      sharedMode = false;
+      sharedScore = null;
+      bodyControls.inert = false;
+      sharedBanner.hidden = true;
+      lastScoreChange = null;
+      selectedTeams.clear();
+      loadFromStorage();
+      renderCurrentState();
+    }
+  },
+  saveLocal(model) {
+    const state = {...structuredClone(model),version:tabId + ':' + (++serial),effect:null};
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    if (!sharedMode) syncFromStorage(state);
+  }
+};
+
+function sendScore(operation) {
+  if (!sharedScore || !sharedSend) return;
+  const key = crypto.randomUUID();
+  sharedSend({...operation,key});
+}
+function sharedDelta(amount, targets = null) {
+  const signature = JSON.stringify([amount,targets]), now = performance.now();
+  if (scoreGroup?.signature !== signature || now-scoreGroup.time > undoWindow) {
+    scoreGroup = {id:crypto.randomUUID(),signature};
+  }
+  scoreGroup.time = now;
+  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,epoch:sharedScore.epoch});
+}
+function showConflict() {
+  const conflict = sharedScore?.conflicts[0];
+  if (!conflict) return;
+  const base = sharedScore.version;
+  const list = (element, state) => {
+    const values = ['학급 ' + state.count + '점', ...state.teams.map(team=>team.name + ' ' + team.score + '점')];
+    element.replaceChildren(...values.map(value=>{
+      const li = document.createElement('li');
+      li.textContent = value;
+      return li;
+    }));
+  };
+  list(document.getElementById('shared-score-current'),sharedScore.state);
+  list(document.getElementById('shared-score-candidate'),conflict.candidate);
+  for (const [id,useCandidate] of [['keep-shared-score',false],['apply-conflicting-score',true]]) {
+    document.getElementById(id).onclick = () => {
+      sendScore({kind:'score-resolve',base,conflict:conflict.id,useCandidate});
+      conflictsDialog.close();
+    };
+  }
+  if (!conflictsDialog.open) conflictsDialog.showModal();
+}
+conflictsButton.onclick = showConflict;
 
 function readStoredState() {
   try {
@@ -116,7 +217,16 @@ function snapshot(version) {
     scoreLink: { enabled: linkEnabled, points: linkPoints }
   };
 }
-function saveToStorage(effect = null) {
+function saveToStorage(effect = null, base = sharedScore?.version) {
+  if (sharedMode) {
+    if (!sharedScore) return;
+    if (effect) sharedDelta(effect.inputAmount ?? effect.classDiff,effect.targets);
+    else {
+      scoreGroup = null;
+      sendScore({kind:'score-edit',base,snapshot:snapshot(undefined)});
+    }
+    return;
+  }
   const version = tabId + ':' + (++serial);
   const state = {...snapshot(version),effect};
   try {
@@ -129,7 +239,7 @@ function saveToStorage(effect = null) {
   }
 }
 function syncFromStorage(state = readStoredState()) {
-  if (!state || !state.version || state.version === lastAppliedVersion) return;
+  if (sharedMode || !state || !state.version || state.version === lastAppliedVersion) return;
   const remoteTeams = Array.isArray(state.teams) ? state.teams : [];
   if (teams.length !== remoteTeams.length || teams.some((team, index) => team.name !== remoteTeams[index].name)) {
     selectedTeams.clear();
@@ -184,6 +294,11 @@ function recordScoreChange(key = null) {
   lastScoreChange = { key, time: now, count, scores: teams.map(team => team.score), activeGoalRef };
 }
 function undoScore() {
+  if (sharedMode) {
+    scoreGroup = null;
+    sendScore({kind:'score-undo',base:sharedScore?.version});
+    return;
+  }
   syncFromStorage();
   if (!lastScoreChange) return;
   const previous = lastScoreChange;
@@ -198,7 +313,7 @@ function undoScore() {
 function changeClassScore(amount) {
   syncFromStorage();
   const next = count + amount;
-  if (next < minScore || next > maxScore) return;
+  if (next < minScore || next > maxScore || sharedMode && !sharedScore) return;
   recordScoreChange(`class:${amount}`);
   const old = count;
   count = next;
@@ -227,7 +342,7 @@ function createTeams() {
   n = Math.max(1, Math.min(n, 24 - teams.length));
   if (teams.length >= 24) return;
   lastScoreChange = null;
-  for (let i = 0; i < n; i++) teams.push({ name: `모둠 ${teams.length + 1}`, score: 0 });
+  for (let i = 0; i < n; i++) teams.push({ id:crypto.randomUUID(), name: `모둠 ${teams.length + 1}`, score: 0 });
   hideTeamSetupModal();
   renderTeams();
   saveToStorage();
@@ -281,10 +396,13 @@ function renderTeams() {
     remove.setAttribute('aria-label',team.name+' 삭제');
     remove.onclick=async()=>{
       const name=team.name;
-      const version=lastAppliedVersion;
+      const version=sharedMode ? sharedScore?.version : lastAppliedVersion;
       if(!await confirmTeamDelete(name))return;
       syncFromStorage();
-      if(lastAppliedVersion!==version || teams[idx]?.name!==name)return;
+      if((sharedMode ? sharedScore?.version : lastAppliedVersion)!==version || teams[idx]?.name!==name) {
+        if (sharedMode) sharedNotice?.('점수가 변경되었습니다. 모둠 삭제를 다시 선택해 주세요.');
+        return;
+      }
       teams.splice(idx,1);
       selectedTeams.clear();lastScoreChange=null;
       renderCurrentState();saveToStorage();
@@ -317,14 +435,15 @@ function renderBatchControls() {
     card.classList.toggle('team-selected', selected);
     card.querySelector('.team-select-btn').setAttribute('aria-pressed', String(selected));
   });
-  batchForm.hidden = teams.length === 0 && !lastScoreChange;
+  const canUndo = sharedMode ? !!sharedScore?.undo : !!lastScoreChange;
+  batchForm.hidden = teams.length === 0 && !canUndo;
   selectAllButton.textContent = selectedTeams.size ? '전체해제' : '전체선택';
   selectAllButton.disabled = !teams.length;
   const targetCount = selectedTeams.size;
   selectedTeamCount.textContent = targetCount ? `${targetCount}모둠 선택` : '';
   applyBatchButton.setAttribute('aria-label', targetCount ? `${targetCount}모둠에 반영` : '반영');
   updateBatchButton();
-  undoButton.disabled = !lastScoreChange;
+  undoButton.disabled = !canUndo;
 }
 
 function updateBatchButton() {
@@ -369,7 +488,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
   if (classDiff) checkForGoalAchievement('class', oldCount, count);
   checkForGoalAchievement('team', oldTotal, newTotal);
   const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldCount,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
-  saveToStorage(effect);
+  saveToStorage({...effect,inputAmount:amount,targets:indices.map(index=>teams[index].id)});
   playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease);
   presentScoreEffect(effect,true);
 }
@@ -547,11 +666,13 @@ function presentScoreEffect(effect,audible=false) {
 function openManagementModal() {
   setSettingsOpen(false);
   syncFromStorage();
+  managementBase = sharedScore?.version;
   document.getElementById('manage-main-score').value = count;
   const list = document.getElementById('team-management-list'); list.innerHTML = '';
   teams.forEach(team => {
     const item = document.createElement('div'); item.className = 'team-manage-item';
     item.innerHTML = '<input type="text" class="manage-input manage-name" maxlength="20"> <input type="number" class="manage-input manage-score"> <button type="button" class="delete-team-btn" aria-label="모둠 삭제">삭제</button>';
+    if (team.id) item.dataset.teamId = team.id;
     item.querySelector('.manage-name').value = team.name;
     item.querySelector('.manage-score').value = team.score;
     list.appendChild(item);
@@ -568,10 +689,15 @@ function closeAndSaveManagement() {
   document.querySelectorAll('#team-management-list .team-manage-item').forEach(item => {
     let score = parseInt(item.querySelector('.manage-score').value, 10) || 0;
     newTeams.push({
+      id:item.dataset.teamId || crypto.randomUUID(),
       name: item.querySelector('.manage-name').value.trim() || `모둠 ${newTeams.length + 1}`,
       score: Math.max(minScore, Math.min(score, maxScore))
     });
   });
+  if (sharedMode && nextCount === count && JSON.stringify(newTeams) === JSON.stringify(teams)) {
+    closeManagementModal();
+    return;
+  }
   const sameTeams = newTeams.length === teams.length && newTeams.every((team, index) => team.name === teams[index].name);
   if (!sameTeams) {
     lastScoreChange = null;
@@ -585,7 +711,7 @@ function closeAndSaveManagement() {
   renderClassNumber(count);
   checkForGoalAchievement('class',oldCount,count);
   checkForGoalAchievement('team', oldTotal, totalTeamScore());
-  renderTeams(); saveToStorage();
+  renderTeams(); saveToStorage(null,managementBase);
   managementModal.style.display = 'none'; playSound(sounds.confirm);
 }
 function closeManagementModal() { managementModal.style.display = 'none'; }
@@ -602,7 +728,7 @@ document.getElementById('add-team-btn').addEventListener('click', () => {
 
 function openGoalManagementView() {
   setSettingsOpen(false);
-  syncFromStorage(); renderGoalLists(); goalManagementView.style.display = 'flex';
+  syncFromStorage(); goalsBase = sharedScore?.version; renderGoalLists(); goalManagementView.style.display = 'flex';
 }
 function closeAndSaveGoalManagementView() {
   syncFromStorage();
@@ -622,7 +748,7 @@ function closeAndSaveGoalManagementView() {
   classGoals = readGoals('class'); teamGoals = readGoals('team');
   activeGoalRef = null; currentActiveGoal = null;
   renderActiveGoal();
-  saveToStorage(); goalManagementView.style.display = 'none'; playSound(sounds.confirm);
+  saveToStorage(null,goalsBase); goalManagementView.style.display = 'none'; playSound(sounds.confirm);
 }
 function renderGoalLists() {
   const classList = document.getElementById('class-goals-list');
@@ -830,6 +956,7 @@ window.addEventListener('load', () => {
   renderCurrentState();
   initialized = true;
   syncFromStorage();
+  if (window.parent !== window) window.frameElement?.dispatchEvent(new Event('score-sync-ready'));
 });
 
 document.getElementById('create-teams-btn').onclick=showTeamSetupModal;

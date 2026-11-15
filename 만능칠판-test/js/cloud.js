@@ -1,5 +1,6 @@
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=shared-score-1';
+import {applyScoreOperation} from './shared-score.js';
 import {parseFirebaseConfig} from './cloud-config.js';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
@@ -27,7 +28,7 @@ export class CloudBoard {
 
   async authenticate(config) {
     if (this.user && JSON.stringify(this.config) === JSON.stringify(config)) return;
-    if (this.options) throw Error('현재 연결을 해제한 뒤 다른 Firebase 프로젝트를 연결해주세요.');
+    if (this.options && JSON.stringify(this.options.config) !== JSON.stringify(config)) throw Error('현재 연결을 해제한 뒤 다른 Firebase 프로젝트를 연결해주세요.');
     const [app, auth, fs] = await Promise.all([
       import(sdk + '/firebase-app.js'), import(sdk + '/firebase-auth.js'), import(sdk + '/firebase-firestore.js')
     ]);
@@ -45,7 +46,7 @@ export class CloudBoard {
   collection(...parts) {return this.fs.collection(this.db, 'wbBoards', this.options.boardId, ...parts);}
   get deviceId() {return this.user?.uid;}
 
-  async create(config, label, pages) {
+  async create(config, label, pages, score) {
     await this.authenticate(parseFirebaseConfig(config));
     const options = {config:this.config, boardId:uid(), label, initial:true};
     const {fs, db, deviceId} = this;
@@ -55,9 +56,8 @@ export class CloudBoard {
     batch.set(fs.doc(board, 'devices', deviceId), {label, joined:fs.serverTimestamp()});
     await batch.commit();
     this.options = options;
-    try {await this.enqueue({kind:'seed', pages}, false);}
+    try {await this.enqueue({kind:'seed', pages, score}, false, options);}
     catch(error) {this.options=null;throw error;}
-    await this.store.setMeta('cloudConnection', options);
     await this.start(options);
   }
 
@@ -151,7 +151,9 @@ export class CloudBoard {
 
   async approve(code) {
     const {fs, db} = this;
-    const request = this.ref('requests', code.replace(/[\s-]/g,'').toUpperCase());
+    const normalized = code.replace(/[\s-]/g,'').toUpperCase();
+    if (!/^[A-Z0-9]{20}$/.test(normalized)) throw Error('새 기기에서 발급한 20자리 연결 코드를 입력해주세요.');
+    const request = this.ref('requests', normalized);
     await fs.runTransaction(db, async tx => {
       const snapshot = await tx.get(request);
       if (!snapshot.exists()) throw Error('연결 코드를 찾지 못했습니다.');
@@ -177,17 +179,35 @@ export class CloudBoard {
   }
 
   async start(options) {
-    await this.authenticate(parseFirebaseConfig(options.config));
     this.options = options;
     this.state = await this.store.getMeta('cloud-state:' + options.boardId) || newBoard();
     this.pending = new Map((await this.store.listCloudOperations(options.boardId)).map(operation => [operation.id, operation]));
+    this.head = this.state.revision;
+    this.boardReady = boardPages(this.projected()).length > 0;
+    if (this.boardReady) this.events.board();
+    this.events.status();
+    this.connectServer(options).catch(this.events.error);
+  }
+
+  async connectServer(options) {
+    try {await this.authenticate(parseFirebaseConfig(options.config));}
+    catch (error) {
+      if (this.options !== options || this.detaching) return;
+      clearTimeout(this.authRetry);
+      this.authRetry = setTimeout(()=>this.connectServer(options).catch(this.events.error),5000);
+      this.events.error(error);
+      return;
+    }
+    if (this.options !== options || this.detaching) return;
     const {fs} = this;
     const statusError = error => {
+      if (this.options !== options) return;
       this.online = false;
       this.events.status();
       this.events.error(error);
     };
     this.subscriptions.push(fs.onSnapshot(this.ref(), {includeMetadataChanges:true}, snapshot => {
+      if (this.options !== options) return;
       if (!isReady(snapshot)) {
         this.online = false;
         this.events.status();
@@ -226,20 +246,24 @@ export class CloudBoard {
       this.devices = [];
       this.events.status();
     }, this.events.error));
-    if (options.initial && this.pending.size && !this.state.revision) {
-      this.boardReady = boardPages(this.projected()).length > 0;
-      this.events.board();
-    }
-    if (this.state.revision > 0) {
-      this.boardReady = true;
-      this.events.board();
-    }
-    this.events.status();
   }
 
-  async disconnect() {
-    if (this.pulling || this.pushing || (!this.revoked && this.pending.size)) throw Error('서버에 보낼 변경이 남아 있습니다. 동기화를 마친 뒤 연결을 해제해주세요.');
+  async disconnect(waitForChanges) {
+    if (!this.options || this.detaching) return;
+    if (!this.boardReady) throw Error('공유 칠판을 불러온 뒤 연결을 해제해주세요.');
+    this.detaching = true;
+    const previous = this.revoked ? null : this.options;
+    try {
+      await waitForChanges();
+      await Promise.allSettled([this.pulling,this.pushing]);
+      await this.store.saveLocalHandoff(this.options.boardId,previous);
+    } finally {this.detaching = false;}
+    this.clearConnection();
+  }
+
+  clearConnection() {
     clearTimeout(this.retryTimer);
+    clearTimeout(this.authRetry);
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
     this.cancelApproval();
     this.options = null;
@@ -252,8 +276,7 @@ export class CloudBoard {
     this.revoked = false;
     this.latestView = null;
     this.state = newBoard();
-    await this.store.setMeta('cloudConnection', null);
-    await this.store.setMeta('cloudRequest', null);
+    this.pending.clear();
     this.events.status();
   }
 
@@ -264,10 +287,27 @@ export class CloudBoard {
     return board;
   }
 
-  async enqueue(operation, startPush = true) {
+  projectedScore(drafts = []) {
+    const board = {score:structuredClone(this.state.score)};
+    const seen = new Set();
+    for (const operation of this.pending.values()) {
+      if (operation.kind.startsWith('score-')) {
+        seen.add(operation.key);
+        applyScoreOperation(board,operation);
+      } else if (operation.kind === 'seed' && operation.score) {
+        applyScoreOperation(board,{kind:'score-seed',snapshot:operation.score,key:'first-score'});
+      }
+    }
+    for (const operation of drafts) {
+      if (!seen.has(operation.key)) applyScoreOperation(board,operation);
+    }
+    return board.score ?? null;
+  }
+
+  async enqueue(operation, startPush = true, initialConnection) {
     if (!this.options) throw Error('기기 연결을 확인해주세요.');
     const record = {...structuredClone(operation), id:uid(), boardId:this.options.boardId, time:Date.now()};
-    await this.store.putCloudOperation(record);
+    await this.store.putCloudOperation(record,initialConnection);
     this.pending.set(record.id, record);
     if (startPush) {
       this.events.board();
@@ -277,7 +317,7 @@ export class CloudBoard {
   }
 
   async pull() {
-    if (this.pulling || !this.online) return this.pulling;
+    if (this.pulling || !this.online || this.detaching) return this.pulling;
     const {fs} = this;
     this.pulling = (async () => {
       while (this.state.revision < this.head) {
@@ -298,7 +338,7 @@ export class CloudBoard {
           }
           const operation = JSON.parse(payload);
           applyOperation(nextState, operation, revision);
-          if (this.pending.has(entry.operationId)) confirmed.push(entry.operationId);
+          confirmed.push(entry.operationId);
         }
         await this.store.cacheCloudState(this.options.boardId, nextState, confirmed);
         this.state=nextState;
@@ -312,13 +352,15 @@ export class CloudBoard {
   }
 
   async push() {
-    if (!this.online || this.pushing || this.pulling || !this.pending.size || !this.options) return;
+    if (!this.online || this.pushing || this.pulling || !this.pending.size || !this.options || this.detaching) return;
     const {fs, db} = this;
-    this.pushing = true;
-    try {
+    this.pushing = (async ()=>{
       // Keep an operation pending until its committed sequence is applied by pull().
       for (const operation of [...this.pending.values()]) {
+        if (this.detaching || !this.online) break;
         if (operation.sent) continue;
+        const permission = await this.store.getMeta('cloudConnection');
+        if (permission?.boardId !== operation.boardId || this.detaching) break;
         const {time, boardId, id, sent, ...content} = operation;
         const payload = JSON.stringify(content);
         const parts = [];
@@ -351,20 +393,39 @@ export class CloudBoard {
         this.head = Math.max(this.head ?? 0, revision);
       }
       this.retryDelay = 1000;
-    } finally {
-      this.pushing = false;
+    })().finally(()=>{
+      this.pushing = null;
       this.events.status();
-      if (this.online && this.state.revision < this.head) this.pull().catch(error=>this.retrySync(error));
-    }
+      if (!this.detaching && this.online && this.state.revision < this.head) this.pull().catch(error=>this.retrySync(error));
+    });
+    await this.pushing;
+  }
+
+  setOffline() {
+    if (!this.options) return;
+    this.online = false;
+    this.events.status();
   }
 
   retrySync(error) {
     const temporary = ['unavailable','deadline-exceeded','aborted','internal','resource-exhausted'].includes(error.code);
     if (!temporary) {this.events.error(error);return;}
+    if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
+      this.online = false;
+      this.events.status();
+    }
     clearTimeout(this.retryTimer);
     if (!this.options) return;
-    this.retryTimer=setTimeout(()=>{
-      if (this.online) this.pull().catch(next=>this.retrySync(next));
+    this.retryTimer=setTimeout(async ()=>{
+      if (!this.options || this.detaching) return;
+      try {
+        const snapshot = await this.fs.getDocFromServer(this.ref());
+        if (!isReady(snapshot) || !this.options) return;
+        this.head = Math.max(this.head || 0,snapshot.data().head);
+        this.online = true;
+        this.events.status();
+        await this.pull();
+      } catch (next) {this.retrySync(next);}
     },this.retryDelay);
     this.retryDelay=Math.min(this.retryDelay*2,60000);
   }

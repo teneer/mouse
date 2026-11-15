@@ -1,16 +1,17 @@
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
-import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=shared-score-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js';
 import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js';
-import {wireCloudUI} from './js/cloud-ui.js';
+import {CloudBoard} from './js/cloud.js?v=shared-score-1';
+import {wireScoreSync} from './js/score-sync.js?v=shared-score-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=shared-score-1';
+import {wireCloudUI} from './js/cloud-ui.js?v=shared-score-1';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
@@ -30,7 +31,7 @@ let favoriteDraft, favoriteColorDraft, favoriteSizeEnabled, textPropsTarget, con
 let textBoxDefaults=normalizeTextBoxStyle(readPreference('wb50.textBoxDefaults'));
 let favoriteBackground=readPreference('wb42.favoriteBackground'), localView, pageListGeneration=0, renamePageId=null;
 let groupSession=null,suppressSelection=false;
-let cloud, boardFiles, cloudUI, cloudBase, cloudRefresh=false, cloudRefreshTimer, viewTimer, applyingView=false;
+let cloud, boardFiles, cloudUI, cloudBase, reloadLocalAfterDisconnect, cloudRefresh=false, cloudRefreshTimer, viewTimer, applyingView=false;
 let cancelledText=false, cloudHistory=null, seenView=null;
 const cloudActive=()=>!!cloud?.options && cloud.boardReady;
 try {session=JSON.parse(sessionStorage.getItem(SESSION_KEY)) || session;} catch {}
@@ -51,7 +52,8 @@ function isTextEditing() {
 function isFormEditing() {
   const e=document.activeElement;return !!(e && e.matches('input,textarea,select,[contenteditable="true"]'));
 }
-function allowed() {return !!current&&!busy&&!modalOpen()&&!tools?.gesture;}
+const canEditBoard = ()=>!cloud?.options || !!cloudBase && !cloud.detaching;
+function allowed() {return !!current&&canEditBoard()&&!busy&&!modalOpen()&&!tools?.gesture;}
 function rememberView(publish=false) {
   if(!current || !c)return;
   session.activeId=current.id;session.views[current.id]=c.viewportTransform.slice();
@@ -1017,7 +1019,15 @@ async function applyLocalView(){
   }finally{applyingView=false;if(view!==localView)queueMicrotask(()=>applyLocalView().catch(fail));}
 }
 async function refreshRemote() {
-  if(cloudActive() || syncing || busy || dirty || saving || tools?.gesture || isTextEditing() || modalOpen() || !current)return;
+  if (cloud?.options && !cloud.detaching && !cloud.pulling && !cloud.pushing && !busy && !dirty && !saving && !tools?.gesture && !isTextEditing()) {
+    const options = cloud.options;
+    const connected = await store.getMeta('cloudConnection');
+    if (cloud.options === options && !connected && !cloud.detaching) {
+      cloud.clearConnection();
+      await reloadLocalAfterDisconnect();
+    }
+  }
+  if(cloud?.options || syncing || busy || dirty || saving || tools?.gesture || isTextEditing() || modalOpen() || !current)return;
   syncing=true;
   try {
     const all=await store.listPages();
@@ -1261,7 +1271,7 @@ async function boot() {
   for(const element of document.querySelectorAll('[data-board-icon]'))setBoardIcon(element,element.dataset.boardIcon);
   c=new fabric.Canvas('whiteboardCanvas',{width:boardViewportWidth(),height:boardViewportHeight(),preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true,enablePointerEvents:true});
   fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});
-  tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&!busy&&!modalOpen(),onChange:changed,onViewport:()=>rememberView(true),onText:p=>addText('텍스트',p,true),onMode:mode=>{
+  tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&canEditBoard()&&!busy&&!modalOpen(),onChange:changed,onViewport:()=>rememberView(true),onText:p=>addText('텍스트',p,true),onMode:mode=>{
     const map={selectMoveToggleBtn:'select',penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
     for(const [id,m] of Object.entries(map))$(id).classList.toggle('active-select',mode===m);
     $('selectMoveLabel').textContent=mode==='move'?'이동':'선택';setBoardIcon($('selectMoveToggleBtn'),mode==='move'?'hand':'select');$('selectMoveToggleBtn').classList.toggle('active-move',mode==='move');
@@ -1284,23 +1294,34 @@ async function boot() {
   c.on('text:editing:exited',()=>{if(cancelledText)return;if(groupSession)closeGroupSession();else changed();flush().then(()=>{if(cloudActive())requestCloudRefresh();else return applyLocalView();}).catch(fail);});
 
   wireUI();setupIntegratedScorePanel();
+  let scoreSync;
+  const useLocal = async()=>{
+    await scoreSync.restoreLocal().catch(fail);
+    clearTimeout(viewTimer);seenView=null;cloudHistory=null;
+    pages=await store.listPages();
+    await setPage(pages.find(page=>page.id===session.activeId)||pages[0],true);
+    restoreLocalView();
+  };
+  reloadLocalAfterDisconnect = useLocal;
   cloud=new CloudBoard(store,{
-    board:requestCloudRefresh,view:requestCloudRefresh,error:fail,
-    status:()=>cloudUI?.status(),approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
+    board:()=>{requestCloudRefresh();scoreSync?.refresh();},
+    view:requestCloudRefresh,error:fail,
+    status:()=>{cloudUI?.status();scoreSync?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
   });
-  cloudUI=wireCloudUI({cloud,files:boardFiles,openModal,notify,flush,
+  scoreSync=wireScoreSync($('scoreFrame'),cloud,store,notify);
+  cloudUI=wireCloudUI({cloud,files:boardFiles,openModal,notify,flush,scoreSync,
+    finishEdits:async()=>{
+      c.getActiveObject()?.exitEditing?.();
+      closeGroupSession();
+      await flush();
+    },
     pages:()=>pages,current:()=>current,
     prepareSeed:async()=>{
       const list=await store.listPages();
       for(const page of list)normalizedObjects(page.content.canvas.objects);
       return Promise.all(list.map(prepareCloudPage));
     },
-    useLocal:async()=>{
-      clearTimeout(viewTimer);seenView=null;cloudHistory=null;
-      pages=await store.listPages();
-      await setPage(pages.find(page=>page.id===session.activeId)||pages[0],true);
-      restoreLocalView();
-    },
+    useLocal:async()=>{sync.notify();await useLocal();},
     renderFiles:()=>{updateFileInteraction();c.requestRenderAll();},
     goTo:id=>{closeModal('fileManagerModal');return run(()=>activatePage(id));}
   });
@@ -1314,6 +1335,9 @@ async function boot() {
     finally{control.disabled=false;}
   };
   restoreLocalView();
-  cloud.resume().catch(fail);
+  const reconnect=cloud.resume();
+  reconnect.catch(fail).finally(()=>scoreSync.ready().catch(fail));
+  if (navigator.onLine === false) cloud.setOffline();
+  window.addEventListener('offline',()=>cloud.setOffline());
 }
 boot().catch(error=>{console.error(error);const hint=location.protocol==='file:'?' 파일을 직접 열지 말고 HTTPS 배포 주소 또는 localhost에서 실행해주세요.':'';const fatal=$('fatalError');if(fatal){fatal.textContent=`앱을 시작하지 못했습니다. ${error.message}${hint}`;fatal.hidden=false;}status('시작 실패','error');});

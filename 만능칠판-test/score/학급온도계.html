@@ -5,11 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=team-step-1">
+    <link rel="stylesheet" href="style.css?v=shared-score-1">
     <link rel="stylesheet" href="../dialog.css?v=appearance-1">
 </head>
 
 <body>
+    <div id="shared-score-banner" hidden>
+        <span id="shared-score-message" role="status"></span>
+        <button id="score-conflicts" type="button" hidden>점수 충돌 확인</button>
+    </div>
     <div class="container">
         <div id="display-area">
             <div id="top-row">
@@ -216,8 +220,22 @@
             <div class="dialog-footer"><button class="dialog-action" value="cancel" autofocus>취소</button><button class="dialog-action dialog-danger" value="delete">삭제</button></div>
         </form>
     </dialog>
+    <dialog class="score-delete-dialog" id="score-conflict-dialog" aria-labelledby="score-conflict-title">
+        <form method="dialog">
+            <header class="dialog-header"><h2 id="score-conflict-title">점수 충돌 확인</h2><button class="dialog-close" aria-label="닫기">×</button></header>
+            <p>점수가 다른 기기에서도 바뀌었습니다. 전체 기기에 적용할 점수판을 선택하세요.</p>
+            <div class="score-conflict-options">
+                <section><h3>현재 공유 점수</h3><ul id="shared-score-current"></ul></section>
+                <section><h3>충돌한 변경 결과</h3><ul id="shared-score-candidate"></ul></section>
+            </div>
+            <div class="dialog-footer">
+                <button class="dialog-action" type="button" id="keep-shared-score">현재 점수 유지</button>
+                <button class="dialog-action dialog-primary" type="button" id="apply-conflicting-score">변경 결과 적용</button>
+            </div>
+        </form>
+    </dialog>
     <div id="goal-alert" style="display:none;"><span id="goal-alert-message"></span></div>
 
-    <script type="module" src="script.js?v=appearance-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
+    <script type="module" src="script.js?v=shared-score-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
 </body>
 </html>
