@@ -1,0 +1,6 @@
+/* 클래스레볼루션에서는 전자칠판을 독립 전체 화면 모드로 사용합니다. */
+#scorePanel, #scoreSplitter, #scorePanelToggle { display: none !important; }
+body.score-open #scorePanel, body.score-full #scorePanel { display: none !important; }
+#canvas-container { left: 0 !important; right: 0 !important; width: 100% !important; }
+body.score-full #canvas-container { visibility: visible !important; }
+body.score-full #toolbarScaleWrap { display: block !important; }
