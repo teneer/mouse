@@ -2,7 +2,7 @@ import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-confl
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=conflict-fields-1';
 import {wireGoals} from './goals-ui.js?v=conflict-fields-1';
 import {wireScoreAudio} from './score-audio.js';
-import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
+import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
 // 점수는 즉시 확정하고, 애니메이션은 확정된 점수를 설명하는 시각 효과로만 사용합니다.
@@ -605,12 +605,10 @@ async function sendStars(rate,direction,reduced,signal) {
   const bar=progress.getBoundingClientRect();
   if(!bar.width){await waitForEffect(200,signal);return;}
   const score=numberElement.getBoundingClientRect();
-  const target={x:score.width?score.left+score.width/2:bar.left+bar.width/2,y:score.height?score.top+score.height/2:bar.top-24};
   // Continuous bars do not draw individual divisions.
   const segments=rate<=20?rate:1;
   await Promise.all(Array.from({length:segments},async (_,index)=>{
-    const start={x:bar.left+bar.width*(index+.5)/segments,y:bar.top+bar.height/2-6};
-    const [from,to]=direction>0?[start,target]:[target,start];
+    const {from,frames}=conversionStarFlight(bar,score,index,segments,direction<0);
     const node=document.createElement('span');
     node.className='score-conversion-star';
     node.textContent='★';
@@ -619,13 +617,8 @@ async function sendStars(rate,direction,reduced,signal) {
     document.body.append(node);
     try{
       if(reduced){await waitForEffect(360,signal);return;}
-      const x=to.x-from.x,y=to.y-from.y;
-      await animateEffect(node,[
-        {transform:'translate(0, 0) scale(1)',opacity:1},
-        {transform:'translate(0, 0) scale(1.18)',opacity:1,offset:.32},
-        {transform:`translate(${x*.55}px, ${y*.55-12}px) scale(1)`,opacity:1,offset:.65},
-        {transform:`translate(${x}px, ${y}px) scale(.62)`,opacity:1}
-      ],{duration:680,delay:Math.min(55,220/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
+      await animateEffect(node,frames,
+        {duration:680,delay:Math.min(55,220/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
     }finally{node.remove();}
   }));
 }
@@ -697,7 +690,7 @@ function presentScoreEffect(effect,audible=false) {
         progress.setAttribute('data-converting','');
         await waitForEffect(300,signal);
         await sendStars(rate,frame.delta,reduced,signal);
-        // Include same-direction input that arrived before the stars landed.
+        // Include same-direction input received during the star animation.
         group=collectPendingConversions(group);
         frame=conversionFrame(group.effect.oldTotal,group.effect.newTotal,rate);
         progress.removeAttribute('data-converting');

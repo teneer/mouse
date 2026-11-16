@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fitScoreFont, conversionFrame, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
+import {fitScoreFont, conversionFrame, conversionStarFlight, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
 import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
 import {movePageId} from '../js/board-navigation.js';
@@ -102,4 +102,17 @@ test('only the explicitly selected tabs follow the shared viewport',async()=>{
   assert.equal(activeView(selected,'pc2'),false);
   assert.equal(activeView({...selected,enabled:false},'pc1'),false);
   assert.equal(activeView({enabled:true},'pc1'),false);
+});
+
+test('deduction stars leave the class score, rise and fade; earned stars still arrive from the bar',()=>{
+  const bar={left:20,top:120,width:160,height:12};
+  const score={left:70,top:40,width:60,height:60};
+  const lost=conversionStarFlight(bar,score,0,3,true);
+  assert.deepEqual(lost.from,{x:100,y:70});
+  assert.match(lost.frames.at(-1).transform,/translate\(-48px, -62px\)/);
+  assert.equal(lost.frames.at(-1).opacity,0);
+  const gained=conversionStarFlight(bar,score,1,3,false);
+  assert.deepEqual(gained.from,{x:100,y:120});
+  assert.match(gained.frames.at(-1).transform,/translate\(0px, -50px\)/);
+  assert.equal(gained.frames.at(-1).opacity,1);
 });
