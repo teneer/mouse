@@ -111,14 +111,23 @@ function applySharedScore(model,live) {
     for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect);
   }
   if (teams.length !== model.state.teams.length || teams.some((team,index)=>team.id !== model.state.teams[index].id)) selectedTeams.clear();
-  if (JSON.stringify(snapshot(undefined)) === JSON.stringify(model.state)) {
+  const {goalSystem: nextGoals, ...nextScores} = model.state;
+  const {goalSystem: currentGoals, ...currentScores} = snapshot(undefined);
+  const announce = live || ownScoreEvents.has(model.version);
+  if (JSON.stringify(currentScores) === JSON.stringify(nextScores)) {
+    // The local click already queued its score effect. Apply the synced goal records without interrupting it.
+    if (JSON.stringify(currentGoals) !== JSON.stringify(nextGoals)) {
+      goalSystem = readGoals(nextGoals);
+      completeReachedAutomaticGoals({count,teams,goalSystem});
+      renderGoalFeedback(announce);
+    }
     renderBatchControls();
     return;
   }
   const effect = previous && previous.version !== model.version && model.effect?.oldCount === count
     && (model.effect.kind !== 'team' || model.effect.oldTotal === totalTeamScore()) ? model.effect : null;
   applyStateFields(structuredClone(model.state));
-  renderCurrentState(effect,live || ownScoreEvents.has(model.version));
+  renderCurrentState(effect,announce);
 
 }
 
@@ -267,6 +276,11 @@ function snapshot(version) {
     scoreLink: { enabled: linkEnabled, points: linkPoints }
   };
 }
+function renderGoalFeedback(announce) {
+  goalUI.update(goalSystem,announce);
+  goalUI.giftGroup(document.getElementById('class-goal-gifts'));
+  for (const gift of document.querySelectorAll('[data-team-gifts]')) goalUI.giftGroup(gift,gift.dataset.teamGifts);
+}
 function saveToStorage(effect = null, base = sharedScore?.state) {
   if (sharedMode) {
     if (!sharedScore) return;
@@ -283,9 +297,7 @@ function saveToStorage(effect = null, base = sharedScore?.state) {
   const version = tabId + ':' + (++serial);
   reconcileGoals({count,teams,goalSystem},localBaseline||{count,teams},{key:version,authoredAt:Date.now()});
   localBaseline={count,teams:structuredClone(teams)};
-  goalUI.update(goalSystem,true);
-  goalUI.giftGroup(document.getElementById('class-goal-gifts'));
-  for (const gift of document.querySelectorAll('[data-team-gifts]')) goalUI.giftGroup(gift,gift.dataset.teamGifts);
+  renderGoalFeedback(true);
   const state = {...snapshot(version),effect};
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
