@@ -113,7 +113,6 @@ export async function importAll(data) {
   return new Promise(function (resolve, reject) {
     const tx = db.transaction(STORE_NAMES, 'readwrite');
     tx.oncomplete = function () { resolve(true); };
-    tx.onerror = function () { reject(tx.error); };
     tx.onabort = function () { reject(tx.error || new Error('복원이 취소되었습니다.')); };
     try {
       STORE_NAMES.forEach(function (storeName) {

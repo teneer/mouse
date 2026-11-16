@@ -1,8 +1,9 @@
 import { getAll, getRecord } from '../core/db.js';
 
+// Centers of the nine stars and the gold egg in bg-class-clouds-way.png.
 const POSITIONS = [
-  [7, 41], [24, 17], [43, 24], [61, 17], [80, 23],
-  [75, 75], [57, 69], [38, 75], [19, 69], [92, 73]
+  [79.6, 26.0], [61.1, 19.4], [42.6, 26.0], [24.0, 19.4], [7.4, 41.3],
+  [19.0, 70.4], [37.5, 77.1], [56.0, 70.4], [74.6, 77.1], [91.9, 75.2]
 ];
 
 function avatarPath(id) {
