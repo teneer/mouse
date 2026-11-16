@@ -1,5 +1,6 @@
-import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=goal-status-1';
-import {wireGoals} from './goals-ui.js?v=goal-status-1';
+import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=conflict-fields-1';
+import {wireGoals} from './goals-ui.js?v=conflict-fields-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,mergeTeamEffects,scoreRemainder} from './score-display.js?v=3';
 
@@ -58,7 +59,7 @@ let serial = 0;
 let lastAppliedVersion = null;
 let initialized = false;
 let sharedMode = false, sharedScore = null, sharedSend, sharedNotice, managementBase;
-let scoreGroup, migrationSnapshot;
+let scoreGroup, migrationSnapshot, deviceNames=new Map(), conflictViewKey;
 const sharedBanner = document.getElementById('shared-score-banner');
 const sharedMessage = document.getElementById('shared-score-message');
 const conflictsButton = document.getElementById('score-conflicts');
@@ -94,10 +95,12 @@ function applySharedScore(model,live) {
   const previous = sharedScore;
   sharedScore = model;
   bodyControls.inert = !model;
-  sharedBanner.hidden = !!model && !model.conflicts.length && !model.notice;
+  const conflicts=model?fieldConflictOptions(model):[];
+  sharedBanner.hidden = !!model && !conflicts.length && !model.notice;
   sharedMessage.textContent = model?.notice?.text || (model ? '' : '공유 점수판을 불러오는 중입니다. 기존 칠판은 교실 PC에서 공유 점수를 시작해 주세요.');
-  conflictsButton.hidden = !model?.conflicts.length;
-  if (model?.conflicts.length) conflictsButton.textContent = `점수 충돌 확인 (${model.conflicts.length})`;
+  conflictsButton.hidden = !conflicts.length;
+  if (conflicts.length) conflictsButton.textContent = '점수 충돌 확인 ('+conflicts.length+')';
+  if (conflictsDialog.open) drawConflicts(conflicts);
   if (!model) {
     applyStateFields({});
     renderCurrentState();
@@ -122,9 +125,10 @@ function applySharedScore(model,live) {
 window.whiteboardScore = {
   localSnapshot: () => initialized
     ? structuredClone(sharedMode ? readStoredState() || migrationSnapshot : snapshot(undefined)) : null,
-  receive({shared, model, send, notice, live}) {
+  receive({shared, model, send, notice, live, deviceNames:registered}) {
     sharedSend = send;
     sharedNotice = notice;
+    deviceNames=new Map((registered||[]).map(({id,label})=>[id,label]));
     if (shared) {
       if (!sharedMode) {
         migrationSnapshot = structuredClone(snapshot(undefined));
@@ -139,6 +143,7 @@ window.whiteboardScore = {
       goalUI.reset();ownScoreEvents.clear();
       sharedMode = false;
       sharedScore = null;
+      if (conflictsDialog.open) conflictsDialog.close();
       bodyControls.inert = false;
       sharedBanner.hidden = true;
       lastScoreChange = null;
@@ -167,31 +172,46 @@ function sharedDelta(amount, targets = null) {
     scoreGroup = {id:crypto.randomUUID(),signature};
   }
   scoreGroup.time = now;
-  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,epoch:sharedScore.epoch});
+  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,fieldBasis:scoreDeltaBasis(sharedScore)});
 }
-function showConflict() {
-  const conflict = sharedScore?.conflicts[0];
-  if (!conflict) return;
-  const base = sharedScore.version;
-  const list = (element, state) => {
-    const values = ['학급 ' + state.count + '점', ...state.teams.map(team=>team.name + ' ' + team.score + '점')];
-    element.replaceChildren(...values.map(value=>{
-      const li = document.createElement('li');
-      li.textContent = value;
-      return li;
-    }));
-  };
-  list(document.getElementById('shared-score-current'),sharedScore.state);
-  list(document.getElementById('shared-score-candidate'),conflict.candidate);
-  for (const [id,useCandidate] of [['keep-shared-score',false],['apply-conflicting-score',true]]) {
-    document.getElementById(id).onclick = () => {
-      sendScore({kind:'score-resolve',base,conflict:conflict.id,useCandidate});
-      conflictsDialog.close();
-    };
+function drawConflicts(conflicts) {
+  if (!conflicts.length) {
+    if (conflictsDialog.open) conflictsDialog.close();
+    return;
   }
-  if (!conflictsDialog.open) conflictsDialog.showModal();
+  const key=JSON.stringify([conflicts,[...deviceNames]]);
+  if (key===conflictViewKey) return;
+  conflictViewKey=key;
+  const container=document.getElementById('score-conflict-fields');
+  container.replaceChildren(...conflicts.map(conflict=>{
+    const group=document.createElement('fieldset');
+    group.className='score-conflict-field';
+    const title=document.createElement('legend');
+    title.textContent=conflict.label;
+    group.append(title);
+    const choices=[{value:conflict.server,label:'서버 값'},...conflict.candidates.map(({value,devices})=>({
+      value,label:devices.map(device=>deviceNames.get(device.id)||device.label||'다른 기기').join(' · ')
+    }))];
+    for (const {value,label} of choices) {
+      const control=document.createElement('button');
+      control.type='button';control.className='dialog-action';
+      control.textContent=label+' · '+value+'점';
+      control.onclick=async()=>{
+        control.disabled=true;
+        await sendScore({kind:'score-field-choice',field:conflict.field,stamp:conflict.stamp,value});
+        control.disabled=false;
+      };
+      group.append(control);
+    }
+    return group;
+  }));
 }
-conflictsButton.onclick = showConflict;
+conflictsButton.onclick=()=>{
+  const conflicts=sharedScore?fieldConflictOptions(sharedScore):[];
+  if (!conflicts.length) return;
+  drawConflicts(conflicts);
+  if (!conflictsDialog.open) conflictsDialog.showModal();
+};
 
 function readStoredState() {
   try {
@@ -247,13 +267,16 @@ function snapshot(version) {
     scoreLink: { enabled: linkEnabled, points: linkPoints }
   };
 }
-function saveToStorage(effect = null, base = sharedScore?.version) {
+function saveToStorage(effect = null, base = sharedScore?.state) {
   if (sharedMode) {
     if (!sharedScore) return;
     if (effect) sharedDelta(effect.inputAmount ?? effect.classDiff,effect.targets);
     else {
       scoreGroup = null;
-      sendScore({kind:'score-edit',base,snapshot:snapshot(undefined)});
+      const patch=scorePatch(base,snapshot(undefined));
+      if (patch.numbers.length || patch.renamed.length || patch.added.length || patch.removed.length || patch.link) {
+        sendScore({kind:'score-patch',patch});
+      }
     }
     return;
   }
@@ -702,7 +725,7 @@ function presentScoreEffect(effect,audible=false) {
 function openManagementModal() {
   setSettingsOpen(false);
   syncFromStorage();
-  managementBase = sharedScore?.version;
+  managementBase = sharedMode ? structuredClone(sharedScore.state) : undefined;
   document.getElementById('manage-main-score').value = count;
   const list = document.getElementById('team-management-list'); list.innerHTML = '';
   teams.forEach(team => {
@@ -720,7 +743,7 @@ function openManagementModal() {
 function closeAndSaveManagement() {
   syncFromStorage();
   const newMain = parseInt(document.getElementById('manage-main-score').value, 10);
-  const nextCount = Number.isNaN(newMain) ? count : Math.max(minScore, Math.min(newMain, maxScore));
+  const nextCount = Number.isNaN(newMain) ? managementBase?.count??count : Math.max(minScore, Math.min(newMain, maxScore));
   const newTeams = [];
   document.querySelectorAll('#team-management-list .team-manage-item').forEach(item => {
     let score = parseInt(item.querySelector('.manage-score').value, 10) || 0;

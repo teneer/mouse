@@ -816,3 +816,7 @@ body.score-modal-open #scoreFrame {background:transparent}
   .device-start-actions {grid-template-columns:1fr}
   .guide-diagram > div {padding:.5rem;font-size:.79rem}
 }
+
+.conflict-guide summary {color:#18536e}
+.conflict-guide h3 {margin:.7rem 0 .25rem}
+.conflict-guide ul {margin:.25rem 0 .6rem;padding-inline-start:1.2rem;line-height:1.55}

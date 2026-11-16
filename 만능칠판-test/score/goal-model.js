@@ -1,6 +1,15 @@
 const clone = value => structuredClone(value);
 export const freshGoals = () => ({goals:[],records:[],revision:null});
-export const readGoals = value => value ? clone(value) : freshGoals();
+export function dropRemovedGoalRecords(system) {
+  const ids=new Set(system.goals.map(goal=>goal.id));
+  system.records=system.records.filter(record=>ids.has(record.goalId));
+}
+
+export function readGoals(value) {
+  const system=value?clone(value):freshGoals();
+  dropRemovedGoalRecords(system);
+  return system;
+}
 
 export function parseGoalScore(value) {
   const number = value.trim().normalize('NFKC').replace(/^−/,'-');
@@ -81,6 +90,7 @@ export function changeGoals(state, operation) {
     if (operation.base !== system.revision) return false;
     const oldIds = new Set(system.goals.map(goal=>goal.id));
     system.goals = clone(operation.goals);
+    dropRemovedGoalRecords(system);
     system.revision = operation.key;
     if (operation.includeExisting) {
       const selected = system.goals;

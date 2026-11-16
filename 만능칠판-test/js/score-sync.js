@@ -19,13 +19,14 @@ export function wireScoreSync(frame, cloud, store, notify) {
         if (!cloud.options) await restoreLocal();
         const shared = !!cloud.options;
         const model = shared ? cloud.projectedScore(drafts.values()) : null;
-        const key = JSON.stringify([shared,model]);
+        const deviceNames=(cloud.devices||[]).map(({id,label})=>({id,label}));
+        const key = JSON.stringify([shared,model,deviceNames]);
         if (!cloud.online || !wasOnline) catchingUp=true;
         wasOnline=cloud.online;
         const live=cloud.online&&!catchingUp;
         if (cloud.online && cloud.state.revision>=cloud.head) catchingUp=false;
         if (key === previous) return;
-        api().receive({shared,model,send,notice:notify,live});
+        api().receive({shared,model,send,notice:notify,live,deviceNames});
         previous = key;
       } catch (error) {notify(error.message);}
       finally {refreshQueued = false;}
@@ -34,7 +35,7 @@ export function wireScoreSync(frame, cloud, store, notify) {
   function send(data) {
     if (!cloud.options || cloud.detaching) return false;
     if (data.kind==='score-goals' && data.base!==(cloud.projectedScore(drafts.values())?.state.goalSystem?.revision??null)) return false;
-    const operation = structuredClone(data);
+    const operation = structuredClone({...data,device:cloud.deviceId||'local',deviceLabel:cloud.options.label||'연결 기기'});
     drafts.set(operation.key,operation);
     refresh();
     write = write.then(async ()=>{

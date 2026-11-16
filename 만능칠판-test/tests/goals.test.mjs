@@ -103,3 +103,12 @@ test('a reached manual goal with no historical record can be completed and cance
   send('score-records','cancel',{complete:false,records:[{id:record.id,reached:record.reached}]});
   assert.equal(goalStatus(goal,9,record),'reached');
 });
+
+test('deleting a goal removes outstanding gifts while preserving unrelated records',()=>{
+  const {score,send}=scenario();
+  send('score-goals','new',{base:null,goals});
+  send('score-delta','one',{group:'points',amount:1,targets:['a']});
+  assert.equal(score().records.length,2);
+  send('score-goals','remove',{base:'new',goals:[goals[0]]});
+  assert.deepEqual(score().records.map(record=>record.goalId),[goals[0].id]);
+});

@@ -1,4 +1,5 @@
-import {changeGoals,completeReachedAutomaticGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=goal-status-1';
+import {applyFieldPatch,resolveFieldConflict,startFieldConflicts,trackFieldDelta} from './score-conflicts.js';
+import {changeGoals,completeReachedAutomaticGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=conflict-fields-1';
 const min = -10000, max = 10000;
 const empty = () => ({count:0,teams:[],scoreLink:{enabled:true,points:3}});
 const copy = value => structuredClone(value);
@@ -57,7 +58,11 @@ export function applyScoreOperation(board, operation) {
   }
 
   if (kind === 'score-delta') {
-    const effect = applyDelta(score.state,operation);
+    if (operation.fieldBasis) startFieldConflicts(score);
+    const activeTargets=operation.fieldBasis && operation.targets
+      ? operation.targets.filter(id=>score.state.teams.some(team=>team.id===id)) : operation.targets;
+    const missed=activeTargets?.length!==operation.targets?.length;
+    const effect = applyDelta(score.state,{...operation,targets:activeTargets});
     if (!effect) {
       score.notice = {key,text:'모둠이 삭제되었거나 점수 범위를 벗어나 대기 중이던 점수 조작을 적용하지 못했습니다.'};
       return;
@@ -69,9 +74,12 @@ export function applyScoreOperation(board, operation) {
         score.conflicts.push({id,candidate:before});
       }
     }
+    if (score.fieldConflicts) trackFieldDelta(score,before,operation);
     reconcileGoals(score.state,before,operation);
-    score.notice = null;
-    if (score.undo?.group !== operation.group) score.undo = {group:operation.group,amount:0,targets:operation.targets || null};
+    score.notice=missed?{key,text:'삭제된 모둠을 제외한 점수 변경을 반영했습니다.'}:null;
+    if (score.undo?.group !== operation.group || !equal(score.undo.targets,activeTargets||null)) {
+      score.undo={group:operation.group,amount:0,targets:activeTargets||null};
+    }
     score.undo.amount += operation.amount;
     score.version = key;
     score.effect = effect;
@@ -96,11 +104,18 @@ export function applyScoreOperation(board, operation) {
       score.state.count += change;
     } else score.state.count -= undo.amount;
     if (score.overwrite) applyDelta(score.overwrite.before,{amount:-undo.amount,targets:undo.targets});
+    if (score.fieldConflicts) trackFieldDelta(score,before,operation);
+  } else if (kind === 'score-patch') {
+    const link=score.state.scoreLink;
+    applyFieldPatch(score,operation);
+    if (score.state.count===before.count && equal(score.state.teams,before.teams) && equal(score.state.scoreLink,link)) return;
+  } else if (kind === 'score-field-choice') {
+    if (!resolveFieldConflict(score,operation)) return;
   } else if (kind === 'score-edit') {
     const candidate = scoreSnapshot({...operation.snapshot,goalSystem:score.state.goalSystem},key);
     if (equal(score.state,candidate)) return;
     if (score.version !== operation.base) {
-      score.conflicts.push({id:key,candidate});
+      score.conflicts.push({id:key,candidate,device:operation.device,label:operation.deviceLabel,at:operation.authoredAt});
       return;
     }
     const previous = score.state;
@@ -127,7 +142,7 @@ export function applyScoreOperation(board, operation) {
   } else return;
   reconcileGoals(score.state,before,operation);
   score.undo = null;
-  score.notice = null;
+  if (kind!=='score-patch') score.notice = null;
   score.version = key;
   score.effect = null;
 }

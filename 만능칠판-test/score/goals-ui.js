@@ -1,4 +1,4 @@
-import {goalStatus,parseGoalScore} from './goal-model.js?v=goal-status-1';
+import {goalStatus,parseGoalScore} from './goal-model.js?v=conflict-fields-1';
 import {mountGoalCelebration} from './goal-celebration.js';
 
 const $ = id => document.getElementById(id);

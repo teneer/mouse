@@ -728,9 +728,12 @@ button, .main-scoreboard, .team-card, #batch-score {
 #shared-score-banner { flex:none; padding: .45rem .7rem; background: #fff4d3; color: #533500; overflow-wrap: anywhere; }
 #shared-score-banner button { margin: .2rem 0; }
 #score-conflict-dialog { max-height: 80dvh; overflow: auto; }
-.score-conflict-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,11rem),1fr)); gap: .7rem; }
-.score-conflict-options section { padding: .5rem; border: 1px solid #bfd4dd; border-radius: .55rem; }
-.score-conflict-options ul { padding-inline-start: 1.3rem; overflow-wrap: anywhere; }
+.score-conflict-field {margin:.5rem 0;padding:.6rem;border:1px solid #bfd4dd;border-radius:.55rem}
+.score-conflict-field legend {font-weight:700;color:#123447}
+#score-conflict-dialog .score-conflict-field button {
+  margin:.15rem;padding:.45rem .6rem;background:#edf5f7;color:#123c4b;border:1px solid #b9d1de;border-radius:8px;
+}
+#score-conflicts,#create-teams-btn {min-height:36px}
 
 .class-goal-heading, #class-goal-gifts, .goal-tabs {display:flex;align-items:baseline;gap:.35rem;min-width:0}
 .goal-tabs {flex-wrap:wrap;padding:.5rem}

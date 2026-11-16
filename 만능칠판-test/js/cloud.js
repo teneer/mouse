@@ -1,7 +1,8 @@
-import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=goal-status-1';
+import {startFieldConflicts} from './score-conflicts.js';
+import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=conflict-fields-1';
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=goal-status-1';
-import {applyScoreOperation} from './shared-score.js?v=goal-status-1';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=conflict-fields-1';
+import {applyScoreOperation} from './shared-score.js?v=conflict-fields-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
@@ -310,6 +311,7 @@ export class CloudBoard {
     for (const operation of drafts) {
       if (!seen.has(operation.key)) applyScoreOperation(board,operation);
     }
+    if (board.score) startFieldConflicts(board.score);
     return board.score ?? null;
   }
 
@@ -346,6 +348,7 @@ export class CloudBoard {
             payload = parts.docs.map(part => part.data().payload).join('');
           }
           const operation = JSON.parse(payload);
+          if (operation.kind.startsWith('score-') && entry.author) operation.device=entry.author;
           applyOperation(nextState, operation, revision);
           confirmed.push(entry.operationId);
         }

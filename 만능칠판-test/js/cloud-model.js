@@ -1,4 +1,4 @@
-import {applyScoreOperation} from './shared-score.js?v=goal-status-1';
+import {applyScoreOperation} from './shared-score.js?v=conflict-fields-1';
 import {reorderPages} from './board-navigation.js';
 import {normalizePattern} from './board-background.js';
 

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-status-1">
+    <link rel="stylesheet" href="style.css?v=conflict-fields-1">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=1">
 </head>
@@ -58,7 +58,7 @@
                 </div>
                 
                 <div id="create-teams-btn-wrap">
-                    <button id="create-teams-btn">모둠 점수판 생성</button>
+                    <button id="create-teams-btn" type="button" class="score-secondary">＋ 모둠 추가</button>
                 </div>
             </section>
         </div>
@@ -206,18 +206,11 @@
     <dialog class="score-delete-dialog" id="score-conflict-dialog" aria-labelledby="score-conflict-title">
         <form method="dialog">
             <header class="dialog-header"><h2 id="score-conflict-title">점수 충돌 확인</h2><button class="dialog-close" aria-label="닫기">×</button></header>
-            <p>점수가 다른 기기에서도 바뀌었습니다. 전체 기기에 적용할 점수판을 선택하세요.</p>
-            <div class="score-conflict-options">
-                <section><h3>현재 공유 점수</h3><ul id="shared-score-current"></ul></section>
-                <section><h3>충돌한 변경 결과</h3><ul id="shared-score-candidate"></ul></section>
-            </div>
-            <div class="dialog-footer">
-                <button class="dialog-action" type="button" id="keep-shared-score">현재 점수 유지</button>
-                <button class="dialog-action dialog-primary" type="button" id="apply-conflicting-score">변경 결과 적용</button>
-            </div>
+            <p>서버 값과 기기에서 마지막으로 입력한 값 중 적용할 점수를 고르세요.</p>
+            <div id="score-conflict-fields"></div>
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=goal-status-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
+    <script type="module" src="script.js?v=conflict-fields-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
 </body>
 </html>
