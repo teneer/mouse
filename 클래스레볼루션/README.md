@@ -3,7 +3,7 @@
 통합 학급 운영 플랫폼의 초기 구현 및 Work 인수인계 문서입니다.
 
 ## 시작점
-- 작업 브랜치: `class-revolution`
+- 작업 브랜치: `main`
 - 프로젝트 경로: `클래스레볼루션/`
 - [Work 인수인계 문서](WORK_HANDOFF.md)
 - [세부 문서 목록](docs/README.md)

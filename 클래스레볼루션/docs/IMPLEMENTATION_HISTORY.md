@@ -5,14 +5,15 @@
 ## 1. Git 기준
 
 - 저장소: `teneer/mouse`
-- 새 작업 브랜치: `class-revolution`
+- 초기 작업 브랜치: `class-revolution`
+- 현재 작업 브랜치: `main`. 프로젝트 변경은 `클래스레볼루션/` 안에서 커밋하고 푸시한다.
 - 새 프로젝트 폴더: `클래스레볼루션/`
 - 브랜치 생성 기준: `main`의 커밋 `4d879dfc42d492b5dcef23e39c61f2ee4dd7cc65`
 - 초기 구현 기준 커밋: `7ebdf3c514e4d0d8f3ba2d6761f42d86208743f2`
 - README 추가 커밋: `1e85a40c9011caf30f38f7fcd81b573b718e8ac4`
 - 에셋 매핑 문서 추가 커밋: `1babb08ab55d98de5c1cb7661e19a4d29b54c90c`
 
-Work 시작 시 실제 브랜치 HEAD가 이보다 앞서 있을 수 있으므로 GitHub에서 최신 상태를 다시 확인한다.
+Work 시작 시 GitHub의 `main` 최신 커밋을 확인한다.
 
 ## 2. 전자칠판 복사
 
