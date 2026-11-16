@@ -48,11 +48,31 @@ export function openDatabase() {
   return databasePromise;
 }
 
-function requestResult(request) {
+export function requestResult(request) {
   return new Promise(function (resolve, reject) {
     request.onsuccess = function () { resolve(request.result); };
     request.onerror = function () { reject(request.error); };
   });
+}
+
+export async function transact(storeNames, mode, operation) {
+  const db = await openDatabase();
+  const transaction = db.transaction(storeNames, mode);
+  const completed = new Promise(function (resolve, reject) {
+    transaction.oncomplete = resolve;
+    transaction.onabort = function () {
+      reject(transaction.error || new Error('저장이 취소되었습니다.'));
+    };
+  });
+  const work = Promise.resolve().then(function () { return operation(transaction); });
+  try {
+    const [result] = await Promise.all([work, completed]);
+    return result;
+  } catch (error) {
+    try { transaction.abort(); } catch (abortError) { /* The transaction already finished. */ }
+    await completed.catch(function () {});
+    throw error;
+  }
 }
 
 export async function getRecord(storeName, key) {

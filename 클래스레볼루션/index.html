@@ -4,23 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#f5f7fb">
+  <meta name="theme-color" content="#efeee3">
   <title>클래스레볼루션</title>
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="stage1.css">
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="./" aria-label="클래스레볼루션 홈">
-        <span class="brand-mark">CR</span>
-        <span class="brand-copy"><strong>CLASS REVOLUTION</strong><small>통합 학급 운영 플랫폼</small></span>
+        <span class="brand-mark" aria-hidden="true">★</span>
+        <span class="brand-copy">클래스레볼루션</span>
       </a>
-      <nav class="mode-nav" aria-label="작업 모드">
-        <button class="mode-tab is-active" type="button" data-mode="whiteboard"><span class="nav-icon">▱</span>전자칠판</button>
-        <button class="mode-tab" type="button" data-mode="scoreboard"><span class="nav-icon">✦</span>점수판</button>
-        <button class="mode-tab" type="button" data-mode="growth"><span class="nav-icon">♧</span>학급 성장</button>
-        <button class="mode-tab" type="button" data-mode="checklist"><span class="nav-icon">☷</span>체크리스트</button>
-      </nav>
+      <span class="classroom-tab">◇ 수업화면</span>
       <div class="header-actions">
         <span class="local-indicator"><i></i><span id="storage-status">로컬 저장 준비 중</span></span>
         <button class="quiet-button" id="backup-button" type="button">백업</button>
@@ -29,22 +25,30 @@
       </div>
     </header>
 
-    <main class="workspace">
-      <section class="mode-panel is-active" id="mode-whiteboard" aria-label="전자칠판">
-        <iframe class="whiteboard-frame" src="modules/whiteboard/index.html" title="만능칠판 6.0 기반 전자칠판"></iframe>
-      </section>
-      <section class="mode-panel" id="mode-scoreboard" aria-label="점수판">
-        <div id="scoreboard-root" class="module-root"></div>
-      </section>
-      <section class="mode-panel" id="mode-growth" aria-label="학급 성장">
-        <div id="growth-root" class="module-root"></div>
-      </section>
-      <section class="mode-panel" id="mode-checklist" aria-label="체크리스트">
-        <div id="checklist-root" class="module-root"></div>
-      </section>
-    </main>
+    <div class="classroom-body">
+      <nav class="mode-nav" aria-label="수업화면 메뉴">
+        <button class="mode-tab is-active" type="button" data-mode="scoreboard" aria-label="우리반 학생"><span class="nav-icon" aria-hidden="true">▦</span><span class="mode-label">우리반 학생</span></button>
+        <button class="mode-tab" type="button" data-mode="growth" aria-label="학급점수판"><span class="nav-icon" aria-hidden="true">♧</span><span class="mode-label">학급점수</span></button>
+        <button class="mode-tab" type="button" data-mode="whiteboard" aria-label="판서"><span class="nav-icon" aria-hidden="true">▱</span><span class="mode-label">판서</span></button>
+        <button class="mode-tab" type="button" data-mode="checklist" aria-label="명렬"><span class="nav-icon" aria-hidden="true">☷</span><span class="mode-label">명렬</span></button>
+      </nav>
+      <main class="workspace">
+        <section class="mode-panel" id="mode-whiteboard" aria-label="전자칠판">
+          <iframe class="whiteboard-frame" src="modules/whiteboard/index.html" title="만능칠판 6.0 기반 전자칠판"></iframe>
+        </section>
+        <section class="mode-panel is-active" id="mode-scoreboard" aria-label="점수판">
+          <div id="scoreboard-root" class="module-root"></div>
+        </section>
+        <section class="mode-panel" id="mode-growth" aria-label="학급 성장">
+          <div id="growth-root" class="module-root"></div>
+        </section>
+        <section class="mode-panel" id="mode-checklist" aria-label="체크리스트">
+          <div id="checklist-root" class="module-root"></div>
+        </section>
+      </main>
+    </div>
   </div>
   <div id="global-feedback" class="global-feedback" aria-live="polite" aria-atomic="true"></div>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=classroom-stage1"></script>
 </body>
 </html>

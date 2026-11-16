@@ -1,110 +1,73 @@
-import { openDatabase } from './db.js';
+import { requestResult, transact } from './db.js';
 
-function uid() {
-  return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
-}
-
-export async function applyIndividualScore(options) {
-  const classId = options.classId;
-  const studentId = options.studentId;
+export function applyScoreBatch(options) {
+  const { classId } = options;
+  const studentIds = Array.from(new Set(options.studentIds));
   const delta = Number(options.delta);
   const reason = String(options.reason || '');
   const source = String(options.source || 'manual');
-  if (!Number.isInteger(delta) || delta === 0) throw new Error('점수 변경은 0이 아닌 정수여야 합니다.');
+  if (!studentIds.length || !Number.isSafeInteger(delta) || delta === 0) {
+    throw new Error('학생과 0이 아닌 정수 점수를 입력해 주세요.');
+  }
 
-  const db = await openDatabase();
-  return new Promise(function (resolve, reject) {
-    const tx = db.transaction(['students', 'scoreEvents', 'growthStates', 'growthConversions'], 'readwrite');
-    let result = null;
-    let failure = null;
-    const studentStore = tx.objectStore('students');
-    const eventStore = tx.objectStore('scoreEvents');
-    const growthStore = tx.objectStore('growthStates');
-    const conversionStore = tx.objectStore('growthConversions');
-    const studentRequest = studentStore.get(studentId);
+  return transact(['students', 'scoreEvents', 'growthStates', 'growthConversions'], 'readwrite', async function (transaction) {
+    const studentStore = transaction.objectStore('students');
+    const eventStore = transaction.objectStore('scoreEvents');
+    const growthStore = transaction.objectStore('growthStates');
+    const conversionStore = transaction.objectStore('growthConversions');
+    const [students, savedGrowth] = await Promise.all([
+      Promise.all(studentIds.map(function (id) { return requestResult(studentStore.get(id)); })),
+      requestResult(growthStore.get(classId))
+    ]);
+    if (students.some(function (student) { return !student || student.classId !== classId || student.status === 'deleted'; })) {
+      throw new Error('선택한 학생 중 명단에서 찾을 수 없는 학생이 있습니다.');
+    }
 
-    studentRequest.onerror = function () {
-      failure = studentRequest.error || new Error('학생 정보를 읽지 못했습니다.');
-      try { tx.abort(); } catch (error) {}
-    };
-
-    studentRequest.onsuccess = function () {
-      const student = studentRequest.result;
-      if (!student || student.classId !== classId) {
-        failure = new Error('학생을 찾을 수 없습니다.');
-        try { tx.abort(); } catch (error) {}
-        return;
-      }
-
-      const now = new Date().toISOString();
+    const now = new Date().toISOString();
+    const growthState = savedGrowth || { classId, classScore: 0, pending: [], totalContributions: 0 };
+    growthState.pending = Array.isArray(growthState.pending) ? growthState.pending : [];
+    growthState.totalContributions = Number(growthState.totalContributions || 0);
+    const conversions = [];
+    const batchId = crypto.randomUUID();
+    const events = students.map(function (student) {
       student.score = Number(student.score || 0) + delta;
       student.updatedAt = now;
       studentStore.put(student);
-
-      const scoreEvent = {
-        id: uid(),
-        classId: classId,
-        studentId: studentId,
-        studentName: student.name,
-        groupId: student.groupId || null,
-        delta: delta,
-        reason: reason,
-        source: source,
-        createdAt: now
+      const event = {
+        id: crypto.randomUUID(), batchId, classId, studentId: student.id, studentName: student.name,
+        groupId: student.groupId || null, delta, reason, source, createdAt: now
       };
-      eventStore.add(scoreEvent);
+      eventStore.add(event);
 
-      const growthRequest = growthStore.get(classId);
-      growthRequest.onerror = function () {
-        failure = growthRequest.error || new Error('학급 성장 기록을 읽지 못했습니다.');
-        try { tx.abort(); } catch (error) {}
-      };
-      growthRequest.onsuccess = function () {
-        const state = growthRequest.result || {
-          classId: classId, classScore: 0, pending: [], totalContributions: 0, updatedAt: now
-        };
-        state.pending = Array.isArray(state.pending) ? state.pending : [];
-        state.totalContributions = Number(state.totalContributions || 0);
-        const conversions = [];
-
-        // 양의 개인 점수 1점마다 별길 기여 1개를 기록합니다.
-        // 감점이 이미 적립된 기여를 되돌리는지는 별도 정책 결정 전까지 보류합니다.
-        if (delta > 0) {
-          for (let index = 0; index < delta; index += 1) {
-            state.pending.push({
-              id: uid(),
-              studentId: studentId,
-              studentName: student.name,
-              avatarId: student.avatarId || null,
-              scoreEventId: scoreEvent.id,
-              createdAt: now
-            });
-            state.totalContributions += 1;
-
-            if (state.pending.length === 10) {
-              const contributions = state.pending.slice();
-              state.classScore = Number(state.classScore || 0) + 1;
-              const conversion = {
-                id: uid(),
-                classId: classId,
-                classScoreAfter: state.classScore,
-                contributions: contributions,
-                createdAt: now
-              };
-              conversionStore.add(conversion);
-              conversions.push(conversion);
-              state.pending = [];
-            }
-          }
+      // Growth conversion still uses the existing positive-point rule.
+      for (let index = 0; index < delta; index += 1) {
+        growthState.pending.push({
+          id: crypto.randomUUID(), studentId: student.id, studentName: student.name,
+          avatarId: student.avatarId || null, scoreEventId: event.id, createdAt: now
+        });
+        growthState.totalContributions += 1;
+        if (growthState.pending.length === 10) {
+          growthState.classScore = Number(growthState.classScore || 0) + 1;
+          const conversion = {
+            id: crypto.randomUUID(), classId, classScoreAfter: growthState.classScore,
+            contributions: growthState.pending, createdAt: now
+          };
+          conversionStore.add(conversion);
+          conversions.push(conversion);
+          growthState.pending = [];
         }
-        state.updatedAt = now;
-        growthStore.put(state);
-        result = { student: student, event: scoreEvent, growthState: state, conversions: conversions };
-      };
-    };
-
-    tx.oncomplete = function () { resolve(result); };
-    tx.onerror = function () { reject(failure || tx.error || new Error('점수 저장에 실패했습니다.')); };
-    tx.onabort = function () { reject(failure || tx.error || new Error('점수 변경이 취소되었습니다.')); };
+      }
+      return event;
+    });
+    growthState.updatedAt = now;
+    growthStore.put(growthState);
+    return { students, events, growthState, conversions };
   });
+}
+
+export async function applyIndividualScore(options) {
+  const { students, events, growthState, conversions } = await applyScoreBatch({
+    ...options, studentIds: [options.studentId]
+  });
+  return { student: students[0], event: events[0], growthState, conversions };
 }

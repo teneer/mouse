@@ -34,6 +34,10 @@ function switchMode(mode) {
   document.querySelectorAll('.mode-panel').forEach(function (panel) {
     panel.classList.toggle('is-active', panel.id === 'mode-' + mode);
   });
+  if (document.body.dataset.classroomMode !== mode) {
+    document.body.dataset.classroomMode = mode;
+    document.dispatchEvent(new Event('classroom-mode-changed'));
+  }
   try { localStorage.setItem(MODE_KEY, mode); } catch (error) {}
 }
 
@@ -128,8 +132,8 @@ async function start() {
     }
   });
 
-  let savedMode = 'whiteboard';
-  try { savedMode = localStorage.getItem(MODE_KEY) || 'whiteboard'; } catch (error) {}
+  let savedMode = 'scoreboard';
+  try { savedMode = localStorage.getItem(MODE_KEY) || 'scoreboard'; } catch (error) {}
   switchMode(savedMode);
   await refreshAll();
   setStatus('로컬 데이터베이스 연결됨', false);
