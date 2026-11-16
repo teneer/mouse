@@ -93,25 +93,37 @@ export async function deleteRecord(storeName, key) {
 }
 
 export async function exportAll() {
+  const db = await openDatabase();
+  const tx = db.transaction(STORE_NAMES, 'readonly');
+  const records = await Promise.all(STORE_NAMES.map(function (storeName) {
+    return requestResult(tx.objectStore(storeName).getAll());
+  }));
   const result = { schemaVersion: DB_VERSION, database: DB_NAME };
-  for (const storeName of STORE_NAMES) result[storeName] = await getAll(storeName);
+  STORE_NAMES.forEach(function (storeName, index) { result[storeName] = records[index]; });
   return result;
 }
 
 export async function importAll(data) {
-  if (!data || typeof data !== 'object') throw new Error('올바른 백업 파일이 아닙니다.');
+  if (!data || data.database !== DB_NAME || data.schemaVersion !== DB_VERSION ||
+      !STORE_NAMES.every(function (storeName) { return Array.isArray(data[storeName]); })) {
+    throw new Error('올바른 백업 파일이 아닙니다.');
+  }
+
   const db = await openDatabase();
   return new Promise(function (resolve, reject) {
     const tx = db.transaction(STORE_NAMES, 'readwrite');
-    STORE_NAMES.forEach(function (storeName) {
-      const store = tx.objectStore(storeName);
-      store.clear();
-      (Array.isArray(data[storeName]) ? data[storeName] : []).forEach(function (record) {
-        store.put(record);
-      });
-    });
     tx.oncomplete = function () { resolve(true); };
     tx.onerror = function () { reject(tx.error); };
     tx.onabort = function () { reject(tx.error || new Error('복원이 취소되었습니다.')); };
+    try {
+      STORE_NAMES.forEach(function (storeName) {
+        const store = tx.objectStore(storeName);
+        store.clear();
+        data[storeName].forEach(function (record) { store.add(record); });
+      });
+    } catch (error) {
+      tx.abort();
+      reject(error);
+    }
   });
 }

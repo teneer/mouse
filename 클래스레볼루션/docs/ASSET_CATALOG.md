@@ -30,7 +30,7 @@
 | 나무.png | 160×643 | 세로형 나무 이미지 |
 | 나무편집.png | 250×1005 | 편집된 세로형 나무 이미지 |
 
-ZIP 내부 경로는 `assets/`다. 현재 GitHub 브랜치에는 이 PNG들이 아직 배치되지 않았다.
+ZIP 내부 경로는 `assets/`다. PNG 21개를 `assets/visuals/`에 원본 파일명으로 배치했다.
 
 ### `avatar fx.zip` — 1,907,712 bytes / PNG 140개
 
@@ -40,7 +40,7 @@ ZIP 내부 경로는 `assets/`다. 현재 GitHub 브랜치에는 이 PNG들이 �
 - `avatar_NNN_400.png`: 400×250
 - ZIP 내부 최상위 폴더: `avatar fx/`
 
-현재 점수판 코드는 `assets/avatars/220/avatar_NNN_220.png`를 참조한다. 400 버전은 큰 카드/상세 보기용 후보로 보존한다.
+현재 점수판 코드는 `assets/avatars/220/avatar_NNN_220.png`를 참조한다. 220 버전은 `assets/avatars/220/`에, 상세 보기 후보인 400 버전은 `assets/avatars/400/`에 각각 70개 배치했다.
 
 ### `클래스123 복원프로젝트.zip` — 6,609,992 bytes / PNG 171개
 
@@ -119,7 +119,7 @@ ZIP 내부 경로는 `assets/`다. 현재 GitHub 브랜치에는 이 PNG들이 �
 
 - 전자칠판 코드 복사: 완료
 - 사용자 MP3 9개 복사: 완료
-- 원본 이미지 ZIP 3개 내부 PNG 배치: 미완료
-- 아바타 파일 실제 경로 배치: 미완료
+- `assets.zip` 및 `avatar fx.zip`의 PNG 161개 배치: 완료
+- 클래스123 복원 이미지·화면 캡처 및 원본 ZIP: 첨부 자료로 보존
 - 스프라이트 좌표/애니메이션 매핑: 미완료
 - 영상 MP4 및 접촉 시트 GitHub 업로드: 미완료

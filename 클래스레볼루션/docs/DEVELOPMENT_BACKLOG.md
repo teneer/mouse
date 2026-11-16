@@ -5,12 +5,12 @@
 ## P0 — Work 첫 작업: 안정적인 실행 기반
 
 ### P0.1 사용자 이미지 에셋 배치
-- [ ] `assets.zip`의 21 PNG를 `assets/visuals/`에 원본 파일명으로 배치
-- [ ] `avatar fx.zip`의 70종 × 220/400 아바타를 현재 코드의 참조 경로에 배치
+- [x] `assets.zip`의 21 PNG를 `assets/visuals/`에 원본 파일명으로 배치
+- [x] `avatar fx.zip`의 70종 × 220/400 아바타를 현재 코드의 참조 경로에 배치
 - [ ] `클래스123 복원프로젝트.zip`은 레거시 아바타와 화면 캡처를 분리 보관
-- [ ] ZIP 원본을 보존하고, 이미지 파일 수·해상도·경로 manifest 작성
-- [ ] 현재 `growth.js` 참조 경로인 `assets/visuals/bg-class-clouds-way.png` 및 `assets/visuals/sp_board_sky_village.png` 확인
-- [ ] 현재 `scoreboard.js` 참조 경로인 `assets/avatars/220/avatar_NNN_220.png` 확인
+- [x] ZIP 원본을 보존하고, 이미지 파일 수·해상도·경로 manifest 작성
+- [x] 성장 화면의 `app.css` 및 `growth.js` 참조 경로인 `assets/visuals/bg-class-clouds-way.png` 및 `assets/visuals/sp_board_sky_village.png` 확인
+- [x] 현재 점수판·성장·체크리스트의 아바타 참조 경로인 `assets/avatars/220/avatar_NNN_220.png` 확인
 - [ ] 스프라이트 시트 프레임 좌표를 확인하고 애니메이션/아이콘 매핑표 작성
 - [ ] 모든 이미지 404, 투명도, 종횡비, object-fit 확인
 

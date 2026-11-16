@@ -74,7 +74,12 @@ async function start() {
     bus: bus
   });
 
+  function refreshAll() {
+    return Promise.all([scoreboard.refresh(), growth.refresh(), checklist.refresh()]);
+  }
+
   bus.subscribe(function (event) {
+    if (event.type === 'data.restored') refreshAll().catch(function (error) { console.error(error); });
     if (event.type === 'score.changed') {
       scoreboard.refresh();
       growth.refresh();
@@ -112,7 +117,6 @@ async function start() {
     try {
       const data = JSON.parse(await file.text());
       await importAll(data);
-      await Promise.all([scoreboard.refresh(), growth.refresh(), checklist.refresh()]);
       bus.publish('data.restored', { fileName: file.name });
       setStatus('백업 데이터 복원 완료', false);
     } catch (error) {
@@ -127,7 +131,7 @@ async function start() {
   let savedMode = 'whiteboard';
   try { savedMode = localStorage.getItem(MODE_KEY) || 'whiteboard'; } catch (error) {}
   switchMode(savedMode);
-  await Promise.all([scoreboard.refresh(), growth.refresh(), checklist.refresh()]);
+  await refreshAll();
   setStatus('로컬 데이터베이스 연결됨', false);
   window.classRevolution = { db: db, bus: bus, switchMode: switchMode };
 }
