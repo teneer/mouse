@@ -110,13 +110,15 @@ function applySharedScore(model,live) {
     const seen = new Set((previous.sounds || []).map(item=>item.key));
     for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect);
   }
-  if (teams.length !== model.state.teams.length || teams.some((team,index)=>team.id !== model.state.teams[index].id)) selectedTeams.clear();
-  const {goalSystem: nextGoals, ...nextScores} = model.state;
-  const {goalSystem: currentGoals, ...currentScores} = snapshot(undefined);
+  const {count: nextCount, teams: nextTeams, scoreLink, goalSystem: nextGoals} = model.state;
+  const sameTeamOrder = teams.length === nextTeams.length && teams.every((team,index)=>team.id === nextTeams[index].id);
+  if (!sameTeamOrder) selectedTeams.clear();
   const announce = live || ownScoreEvents.has(model.version);
-  if (JSON.stringify(currentScores) === JSON.stringify(nextScores)) {
-    // The local click already queued its score effect. Apply the synced goal records without interrupting it.
-    if (JSON.stringify(currentGoals) !== JSON.stringify(nextGoals)) {
+  const sameScores = count === nextCount && linkEnabled === scoreLink.enabled && linkPoints === scoreLink.points &&
+    sameTeamOrder && teams.every((team,index)=>team.score === nextTeams[index].score && team.name === nextTeams[index].name);
+  if (sameScores) {
+    // Syncing an unchanged score must not interrupt an already queued conversion.
+    if (JSON.stringify(goalSystem) !== JSON.stringify(nextGoals)) {
       goalSystem = readGoals(nextGoals);
       completeReachedAutomaticGoals({count,teams,goalSystem});
       renderGoalFeedback(announce);
