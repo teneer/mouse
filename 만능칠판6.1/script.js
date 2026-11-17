@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=device-guide-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=6.1.1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
@@ -15,7 +15,7 @@ import {objectKind,objectName,objectDisplayName} from './js/object-names.js';
 import {CloudBoard} from './js/cloud.js?v=conflict-fields-1';
 import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=conflict-fields-1';
-import {wireCloudUI} from './js/cloud-ui.js?v=device-guide-1';
+import {wireCloudUI} from './js/cloud-ui.js?v=6.1.1';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
