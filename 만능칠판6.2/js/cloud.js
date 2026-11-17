@@ -8,7 +8,7 @@ import {
   OBJECT_CONTROL_LEASE_MS, OBJECT_CONTROL_RENEW_MS, objectControlDocumentId,
   objectControlKey, objectControlLeaseExpired, objectControlOwnerMatches,
   objectControlRequestMatches
-} from './object-control.js?v=object-control-1';
+} from './object-control.js?v=object-control-2';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
 const sequence = revision => String(revision).padStart(12, '0');
