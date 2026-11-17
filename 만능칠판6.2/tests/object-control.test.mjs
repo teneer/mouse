@@ -7,9 +7,10 @@ import {
 } from '../js/object-control.js';
 
 test('object control IDs are stable and separate page/object pairs',()=>{
-  assert.equal(objectControlDocumentId('page-a','object-b'),'page-a__object-b');
-  assert.equal(objectControlKey('page-a','object-b'),'page-a::object-b');
+  assert.match(objectControlDocumentId('page-a','object-b'),/^obj_[0-9a-f]+$/);
+  assert.equal(objectControlKey('page-a','object-b'),'["page-a","object-b"]');
   assert.notEqual(objectControlDocumentId('page-a__object','b'),objectControlDocumentId('page-a','object__b'));
+  assert.notEqual(objectControlKey('page-a::object','b'),objectControlKey('page-a','object::b'));
 });
 
 test('leases use a long owner window and a shorter renewal interval',()=>{
