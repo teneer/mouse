@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 6.0</title><link href="style.css?v=conflict-fields-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=1" rel="stylesheet"/></head>
+<body>
+<div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
+<aside id="scorePanel" class="score-panel" aria-label="학급 점수판" aria-hidden="true" inert>
+  <iframe id="scoreFrame" title="학급 점수판" src="./score/학급온도계.html?v=score-tab-preview-1"></iframe>
+</aside>
+<div id="scoreSplitter" role="separator" aria-label="전자칠판과 점수판 경계 조절" aria-orientation="vertical" aria-valuemin="20" aria-valuemax="90" aria-valuenow="70" tabindex="-1"><span class="split-grip"></span></div>
+
+<aside id="appCelebration" hidden aria-label="축하 메시지"></aside>
+<div class="tip-up-settings" id="viewSyncMenu" aria-label="화면 동기화 대상"><div class="cloud-buttons"><button type="button" data-view-all>전체선택</button><button type="button" data-view-none>전체해제</button></div><div data-view-tabs></div></div>
+<div id="feedbackStack"><div aria-live="polite" id="saveStatus" role="status">불러오는 중입니다.</div><div aria-live="polite" hidden="" id="toast" role="status"></div></div>
+<div id="toolbarScaleWrap"><div id="toolbarWrapper"><div id="toolbarToggle"><button aria-expanded="true" id="toolbarHideBtn" aria-label="툴바 접기" title="툴바 숨기기/보이기" data-board-icon="down"></button></div><div aria-label="칠판 도구" id="toolbar">
+<div class="toolbar-group history-group"><button aria-label="실행 취소" class="action-btn icon-only" id="undoBtn" title="실행 취소 (Ctrl+Z)" data-board-icon="undo"></button><button aria-label="다시 실행" class="action-btn icon-only" id="redoBtn" title="다시 실행 (Ctrl+Shift+Z)" data-board-icon="redo"></button></div>
+<div class="toolbar-group"><button class="mode-btn toggle-btn" id="selectMoveToggleBtn" data-board-icon="select"><span id="selectMoveLabel">선택</span></button></div>
+<div class="toolbar-group">
+<button class="mode-btn" id="penModeBtn" data-board-icon="pen">펜</button>
+<button class="mode-btn" id="markerModeBtn" data-board-icon="marker">형광펜</button>
+<button class="mode-btn" id="freeTextModeBtn" data-board-icon="text">텍스트</button>
+<button class="mode-btn" id="eraserModeBtn" data-board-icon="eraser">지우개</button>
+</div>
+<div class="toolbar-group"><button class="action-btn" id="deleteSelectionBtn" title="짧게 누르면 선택한 개체 삭제 · 길게 누르면 현재 페이지 전체 삭제" data-board-icon="trash">삭제</button></div>
+<div aria-label="빠른 색상과 크기" class="toolbar-group">
+<button class="action-btn appearance-button" type="button" id="currentColorButton" data-popup="colorPalette" aria-controls="colorPalette" aria-expanded="false"><span class="color-swatch" aria-hidden="true"></span></button>
+<button class="action-btn appearance-button" type="button" id="currentSizeButton" data-popup="sizePalette" aria-controls="sizePalette" aria-expanded="false"><span aria-hidden="true">3</span></button>
+<button class="action-btn" type="button" id="backgroundBtn" data-board-icon="background">배경</button>
+</div>
+
+<div class="toolbar-group"><button class="mode-btn" id="homeBtn" data-board-icon="home">홈</button></div>
+<div class="toolbar-group"><button class="action-btn" id="pageListBtn" data-popup="pageList" aria-controls="pageList" aria-expanded="false" data-board-icon="pages"><span id="pageListLabel">1쪽</span></button></div>
+<div class="toolbar-group"><button aria-label="축소" class="action-btn" id="zoomOutBtn">−</button><span id="zoomLabel">100%</span><button aria-label="확대" class="action-btn" id="zoomInBtn">＋</button></div>
+<div class="toolbar-group"><label class="action-btn view-sync" id="viewSyncTrigger" aria-expanded="false" aria-controls="viewSyncMenu" title="길게 누르거나 아래쪽 화살표 키로 동기화 탭 선택"><input id="viewSync" type="checkbox"/><span data-board-icon="sync">화면 동기화</span></label></div>
+<div class="toolbar-group"><button id="scorePanelToggle" class="action-btn" type="button" aria-controls="scorePanel" aria-expanded="false" title="오른쪽 학급 점수판 표시/숨기기" data-board-icon="score"><span id="scorePanelLabel">점수판 열기</span></button></div>
+<div class="toolbar-group"><output id="cloudSyncStatus" role="status">로컬 모드</output></div>
+<div class="toolbar-group"><button aria-expanded="false" class="action-btn" data-popup="moreSettings" id="moreBtn">더 보기 ▲</button></div>
+</div></div></div>
+
+
+
+<div class="tip-up-settings" id="colorPalette"><div class="quick-colors" id="quickColors" role="group" aria-label="색상 선택"></div></div>
+<div class="tip-up-settings" id="sizePalette"><div class="quick-sizes" id="quickSizes" role="group" aria-label="크기 선택"></div></div>
+<div class="tip-up-settings" id="pageList" aria-label="페이지 목록"><div id="pageTiles"></div></div>
+<div class="tip-up-settings" id="moreSettings" style="display:none"><div class="more-grid"><button class="action-btn" id="loadGeneralBtn" data-board-icon="folder-open">불러오기</button><button class="action-btn" id="saveBtn" data-board-icon="save">저장</button><button class="action-btn" id="copyBtn" data-board-icon="copy">복사</button><button class="action-btn" id="pasteBtn" data-board-icon="paste">붙여넣기</button><button class="action-btn" id="importFileBtn" data-board-icon="image">이미지·PDF</button><button class="action-btn" id="deviceConnectBtn" data-board-icon="devices">기기 연결</button><button class="action-btn" id="fileManagerBtn" data-board-icon="files">파일 관리</button><button class="action-btn" id="backgroundManageBtn" data-board-icon="fixed-objects">고정개체 관리</button><button class="action-btn" id="helpBtn" data-board-icon="book">사용 안내</button><button class="action-btn" id="colorSettingsBtn" data-board-icon="palette">색상·크기 세부속성</button><button class="action-btn" id="moreTextPropsBtn" type="button" data-board-icon="text-settings">텍스트 박스 기본속성</button><button class="action-btn" id="exportBackupBtn" data-board-icon="backup-down">JSON 백업</button><button class="action-btn" id="importBackupBtn" data-board-icon="backup-up">백업 가져오기</button><button class="action-btn" id="importLegacyBtn" data-board-icon="history">이전 데이터</button></div></div>
+<div aria-labelledby="passwordModalTitle" aria-modal="true" class="modal" id="passwordModal" role="dialog"><div class="modal-content compact-modal-content"><header class="dialog-header"><h2 id="passwordModalTitle">PDF 암호</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="passwordModal">×</button></header><p id="passwordModalMessage"></p><input autocomplete="off" id="pdfPasswordInput" placeholder="PDF 암호" type="password"/><div class="modal-actions"><button class="action-btn" id="passwordModalCancelBtn">취소</button><button class="action-btn" id="passwordModalOkBtn">확인</button></div></div></div><div aria-labelledby="confirmModalTitle" aria-modal="true" class="modal" id="confirmModal" role="dialog"><div class="modal-content"><header class="dialog-header"><h2 id="confirmModalTitle">확인</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="confirmModal">×</button></header><p id="confirmModalMessage"></p><div class="modal-actions"><button class="action-btn" id="confirmModalCancelBtn">취소</button><button class="action-btn" id="confirmModalOkBtn">확인</button></div></div></div>
+<div aria-labelledby="importLayoutTitle" aria-modal="true" class="modal" id="importLayoutModal" role="dialog"><div class="modal-content import-layout-content"><header class="dialog-header"><h2 id="importLayoutTitle">배치 방법 선택</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="importLayoutModal">×</button></header><p id="importLayoutCount">여러 항목을 몇 열로 배치할까요?</p><div class="layout-choice-grid"><button aria-label="1열 배치" class="layout-choice" data-columns="1" type="button"><span class="layout-preview columns-1"><span></span></span><strong>1열</strong></button><button aria-label="2열 배치" class="layout-choice" data-columns="2" type="button"><span class="layout-preview columns-2"><span></span><span></span></span><strong>2열</strong></button><button aria-label="3열 배치" class="layout-choice" data-columns="3" type="button"><span class="layout-preview columns-3"><span></span><span></span><span></span></span><strong>3열</strong></button><button aria-label="4열 배치" class="layout-choice" data-columns="4" type="button"><span class="layout-preview columns-4"><span></span><span></span><span></span><span></span></span><strong>4열</strong></button></div><label><input id="importAsBackground" type="checkbox"/> 배경으로 고정</label><div class="modal-actions"><button class="action-btn" type="button" data-columns="0">한곳에 겹치기</button><button class="action-btn" data-close="importLayoutModal">취소</button></div></div></div>
+<div aria-labelledby="saveTitle" aria-modal="true" class="modal" id="saveConfirmModal" role="dialog"><div class="modal-content"><header class="dialog-header"><h2 id="saveTitle">화면 저장</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="saveConfirmModal">×</button></header><p>현재 페이지를 별도의 저장 화면으로 보관합니다.</p><input id="saveScreenNameInput" maxlength="100" placeholder="화면 이름" type="text"/><p class="help-text">미리보기는 저장할 때의 현재 위치와 현재 배율을 기준으로 합니다.</p><div class="modal-actions"><button class="action-btn" data-close="saveConfirmModal">취소</button><button class="action-btn" id="confirmSaveBtn">저장</button></div></div></div>
+<div aria-labelledby="loadTitle" aria-modal="true" class="modal" id="loadSavedScreenModal" role="dialog"><div class="modal-content"><header class="dialog-header"><h2 id="loadTitle">저장된 화면 불러오기</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="loadSavedScreenModal">×</button></header><p class="help-text">저장 당시 위치 · 배율 기준 미리보기입니다. 화면을 불러오면 새 페이지가 추가됩니다.</p><div id="savedScreenListContainer"><p hidden="" id="noSavedScreens">저장된 화면이 없습니다.</p><ul id="savedScreenList"></ul></div></div></div>
+<div aria-labelledby="helpTitle" aria-modal="true" class="modal" id="helpModal" role="dialog"><div class="modal-content"><header class="dialog-header"><h2 id="helpTitle">만능칠판 사용 안내</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="helpModal">×</button></header><ul><li>하단 툴바의 현재 색상과 크기를 누르면 선택 목록이 열립니다. 선택 모드의 우클릭 메뉴와 개체를 길게 눌러 여는 메뉴에서도 바로 바꿀 수 있습니다. 색상·크기 1~5단계는 펜·형광펜·텍스트가 공유합니다. 그룹 안의 객체는 그룹 더블클릭으로 내부 편집을 시작합니다.</li>
+<li>선택/이동 버튼을 누르면 모드가 바뀝니다. 이동 모드에서 화면을 끌거나, Space를 누른 채 끌거나, 마우스 가운데 버튼으로 이동할 수 있습니다.</li><li>마우스 휠 또는 −/＋로 10%~1,000%까지 확대·축소합니다. 홈은 100% 기본 위치로 돌아갑니다.</li><li>선택 모드에서 드래그하거나 Shift+클릭으로 여러 객체를 선택합니다. Ctrl/Cmd+G로 그룹, Ctrl/Cmd+Shift+G로 언그룹합니다.</li><li>Ctrl/Cmd+C·X·V로 시스템 클립보드를 사용합니다. 복사 버튼은 선택 객체를 PNG와 편집 가능한 데이터로 복사합니다. 외부 앱이 데이터를 제거하면 이미지나 텍스트로 붙여넣습니다. 권한이 거부되면 키보드 단축키를 사용해주세요.</li><li>PNG/JPG/GIF/PDF를 칠판에 끌어 넣거나 더 보기 → 이미지·PDF를 사용합니다. GIF는 정지 프레임이고, PDF는 칠판에서 필요한 쪽을 표시합니다. PDF 문자 편집은 지원하지 않습니다.</li><li>각 페이지의 편집 내용은 자동저장됩니다. 언두/리두는 페이지별로 최대 40개이며 용량에 따라 더 줄어듭니다. 새로고침과 원격 변경 수신 시 해당 기록은 초기화됩니다. 페이지 삭제와 저장 화면 삭제는 되돌릴 수 없습니다.</li><li>더 보기 → 기기 연결로 다른 기기에서 같은 칠판을 사용합니다. 파일은 더 보기 → 파일 관리에서 필요한 기기로 받습니다.</li><li>기기 연결을 사용하지 않을 때 같은 브라우저 프로필에서 칠판 내용을 공유합니다. 한 탭에서 화면 동기화를 켜면 모든 탭이 페이지·확대·화면 위치·점수판 상태를 공유합니다. 같은 페이지를 동시에 수정하면 충돌 복구 페이지를 추가합니다.</li><li>자동저장은 브라우저 저장소이지 서버 백업이 아닙니다. 더 보기 → JSON 백업으로 정기 보관해주세요. 주소/브라우저/프로필이 바뀌면 JSON 백업을 직접 가져와야 합니다.</li><li>이전 데이터 버튼은 같은 출처의 구버전 저장 화면과 자동저장 내용만 가져옵니다. 기존 객체는 모두 일반 객체가 됩니다. 원본 DB는 수정하지 않습니다.</li></ul><details class="setting-section conflict-guide">
+  <summary>충돌 처리</summary>
+  <h3>전자칠판</h3>
+  <ul>
+    <li>서로 다른 페이지와 개체를 수정하면 두 변경이 모두 반영됩니다.</li>
+    <li>같은 개체는 서버에 마지막으로 도착한 완료 편집을 적용합니다. 입력 중인 텍스트는 편집을 완료할 때 보냅니다.</li>
+    <li>같은 개체의 삭제와 편집은 서버 도착 순서를 따릅니다. 페이지가 삭제되면 그 페이지의 뒤늦은 편집은 적용하지 않습니다.</li>
+    <li>전자칠판 실행 취소는 해당 페이지의 최근 공유 작업을 취소합니다. 텍스트 입력 중 Ctrl+Z는 입력을 되돌립니다.</li>
+  </ul>
+  <h3>점수판</h3>
+  <ul>
+    <li>각 기기의 점수 증감은 한 번씩 합산합니다. 삭제된 모둠의 점수 조작은 적용하지 않습니다.</li>
+    <li>같은 학급 또는 모둠 점수에 직접 입력이나 초기화가 겹치면 점수 항목별로 비교합니다. 서버 값과 각 기기의 마지막 입력값을 표시하고, 같은 값은 묶습니다.</li>
+    <li>선택한 값은 그 항목에만 적용됩니다. 비교 중 변경이 들어오면 최신 값을 다시 확인할 수 있습니다.</li>
+  </ul>
+</details></div></div>
+<div aria-labelledby="deviceTitle" aria-modal="true" class="modal" id="deviceModal" role="dialog">
+  <div class="modal-content cloud-dialog device-dialog">
+    <header class="dialog-header"><h2 id="deviceTitle">기기 연결</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="deviceModal">×</button></header>
+    <p id="deviceStatus" class="device-status" role="status"></p>
+    <section data-stage="start">
+      <div class="setting-section device-start-actions">
+        <div><h3>처음 연결하기</h3><p>Firebase 설정을 단계별로 진행하고 이 기기의 칠판을 공유합니다.</p><button class="dialog-action dialog-primary" id="deviceFirst">처음 연결하기</button></div>
+        <div><h3>이 기기 추가하기</h3><p>이미 공유 중인 칠판의 QR 또는 연결 키를 사용합니다.</p><button class="dialog-action" id="deviceAdd">이 기기 추가하기</button></div>
+      </div>
+      <button class="dialog-action" id="deviceResume" hidden>이전 연결 다시 열기</button>
+    </section>
+    <section id="deviceFirstGuide" data-stage="first" hidden>
+      <div class="device-guide-progress"><span data-guide-step></span><progress aria-label="Firebase 설정 단계"></progress></div>
+      <div data-guide-content></div>
+      <div id="deviceSetupControls" class="setting-section" hidden>
+        <label for="firebaseConfig">Firebase 웹 앱 설정값</label>
+        <textarea id="firebaseConfig" rows="5" spellcheck="false" autocomplete="off"></textarea>
+        <div class="cloud-buttons"><button class="dialog-action" id="deviceCheck">연결 확인</button></div>
+        <label for="deviceFirstName">기기 이름</label>
+        <input id="deviceFirstName" maxlength="50" placeholder="교실 PC"/>
+        <div class="cloud-buttons"><button class="dialog-action dialog-primary" id="deviceSeed" disabled>첫 동기화 시작</button></div>
+      </div>
+      <div class="dialog-footer device-guide-nav">
+        <button class="dialog-action" data-device-back>돌아가기</button>
+        <button class="dialog-action" data-guide-prev>이전</button>
+        <button class="dialog-action dialog-primary" data-guide-next>다음</button>
+      </div>
+    </section>
+    <section data-stage="join" hidden>
+      <ol>
+        <li>먼저 연결한 기기의 <b>기기 연결</b>에서 연결 링크를 복사합니다. 링크를 열었다면 아래에 자동으로 입력됩니다.</li>
+        <li>기기 이름을 입력하고 연결 코드를 발급합니다.</li>
+        <li>먼저 연결한 기기에 연결 코드를 입력하고 승인합니다. 이 기기의 이전 칠판은 로컬에 보관됩니다.</li>
+      </ol>
+      <label for="deviceJoinLink">연결 링크</label>
+      <input id="deviceJoinLink" type="url" autocomplete="off" spellcheck="false"/>
+      <label for="deviceJoinName">이 기기 이름</label>
+      <input id="deviceJoinName" maxlength="50" placeholder="태블릿"/>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceRequest">연결 코드 발급</button><button class="action-btn" data-device-back>돌아가기</button></div>
+      <output id="devicePairCode" hidden></output>
+    </section>
+    <section data-stage="key" hidden>
+      <p>기존 칠판의 QR을 스캔하거나 연결 키를 붙여넣으세요. 이 기기의 이전 칠판은 로컬에 보관됩니다.</p>
+      <label for="deviceJoinKey">연결 키</label>
+      <input id="deviceJoinKey" type="password" autocomplete="off" spellcheck="false"/>
+      <label for="deviceKeyName">이 기기 이름</label>
+      <input id="deviceKeyName" maxlength="50" placeholder="태블릿"/>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceJoinWithKey">칠판에 연결</button><button class="action-btn" id="deviceLegacyJoin">다른 연결 방법</button><button class="action-btn" data-device-back>돌아가기</button></div>
+    </section>
+    <section id="deviceConnected" data-stage="connected" hidden>
+      <div class="device-list-heading"><h3>연결된 기기</h3><button class="dialog-action dialog-primary" id="deviceShowInvite">기기 추가</button></div>
+      <ul id="deviceList" aria-label="연결된 기기"></ul>
+      <button class="dialog-action" id="deviceSeedScore" hidden>이 기기 점수로 공유 시작</button>
+      <div class="dialog-footer device-local-footer"><button class="dialog-action" id="deviceDisconnect">이 기기에서 연결 해제</button></div>
+    </section>
+    <section data-stage="rename" hidden>
+      <label for="deviceRenameInput">기기 이름</label>
+      <input id="deviceRenameInput" maxlength="50" autocomplete="off" />
+      <div class="dialog-footer">
+        <button class="dialog-action" data-device-back>취소</button>
+        <button class="dialog-action dialog-primary" id="deviceRenameSave">저장</button>
+      </div>
+    </section>
+    <section data-stage="remove" hidden>
+      <p id="deviceRemoveMessage"></p>
+      <div class="dialog-footer"><button class="dialog-action" data-device-back>취소</button><button class="dialog-action dialog-danger" id="deviceRemoveConfirm">연결 해제</button></div>
+    </section>
+    <section data-stage="disconnect" hidden>
+      <p>현재 칠판과 점수를 이 기기에 저장한 뒤 로컬에서 이어서 사용합니다. 다른 기기는 계속 공유 칠판을 사용합니다.</p>
+      <div class="dialog-footer"><button class="dialog-action" data-device-back>취소</button><button class="dialog-action dialog-primary" id="deviceDisconnectConfirm">로컬에서 계속</button></div>
+    </section>
+    <section data-stage="invite" hidden>
+      <h3>기기 추가</h3>
+      <p id="deviceInviteStatus" role="status"></p>
+      <div id="deviceInviteDetails" hidden>
+        <p>새 기기로 QR을 스캔하거나 ‘연결 키 복사’를 눌러 새 기기에 붙여넣으세요.</p>
+        <canvas id="deviceInviteQR" role="img" aria-label="이 칠판에 연결하는 QR 코드"></canvas>
+        <div class="cloud-buttons"><button class="action-btn" id="deviceCopyKey">연결 키 복사</button><button class="action-btn" id="deviceEndInvite">초대 종료</button></div>
+      </div>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceStartInvite" hidden>초대 만들기</button><button class="dialog-action" id="deviceLegacy">코드로 연결</button><button class="dialog-action" id="deviceGuide">추가 방법</button><button class="action-btn" data-device-back>돌아가기</button></div>
+    </section>
+    <section data-stage="legacy" hidden>
+      <h3>연결 코드로 승인</h3>
+      <label for="deviceInvite">기기 추가 링크</label>
+      <input id="deviceInvite" readonly/>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceCopyLink">링크 복사</button></div>
+      <label for="deviceApprovalCode">새 기기에서 발급한 연결 코드</label>
+      <input id="deviceApprovalCode" maxlength="25" autocomplete="off" spellcheck="false"/>
+      <div class="cloud-buttons"><button class="action-btn" id="deviceApprove">새 기기 승인</button><button class="action-btn" data-device-back>돌아가기</button></div>
+    </section>
+    <p id="deviceMessage" role="status" aria-live="polite"></p>
+  </div>
+</div>
+<div aria-labelledby="fileManagerTitle" aria-modal="true" class="modal" id="fileManagerModal" role="dialog">
+  <div class="modal-content cloud-dialog">
+    <header class="dialog-header"><h2 id="fileManagerTitle">파일 관리</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="fileManagerModal">×</button></header>
+    <p>기기에 없는 파일은 파일을 가진 기기에서 앱을 연 상태에서 받을 수 있습니다.</p>
+    <p id="emptyManagedFiles"></p>
+    <ul id="managedFiles"></ul>
+  </div>
+</div>
+<div id="importProgress" hidden>
+  <span id="importProgressText" role="status">파일 확인 중…</span>
+  <button class="action-btn" type="button" id="cancelImportBtn">취소</button>
+</div>
+<div aria-labelledby="pageRenameTitle" aria-modal="true" class="modal" id="pageRenameModal" role="dialog">
+  <div class="modal-content compact-modal-content">
+    <header class="dialog-header"><h2 id="pageRenameTitle">페이지 이름 편집</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="pageRenameModal">×</button></header>
+    <form id="pageRenameForm">
+      <label for="pageNameInput">이름</label>
+      <input id="pageNameInput" type="text" maxlength="80" autocomplete="off" placeholder="페이지 이름"/>
+      <div class="modal-actions"><button class="action-btn" type="button" data-close="pageRenameModal">취소</button><button class="action-btn" type="submit">저장</button></div>
+    </form>
+  </div>
+</div>
+<div aria-labelledby="backgroundTitle" aria-modal="true" class="modal" id="backgroundModal" role="dialog">
+  <div class="modal-content compact-modal-content"><header class="dialog-header"><h2 id="backgroundTitle">배경 변경</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="backgroundModal">×</button></header>
+    <fieldset class="setting-section"><legend>색상</legend><div id="backgroundColors" class="cloud-buttons"></div>
+      <div class="setting-row"><label for="pageBgInput">즐겨찾기 색상</label><input id="pageBgInput" type="color"/><button class="action-btn" id="saveBackgroundColor">등록</button></div>
+    </fieldset>
+    <fieldset class="setting-section"><legend>무늬</legend>
+      <div class="setting-row"><label for="backgroundPattern">종류</label><select id="backgroundPattern"></select></div>
+      <div class="setting-row" id="backgroundSpacingRow" hidden><label for="backgroundSpacing">간격</label><input id="backgroundSpacing" type="range" min="12" max="96" step="1"/><output id="backgroundSpacingValue"></output></div>
+    </fieldset>
+  </div>
+</div>
+<div aria-labelledby="backgroundManageTitle" aria-modal="true" class="modal" id="backgroundManageModal" role="dialog">
+  <div class="modal-content compact-modal-content"><header class="dialog-header"><h2 id="backgroundManageTitle">고정개체 관리</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="backgroundManageModal">×</button></header><div id="backgroundObjects"></div>
+    <button class="action-btn" id="unlockBackgroundObjects">선택한 개체 고정 해제</button>
+  </div>
+</div>
+<input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
+<div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=score-tab-preview-1" type="module"></script>
+<noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
+<div class="context-palette" role="group" aria-label="색상">
+  <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>
+</div>
+<div class="context-palette" role="group" aria-label="크기">
+  <span aria-hidden="true">크기</span><div class="quick-sizes" id="contextSizes"></div>
+</div>
+<button id="contextBackground" role="menuitem" type="button" data-board-icon="background">배경 변경</button><button id="contextBackgroundManage" role="menuitem" type="button" data-board-icon="fixed-objects">고정개체 관리</button><button id="contextCopy" role="menuitem" type="button" data-board-icon="copy">복사</button><button id="contextLoad" role="menuitem" type="button" data-board-icon="folder-open">불러오기</button><button id="contextPin" role="menuitem" type="button" data-board-icon="pin-object">배경으로 고정</button><button id="contextGroup" role="menuitem" type="button" data-board-icon="group">그룹</button><button id="contextUngroup" role="menuitem" type="button" data-board-icon="ungroup">언그룹</button><button id="contextFront" role="menuitem" type="button" data-board-icon="front">맨 앞으로</button><button id="contextBack" role="menuitem" type="button" data-board-icon="back">맨 뒤로</button><button id="contextTextProps" role="menuitem" type="button" data-board-icon="text">텍스트박스 속성</button></div><div aria-labelledby="sharedSettingsTitle" aria-modal="true" class="modal" id="sharedSettingsModal" role="dialog"><div class="modal-content wb-settings"><header class="dialog-header"><h2 id="sharedSettingsTitle">빠른 색상·크기</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="sharedSettingsModal">×</button></header>
+<div class="appearance-overview">
+  <div><strong>색상</strong><div id="previewColors" class="quick-colors" aria-label="빠른 색상"></div></div>
+  <div><strong>크기</strong><div id="previewSizes" class="quick-sizes" aria-label="빠른 크기"></div></div>
+</div>
+<details class="setting-section"><summary>기본값</summary><div id="sizeDefaults"></div></details>
+<div class="appearance-cards">
+  <section class="setting-section">
+    <div class="setting-card-heading"><h3>즐겨찾기 색상</h3><button class="action-btn" id="removeFavoriteColor" type="button">삭제</button></div>
+    <label class="favorite-color-picker"><input id="favoriteColor" aria-label="즐겨찾기 색상" type="color" value="#ff8800"/><output id="favoriteColorValue"></output></label>
+  </section>
+  <section class="setting-section">
+    <div class="setting-card-heading"><h3>즐겨찾기 크기</h3><button class="action-btn" id="removeFavoriteSize" type="button">삭제</button></div>
+    <div id="favoriteSizes"></div>
+    <div class="cloud-buttons"><button class="action-btn" id="smallerFavorite" type="button" aria-label="크기 세트 줄이기">−</button><button class="action-btn" id="largerFavorite" type="button" aria-label="크기 세트 늘리기">+</button></div>
+  </section>
+</div>
+<div class="modal-actions"><button class="action-btn" data-close="sharedSettingsModal" type="button">취소</button><button class="action-btn dialog-primary" id="saveFavorites" type="button">저장</button></div>
+</div></div><div aria-labelledby="textPropsTitle" aria-modal="true" class="modal" id="textPropsModal" role="dialog"><div class="modal-content wb-settings"><header class="dialog-header"><h2 id="textPropsTitle">텍스트박스 속성</h2><button aria-label="닫기" class="close-btn dialog-close" data-close="textPropsModal">×</button></header><form id="textPropsForm">
+  <div class="appearance-cards">
+    <fieldset class="setting-section"><legend>박스 배경</legend>
+      <label><input id="textBgEnabled" type="checkbox"/> 표시</label>
+      <label class="setting-row">배경색 <input id="textBgColor" type="color" value="#ffffff"/></label>
+    </fieldset>
+    <fieldset class="setting-section"><legend>박스 테두리</legend>
+      <label><input id="textBorderEnabled" type="checkbox"/> 표시</label>
+      <label class="setting-row">테두리 색상 <input id="textBorderColor" type="color" value="#000000"/></label>
+      <label class="setting-row">두께 <input id="textBorderWidth" max="30" min="1" type="number" step="any" value="2"/> px</label>
+    </fieldset>
+  </div>
+  <div class="modal-actions"><button class="action-btn" type="button" data-close="textPropsModal">취소</button><button class="action-btn" type="submit">저장</button></div>
+</form></div></div></body></html>
