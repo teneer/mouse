@@ -118,7 +118,7 @@ service cloud.firestore {
               ]))
             ||
             (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'requestDevice','requestTab','requestId','requestedAt'
+              'requestDevice','requestTab','requestId','requestedAt','updatedAt'
             ]) && request.resource.data.requestDevice == request.auth.uid)
             ||
             (resource.data.ownerDevice == null
