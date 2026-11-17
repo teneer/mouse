@@ -1,0 +1,117 @@
+body {
+  cursor: default;
+  caret-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+:is(textarea, input:not([type]), input[type="text"], input[type="url"], input[type="password"], input[type="number"], [contenteditable="true"]) {
+  cursor: text;
+  caret-color: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+:is(button, summary, label:has(input[type="checkbox"]), input[type="checkbox"]) {cursor:pointer}
+button:disabled {cursor:default}
+:is(.modal, .modal-background, .fullscreen-view) {
+  --dialog-border:#c5dae3;
+  --dialog-text:#123447;
+  --dialog-accent:#125771;
+  background:rgb(17 42 54 / 36%);
+  align-items:center;
+  justify-content:center;
+  padding:12px;
+  box-sizing:border-box;
+}
+:is(.modal > .modal-content, .modal-background > .modal-box, .fullscreen-view > .dialog-sheet) {
+  background:#fff;
+  color:var(--dialog-text);
+  border:1px solid var(--dialog-border);
+  border-radius:16px;
+  box-shadow:0 16px 48px rgb(18 52 71 / 20%);
+  max-height:calc(100dvh - 24px - var(--toolbar-clearance, 0px));
+  box-sizing:border-box;
+  overflow:auto;
+  margin:0;
+  position:relative;
+}
+:is(.modal-content, .modal-box, .dialog-sheet) > :is(h2,h3),
+.dialog-sheet .goal-header > h2 {
+  color:var(--dialog-text);
+  font-size:1.2rem;
+  margin:0 0 12px;
+  text-align:left;
+}
+:is(.modal-content, .modal-box, .dialog-sheet) :is(button,input,select,textarea) {font:inherit}
+:is(.modal-content, .modal-box, .dialog-sheet) :is(input:not([type="checkbox"],[type="range"]), select, textarea) {
+  max-width:100%;min-height:36px;box-sizing:border-box;border:1px solid var(--dialog-border);
+  border-radius:8px;background:#fff;color:var(--dialog-text);padding:5px 8px;
+}
+:is(.modal-content, .modal-box, .dialog-sheet) :is(button, input, select, textarea, summary):focus-visible {
+  outline:2px solid var(--dialog-accent);outline-offset:2px;
+}
+:is(.modal-content, .modal-box, .dialog-sheet) :is(.action-btn,.dialog-action) {
+  min-height:36px;height:auto;border-radius:9px;border:1px solid var(--dialog-border);padding:6px 10px;
+  background:#edf5f7;color:var(--dialog-text);
+}
+:is(.modal-content, .modal-box, .dialog-sheet) :is(.dialog-primary,button[type="submit"],#confirmSaveBtn,#passwordModalOkBtn) {
+  background:var(--dialog-accent);color:#fff;border-color:transparent;
+}
+:is(.modal-content, .modal-box, .dialog-sheet) :is(.dialog-danger,.delete-row-btn,.delete-team-btn) {
+  color:#922c25;background:#fbece9;border-color:#ecc5be;
+}
+:is(.modal-content, .modal-box, .dialog-sheet) .dialog-close {
+  position:absolute;top:10px;right:10px;display:grid;place-items:center;
+  min-width:34px;min-height:34px;border:1px solid var(--dialog-border);border-radius:8px;
+  color:var(--dialog-text);background:#edf5f7;line-height:1;padding:0;font-size:20px;
+}
+:is(.modal-actions,.modal-footer,.dialog-footer) {display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+.setting-section {border:1px solid var(--dialog-border);border-radius:10px;padding:10px 12px;margin:10px 0;min-width:0}
+.setting-section :is(legend,summary) {font-weight:650}
+.setting-row {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0}
+.setting-row label {margin:0}
+.background-swatch {display:inline-block;width:1rem;height:1rem;margin-right:6px;border:1px solid #55748460;border-radius:50%}
+:is(.modal-content, .modal-box):has(> .dialog-close) > :is(h2,h3) {padding-right:36px}
+
+:is(.modal-content,.modal-box,.dialog-sheet) {
+  --dialog-header:#eaf4f7;
+  --dialog-padding:18px;
+}
+:is(.modal > .modal-content,.modal-background > .modal-box,.fullscreen-view > .dialog-sheet) {
+  padding:var(--dialog-padding);
+  overflow:auto;
+}
+.dialog-header {
+  box-sizing:border-box;
+  position:relative;
+  display:flex;
+  align-items:center;
+  min-height:58px;
+  border-bottom:1px solid var(--dialog-border);
+  background:var(--dialog-header);
+  padding:12px 52px 12px var(--dialog-padding);
+  margin:calc(-1 * var(--dialog-padding)) calc(-1 * var(--dialog-padding)) 14px;
+}
+.dialog-header :is(h2,h3) {
+  color:var(--dialog-text,#123447);
+  text-align:left;
+  font-size:1.2rem;
+  line-height:1.25;
+  margin:0;
+}
+:is(.modal-content,.modal-box,.dialog-sheet) .dialog-header .dialog-close {
+  right:var(--dialog-padding);top:50%;transform:translateY(-50%);
+  background:#fff;
+}
+:is(.modal-content,.modal-box,.dialog-sheet) :is(input[type="number"],input[type="color"],select) {
+  background:var(--dialog-header);
+}
+.appearance-cards {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+}
+.appearance-cards > .setting-section {margin:0}
+.setting-card-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.setting-card-heading h3 {font-size:1rem;margin:0}
+@media(max-width:540px) {
+  .appearance-cards {grid-template-columns:minmax(0,1fr)}
+  .dialog-header {min-height:52px}
+}

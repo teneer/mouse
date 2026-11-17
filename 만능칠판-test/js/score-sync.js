@@ -3,6 +3,13 @@ export function wireScoreSync(frame, cloud, store, notify) {
   let write = Promise.resolve(), refreshQueued = false;
   let ready = false;
   let previous, wasOnline=false, catchingUp=true;
+  let scoreChannel;
+  try {scoreChannel = new BroadcastChannel('whiteboard.test.score-preview.v1');} catch {}
+  if (scoreChannel) scoreChannel.onmessage = ({data}) => {
+    if (ready && cloud.options && !cloud.detaching && data?.boardId === cloud.options.boardId) {
+      api()?.preview?.(data);
+    }
+  };
 
   function api() {return frame?.contentWindow?.whiteboardScore;}
   function snapshot() {
@@ -32,16 +39,22 @@ export function wireScoreSync(frame, cloud, store, notify) {
       finally {refreshQueued = false;}
     });
   }
-  function send(data) {
+  function send(data,preview) {
     if (!cloud.options || cloud.detaching) return false;
+    const connection = cloud.options;
     if (data.kind==='score-goals' && data.base!==(cloud.projectedScore(drafts.values())?.state.goalSystem?.revision??null)) return false;
     const operation = structuredClone({...data,device:cloud.deviceId||'local',deviceLabel:cloud.options.label||'연결 기기'});
     drafts.set(operation.key,operation);
     refresh();
     write = write.then(async ()=>{
-      try {await cloud.enqueue(operation);return true;}
+      try {await cloud.enqueue(operation);}
       catch (error) {previous = null;notify(error.message);return false;}
       finally {drafts.delete(operation.key);refresh();}
+      // Peers only use this for display. The durable operation still has a single sender.
+      if (preview && cloud.options === connection && !cloud.detaching) {
+        try {scoreChannel?.postMessage({...preview,key:operation.key,boardId:connection.boardId});} catch {}
+      }
+      return true;
     });
     return write;
   }

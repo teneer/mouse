@@ -12,7 +12,7 @@ import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedT
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
 import {CloudBoard} from './js/cloud.js?v=conflict-fields-1';
-import {wireScoreSync} from './js/score-sync.js?v=conflict-fields-1';
+import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=conflict-fields-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=device-guide-1';
 import {validateContent} from './js/validation.js';

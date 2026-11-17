@@ -73,6 +73,8 @@ const goalUI = wireGoals({
   }
 });
 const ownScoreEvents = new Set();
+const previewedScoreEvents = new Set();
+let tabScorePreview;
 function submitGoal(operation) {
   if (sharedMode) return sendScore(operation);
   syncFromStorage();
@@ -89,6 +91,31 @@ function submitGoal(operation) {
 function speakEffect(effect) {
   if (effect?.kind==='team') playSound(effect.amount>0?sounds.teamIncrease:sounds.teamDecrease);
   if (effect?.classDiff) playSound(effect.classDiff>0?sounds.mainIncrease:sounds.mainDecrease);
+}
+
+function clearTabScorePreview() {
+  clearTimeout(tabScorePreview?.timeout);
+  tabScorePreview = undefined;
+}
+
+function cancelTabScorePreview() {
+  if (!tabScorePreview) return;
+  resetConversion();
+  renderClassNumber(count);
+  updateScoreProgress();
+}
+
+function previewTabScore({key,baseVersion,effect}) {
+  if (!sharedMode || !sharedScore || sharedScore.version !== baseVersion || conversionPlayer || tabScorePreview ||
+      typeof key !== 'string' || ownScoreEvents.has(key) || previewedScoreEvents.has(key) ||
+      sharedScore.sounds?.some(item=>item.key === key) || effect?.kind !== 'team' ||
+      !linkEnabled || effect.rate !== linkPoints || effect.oldCount !== count || effect.oldTotal !== totalTeamScore() ||
+      !Number.isSafeInteger(effect.newTotal) || !effect.classDiff ||
+      conversionFrame(effect.oldTotal,effect.newTotal,linkPoints).delta !== effect.classDiff) return;
+  previewedScoreEvents.add(key);
+  if (previewedScoreEvents.size>128) previewedScoreEvents.delete(previewedScoreEvents.values().next().value);
+  tabScorePreview = {key,effect,timeout:setTimeout(cancelTabScorePreview,10000)};
+  presentScoreEffect(effect);
 }
 
 function applySharedScore(model,live) {
@@ -111,6 +138,15 @@ function applySharedScore(model,live) {
     for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect);
   }
   const {count: nextCount, teams: nextTeams, scoreLink, goalSystem: nextGoals} = model.state;
+  const previewEffect = tabScorePreview?.effect;
+  const keepPreview = previewEffect && tabScorePreview.key === model.version && model.effect?.kind === 'team' &&
+    model.effect.oldCount === previewEffect.oldCount && model.effect.oldTotal === previewEffect.oldTotal &&
+    model.effect.newTotal === previewEffect.newTotal && model.effect.rate === previewEffect.rate &&
+    nextCount === count + previewEffect.classDiff;
+  if (keepPreview) clearTabScorePreview();
+  else if (tabScorePreview && (model.version !== previous?.version || model.notice?.key === tabScorePreview.key)) {
+    cancelTabScorePreview();
+  }
   const sameTeamOrder = teams.length === nextTeams.length && teams.every((team,index)=>team.id === nextTeams[index].id);
   if (!sameTeamOrder) selectedTeams.clear();
   const announce = live || ownScoreEvents.has(model.version);
@@ -126,16 +162,17 @@ function applySharedScore(model,live) {
     renderBatchControls();
     return;
   }
-  const effect = previous && previous.version !== model.version && model.effect?.oldCount === count
+  const effect = previous && previous.version !== model.version && !previewedScoreEvents.has(model.version) && model.effect?.oldCount === count
     && (model.effect.kind !== 'team' || model.effect.oldTotal === totalTeamScore()) ? model.effect : null;
   applyStateFields(structuredClone(model.state));
-  renderCurrentState(effect,announce);
+  renderCurrentState(effect,announce,keepPreview);
 
 }
 
 window.whiteboardScore = {
   localSnapshot: () => initialized
     ? structuredClone(sharedMode ? readStoredState() || migrationSnapshot : snapshot(undefined)) : null,
+  preview: previewTabScore,
   receive({shared, model, send, notice, live, deviceNames:registered}) {
     sharedSend = send;
     sharedNotice = notice;
@@ -151,7 +188,7 @@ window.whiteboardScore = {
       sharedMode = true;
       applySharedScore(model,live);
     } else if (sharedMode) {
-      goalUI.reset();ownScoreEvents.clear();
+      goalUI.reset();ownScoreEvents.clear();previewedScoreEvents.clear();
       sharedMode = false;
       sharedScore = null;
       if (conflictsDialog.open) conflictsDialog.close();
@@ -170,20 +207,21 @@ window.whiteboardScore = {
   }
 };
 
-function sendScore(operation) {
+function sendScore(operation,preview) {
   if (!sharedScore || !sharedSend) return;
   const key = crypto.randomUUID();
   ownScoreEvents.add(key);
   if (ownScoreEvents.size>128) ownScoreEvents.delete(ownScoreEvents.values().next().value);
-  return sharedSend({...operation,key,authoredAt:Date.now()});
+  return sharedSend({...operation,key,authoredAt:Date.now()},preview);
 }
-function sharedDelta(amount, targets = null) {
+function sharedDelta(amount, targets = null, effect) {
   const signature = JSON.stringify([amount,targets]), now = performance.now();
   if (scoreGroup?.signature !== signature || now-scoreGroup.time > undoWindow) {
     scoreGroup = {id:crypto.randomUUID(),signature};
   }
   scoreGroup.time = now;
-  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,fieldBasis:scoreDeltaBasis(sharedScore)});
+  const preview = effect?.kind === 'team' && effect.classDiff ? {baseVersion:sharedScore.version,effect} : undefined;
+  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,fieldBasis:scoreDeltaBasis(sharedScore)},preview);
 }
 function drawConflicts(conflicts) {
   if (!conflicts.length) {
@@ -286,7 +324,7 @@ function renderGoalFeedback(announce) {
 function saveToStorage(effect = null, base = sharedScore?.state) {
   if (sharedMode) {
     if (!sharedScore) return;
-    if (effect) sharedDelta(effect.inputAmount ?? effect.classDiff,effect.targets);
+    if (effect) sharedDelta(effect.inputAmount ?? effect.classDiff,effect.targets,effect);
     else {
       scoreGroup = null;
       const patch=scorePatch(base,snapshot(undefined));
@@ -334,14 +372,14 @@ window.addEventListener('storage', event => {
   } catch(error) {console.error('점수 동기화 실패:',error);}
 });
 
-function renderCurrentState(effect,announce=false) {
-  if(!effect){resetConversion();renderClassNumber(count);}
+function renderCurrentState(effect,announce=false,keepConversion=false) {
+  if(!effect && !keepConversion){resetConversion();renderClassNumber(count);}
   renderLinkSettings();
   goalUI.update(goalSystem,announce);
   goalUI.giftGroup(document.getElementById('class-goal-gifts'));
   renderTeams();
   if(effect)presentScoreEffect(effect);
-  else updateScoreProgress();
+  else if(!keepConversion)updateScoreProgress();
   // 관리 모달에 입력 중인 값은 원격 수신으로 덮어쓰지 않습니다.
 }
 function displayFloatingNumber(element, amount, topStart, topEnd) {
@@ -387,6 +425,7 @@ function changeClassScore(amount) {
   syncFromStorage();
   const next = count + amount;
   if (next < minScore || next > maxScore || sharedMode && !sharedScore) return;
+  cancelTabScorePreview();
   recordScoreChange(`class:${amount}`);
   const old = count;
   count = next;
@@ -546,6 +585,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
     ? Math.floor(newTotal / linkPoints) - Math.floor(oldTotal / linkPoints) : 0;
   if (count + classDiff > maxScore || count + classDiff < minScore) return;
 
+  cancelTabScorePreview();
   recordScoreChange(undoKey);
   indices.forEach((index, position) => {
     const next = nextScores[position];
@@ -567,6 +607,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
 }
 
 function resetConversion() {
+  clearTabScorePreview();
   queuedConversions.length=0;
   conversionPlayer?.abort();
   conversionPlayer=null;
@@ -723,7 +764,13 @@ function presentScoreEffect(effect,audible=false) {
       if(conversionPlayer===player){
         conversionPlayer=null;
         progress.removeAttribute('data-converting');
-        renderClassNumber(count);updateScoreProgress();
+        if (tabScorePreview) {
+          const {oldCount,classDiff,newTotal,rate}=tabScorePreview.effect;
+          renderClassNumber(oldCount+classDiff);
+          renderProgress(scoreRemainder(newTotal,rate),rate);
+        } else {
+          renderClassNumber(count);updateScoreProgress();
+        }
       }
     }
   })();
