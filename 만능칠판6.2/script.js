@@ -57,7 +57,7 @@ function isTextEditing() {
 function isFormEditing() {
   const e=document.activeElement;return !!(e && e.matches('input,textarea,select,[contenteditable="true"]'));
 }
-const canEditBoard = ()=>!cloud?.options || !!cloudBase && !cloud.detaching;
+const canEditBoard = ()=>!cloud?.options || (!!cloud.online && !!cloudBase && !cloud.detaching);
 function allowed() {return !!current&&canEditBoard()&&!busy&&!modalOpen()&&!tools?.gesture;}
 function rememberView(publish=false) {
   if(!current || !c)return;
@@ -132,7 +132,14 @@ async function flush() {
         if(cloud.projected().pages[local.id]?.deleted){dirty=false;requestCloudRefresh();break;}
         const normalized=(await prepareCloudPage(local)).content;
         const patch=pagePatch(cloudBase,normalized);
-        if(patch)await cloud.enqueue({kind:'edit',pageId:local.id,patch});
+        if(patch){
+          const objectIds=[...new Set((patch.objects||[]).map(([id])=>id).filter(Boolean))];
+          const controlTokens=objectIds.length?await cloud.ensureObjectControls(local.id,objectIds):{};
+          await cloud.enqueue({
+            kind:'edit',pageId:local.id,patch,
+            ...(objectIds.length?{requiresControl:objectIds,controlTokens,tabId:cloud.tabId}:{})
+          });
+        }
         cloudBase=normalized;
         if(pagePatch(local.content,normalized))requestCloudRefresh();
         if(g===generation)dirty=false;
@@ -1356,7 +1363,17 @@ async function boot() {
   });
   await setPage(pages.find(p=>p.id===session.activeId)||pages[0],true);
   clipboard=new SystemClipboard({canvas:c,allowed,run,onChange:changed,onFiles:files=>importFiles(files),onText:text=>addText(text),notify,isTextEditing});
-  c.on('selection:created',updateHistory);c.on('selection:updated',updateHistory);c.on('selection:cleared',updateHistory);
+  const syncSelectionControls=async()=>{
+    if(!cloudActive()||!current||!cloud.online)return;
+    const active=c.getActiveObject();
+    const selected=active?.type==='activeSelection'?(active.getObjects?.()||[]):active?[active]:[];
+    const ids=selected.map(object=>object.id).filter(id=>typeof id==='string'&&id);
+    await flush();
+    if(cloudActive()&&current)await cloud.syncObjectControls(current.id,ids);
+  };
+  c.on('selection:created',()=>{updateHistory();syncSelectionControls().catch(fail);});
+  c.on('selection:updated',()=>{updateHistory();syncSelectionControls().catch(fail);});
+  c.on('selection:cleared',()=>{updateHistory();if(!suppressSelection&&!groupSession&&cloudActive())flush().then(()=>cloud.syncObjectControls(current?.id,[])).catch(fail);});
   c.on('text:editing:exited',()=>{if(cancelledText)return;if(groupSession)closeGroupSession();else changed();flush().then(()=>{if(cloudActive())requestCloudRefresh();else return applyLocalView();}).catch(fail);});
 
   wireUI();setupIntegratedScorePanel();
@@ -1372,8 +1389,42 @@ async function boot() {
   cloud=new CloudBoard(store,{
     board:()=>{requestCloudRefresh();scoreSync?.refresh();tabViews?.render();},
     view:()=>{requestCloudRefresh();tabViews?.render();},error:fail,
-    status:()=>{cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
+    status:()=>{
+      if(cloud?.options&&!cloud.online&&c){
+        c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
+        if(tools?.gesture)tools.up();
+      }else if(cloud?.online&&c){
+        c.selection=tools?.mode==='select';c.skipTargetFind=tools?.mode==='move';
+      }
+      cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();
+    },
+    controlState:()=>{if(cloud?.online&&dirty)flush().catch(fail);},
+    controlRequest:async request=>{
+      if(request.pageId!==current?.id)return;
+      try{
+        if(isTextEditing())finishText();
+        await flush();
+        await cloud.handoffObjectControl(request);
+      }catch(error){fail(error);}
+    },
+    controlLost:held=>{
+      if(held.pageId!==current?.id||!c)return;
+      const active=c.getActiveObject();
+      if(!active)return;
+      const remaining=(active.type==='activeSelection'?(active.getObjects?.()||[]):[active])
+        .filter(object=>object.id!==held.objectId);
+      suppressSelection=true;
+      try{
+        c.discardActiveObject();
+        if(remaining.length)c.setActiveObject(remaining.length===1?remaining[0]:new fabric.ActiveSelection(remaining,{canvas:c}));
+        c.requestRenderAll();
+      }finally{suppressSelection=false;}
+      updateHistory();
+    },
+    controlRejected:()=>notify('다른 기기가 개체 제어권을 가져왔습니다. 최신 상태를 반영했습니다.'),
+    approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
   });
+  cloud.setTabId(sync.id);
   scoreSync=wireScoreSync($('scoreFrame'),cloud,store,notify,sync.id);
   cloudUI=wireCloudUI({cloud,files:boardFiles,openModal,notify,flush,scoreSync,
     finishEdits:async()=>{
