@@ -1,5 +1,5 @@
 import { getAll, putRecord } from '../core/db.js';
-import { applyIndividualScore } from '../core/score-engine.js';
+import { applyIndividualScore } from '../core/score-engine.js?v=growth-path';
 
 function uid() {
   return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
@@ -126,15 +126,8 @@ export function mountChecklist(root, options) {
         reason: '체크리스트: ' + definition.title, source: 'checklist'
       });
       bus.publish('score.changed', {
-        studentId: studentId, studentName: student.name, delta: reward,
+        studentId: studentId, studentName: student.name, avatarId: student.avatarId, delta: reward, growth: result.trail,
         reason: '체크리스트: ' + definition.title, source: 'checklist'
-      });
-      result.conversions.forEach(function (conversion) {
-        bus.publish('growth.converted', {
-          classScoreAfter: conversion.classScoreAfter,
-          contributions: conversion.contributions,
-          conversionId: conversion.id
-        });
       });
       bus.publish('checklist.rewarded', { studentName: student.name, points: reward, title: definition.title });
     }

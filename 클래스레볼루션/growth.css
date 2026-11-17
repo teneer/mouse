@@ -1,0 +1,202 @@
+#growth-root {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.growth-world {
+  --tree-width: clamp(85px, 13vw, 205px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tree-width);
+  min-height: 100%;
+  background: #44d6ed;
+  color: #124a59;
+}
+
+.growth-sky {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px clamp(12px, 3vw, 54px) 58px;
+  overflow: hidden;
+}
+
+.growth-class-label {
+  position: absolute;
+  z-index: 2;
+  top: clamp(12px, 3vh, 26px);
+  left: 50%;
+  width: min(53%, 520px);
+  margin: 0;
+  padding: 7px 14px;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  background: #ccf5fc55;
+  color: #125669;
+  font-size: clamp(13px, 1.65vw, 22px);
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.growth-board { z-index: 1; width: min(100%, 141vh, 1270px); }
+.growth-path-art {
+  position: relative;
+  container-type: inline-size;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 1500 / 660;
+  background: url("assets/visuals/bg-class-clouds-way.png") center / 100% 100% no-repeat;
+}
+
+.growth-egg-count {
+  position: absolute;
+  z-index: 1;
+  left: 91.9%;
+  top: 75.2%;
+  transform: translate(-50%, -47%);
+  color: #5b400a;
+  font-size: clamp(15px, 4.5cqw, 58px);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.growth-actor {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: clamp(27px, 11%, 120px);
+  justify-items: center;
+  transform: translate(-50%, -54%);
+}
+.growth-actor .avatar-still, .growth-actor .avatar-fx { width: 73%; max-width: 75px; }
+.growth-actor .avatar-fx { animation: avatar-celebration .85s steps(1) infinite; }
+.growth-actor-name {
+  max-width: 100%;
+  color: #132e38;
+  font-size: clamp(8px, 1.5cqw, 16px);
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px #ffffff80;
+  line-height: 1.07;
+}
+.growth-actor.is-arriving { animation: growth-arrival calc(.165s * var(--pace, 1)) ease-out both; }
+.growth-actor.is-restored { animation: growth-arrival calc(.5s * var(--pace, 1)) ease-out both; }
+.growth-actor.is-leaving { animation: growth-retreat calc(.215s * var(--pace, 1)) ease-in both; }
+.growth-archived-star { color: #987318; font-size: clamp(13px, 3.6cqw, 40px); }
+
+.growth-counts {
+  display: flex;
+  justify-content: flex-end;
+  gap: clamp(5px, 1.3vw, 16px);
+  padding-right: 6%;
+  color: #16515d;
+  font-size: clamp(11px, 1.25vw, 16px);
+  font-weight: 800;
+}
+.growth-counts i {
+  display: inline-grid;
+  place-items: center;
+  width: 1.45em;
+  height: 1.45em;
+  border-radius: 50%;
+  background: #1c6bac;
+  color: #fff474;
+  font-style: normal;
+}
+.growth-counts span + span i { background: #da3150; color: white; }
+.growth-village-decoration {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  max-height: 16vh;
+  object-fit: contain;
+  object-position: bottom center;
+  opacity: .87;
+  pointer-events: none;
+}
+
+.growth-tree-strip {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  padding: clamp(10px, 2.1vh, 24px) 9px;
+  background: #785037 url("assets/visuals/나무편집.png") center / 100% 100% no-repeat;
+  color: #fff8ad;
+}
+.growth-tree-title {
+  padding: 11px 6px;
+  border-radius: 0 13px 13px 0;
+  background: #578d16;
+  font-size: clamp(12px, 1.55vw, 21px);
+  font-weight: 850;
+  text-align: center;
+}
+.growth-tree-egg {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 6px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #624323;
+}
+.growth-tree-egg strong { font-size: clamp(13px, 1.7vw, 22px); text-align: center; }
+.growth-tree-egg small { grid-column: 1 / -1; text-align: center; font-size: 10px; }
+.growth-egg-art {
+  display: block;
+  width: 22px;
+  aspect-ratio: 198 / 239;
+  background: url("assets/visuals/bg-class-clouds-way.png") 98% 87.2% / 757.6% 276.2% no-repeat;
+}
+.growth-egg-celebration {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 11px;
+  justify-items: center;
+  background: #15121ff0;
+  color: #ffdf53;
+  font-size: clamp(17px, 3vw, 32px);
+  text-align: center;
+  animation: growth-celebrate .23s ease-out both;
+}
+.growth-egg-celebration .growth-egg-art { position: relative; width: clamp(64px, 11vw, 118px); }
+.growth-egg-celebration .score-wings { top: 47%; transform: translate(-50%, -50%); }
+
+@keyframes growth-arrival {
+  from { opacity: 0; transform: translate(calc(-50% + var(--shift-x)), calc(-54% + var(--shift-y))) scale(.64); }
+  to { opacity: 1; transform: translate(-50%, -54%); }
+}
+@keyframes growth-retreat {
+  from { opacity: 1; transform: translate(-50%, -54%); }
+  to { opacity: 0; transform: translate(calc(-50% + var(--shift-x)), calc(-54% + var(--shift-y))) scale(.8); }
+}
+@keyframes growth-celebrate { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 620px) {
+  .growth-world { --tree-width: clamp(45px, 16vw, 88px); }
+  .growth-sky { padding-inline: 5px; }
+  .growth-tree-strip { padding-inline: 2px; }
+  .growth-tree-egg { padding-inline: 3px; }
+  .growth-counts { padding-right: 2%; }
+  .growth-actor { width: 12%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .growth-actor, .growth-actor .avatar-fx, .growth-egg-celebration { animation: none; }
+}

@@ -1,6 +1,6 @@
 import { AVATAR_COUNT, avatarNumber, stillAvatar } from '../core/avatar.js';
 import { groupPositions, importStudents, loadRoster, moveGroup, moveStudent, saveGroup, saveStudent, studentSeats } from '../core/roster.js';
-import { applyScoreBatch } from '../core/score-engine.js';
+import { applyScoreBatch } from '../core/score-engine.js?v=growth-path';
 import { escapeHtml } from '../core/text.js';
 
 const DIRECTION_KEY = 'class-revolution.room-reversed';
@@ -361,15 +361,10 @@ export function mountScoreboard(root, { classId, bus }) {
       selected.clear();
       notice = '';
       bus.publish('score.changed', {
-        batchId: result.events[0].batchId, delta: sign * amount, reason: reason.trim(), source: 'scoreboard',
+        batchId: result.events[0].batchId, delta: sign * amount, reason: reason.trim(), source: 'scoreboard', growth: result.trail,
         students: result.students.map(function (student) {
           return { id: student.id, name: student.name, avatarId: student.avatarId };
         })
-      });
-      result.conversions.forEach(function (conversion) {
-        bus.publish('growth.converted', {
-          classScoreAfter: conversion.classScoreAfter, contributions: conversion.contributions, conversionId: conversion.id
-        });
       });
     } catch (error) {
       notice = error.message;

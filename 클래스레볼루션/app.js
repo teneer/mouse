@@ -1,9 +1,9 @@
 import { openDatabase, getRecord, putRecord, exportAll, importAll } from './core/db.js';
 import { createEventBus } from './core/events.js';
-import { mountGlobalFeedback } from './core/feedback.js';
-import { mountScoreboard } from './modules/scoreboard.js';
-import { mountGrowth } from './modules/growth.js';
-import { mountChecklist } from './modules/checklist.js';
+import { mountGlobalFeedback } from './core/feedback.js?v=growth-path';
+import { mountScoreboard } from './modules/scoreboard.js?v=growth-path';
+import { mountGrowth } from './modules/growth.js?v=growth-path';
+import { mountChecklist } from './modules/checklist.js?v=growth-path';
 
 const CLASS_ID = 'class-default';
 const MODE_KEY = 'class-revolution.active-mode.v1';
@@ -83,14 +83,13 @@ async function start() {
   }
 
   bus.subscribe(function (event) {
-    if (event.type === 'data.restored') refreshAll().catch(function (error) { console.error(error); });
+    if (event.type === 'data.restored') {
+      growth.handleEvent(event);
+      refreshAll().catch(function (error) { console.error(error); });
+    }
     if (event.type === 'score.changed') {
       scoreboard.refresh();
-      growth.refresh();
-    }
-    if (event.type === 'growth.converted') {
       growth.handleEvent(event);
-      growth.refresh();
     }
     if (event.type === 'students.changed' || event.type === 'groups.changed') {
       scoreboard.refresh();

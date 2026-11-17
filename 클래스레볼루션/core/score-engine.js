@@ -1,4 +1,5 @@
 import { requestResult, transact } from './db.js';
+import { applyPath, sumDeductions } from './growth-path.js';
 
 export function applyScoreBatch(options) {
   const { classId } = options;
@@ -25,9 +26,10 @@ export function applyScoreBatch(options) {
 
     const now = new Date().toISOString();
     const growthState = savedGrowth || { classId, classScore: 0, pending: [], totalContributions: 0 };
-    growthState.pending = Array.isArray(growthState.pending) ? growthState.pending : [];
-    growthState.totalContributions = Number(growthState.totalContributions || 0);
-    const conversions = [];
+    const [pastConversions, historicalScores] = await Promise.all([
+      delta < 0 && growthState.classScore ? requestResult(conversionStore.index('classId').getAll(classId)) : [],
+      Number.isFinite(growthState.totalDeductions) ? [] : requestResult(eventStore.index('classId').getAll(classId))
+    ]);
     const batchId = crypto.randomUUID();
     const events = students.map(function (student) {
       student.score = Number(student.score || 0) + delta;
@@ -38,36 +40,21 @@ export function applyScoreBatch(options) {
         groupId: student.groupId || null, delta, reason, source, createdAt: now
       };
       eventStore.add(event);
-
-      // Growth conversion still uses the existing positive-point rule.
-      for (let index = 0; index < delta; index += 1) {
-        growthState.pending.push({
-          id: crypto.randomUUID(), studentId: student.id, studentName: student.name,
-          avatarId: student.avatarId || null, scoreEventId: event.id, createdAt: now
-        });
-        growthState.totalContributions += 1;
-        if (growthState.pending.length === 10) {
-          growthState.classScore = Number(growthState.classScore || 0) + 1;
-          const conversion = {
-            id: crypto.randomUUID(), classId, classScoreAfter: growthState.classScore,
-            contributions: growthState.pending, createdAt: now
-          };
-          conversionStore.add(conversion);
-          conversions.push(conversion);
-          growthState.pending = [];
-        }
-      }
       return event;
     });
-    growthState.updatedAt = now;
+    const { earned, reopened, trail } = applyPath(
+      growthState, events, students, pastConversions, sumDeductions(historicalScores), now, function () { return crypto.randomUUID(); }
+    );
+    earned.forEach(function (record) { conversionStore.add(record); });
+    reopened.forEach(function (record) { conversionStore.put(record); });
     growthStore.put(growthState);
-    return { students, events, growthState, conversions };
+    return { students, events, growthState, conversions: earned, trail };
   });
 }
 
 export async function applyIndividualScore(options) {
-  const { students, events, growthState, conversions } = await applyScoreBatch({
+  const { students, events, growthState, conversions, trail } = await applyScoreBatch({
     ...options, studentIds: [options.studentId]
   });
-  return { student: students[0], event: events[0], growthState, conversions };
+  return { student: students[0], event: events[0], growthState, conversions, trail };
 }

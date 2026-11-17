@@ -5,12 +5,14 @@ const SOUND_FILES = {
   positive: 'assets/audio/Plus.MP3',
   negative: 'assets/audio/Minus.MP3',
   growth: 'assets/audio/Egg up.MP3',
+  rewind: 'assets/audio/Egg down.MP3',
   checklist: 'assets/audio/Confirm.MP3',
   success: 'assets/audio/Success%20orinal.MP3'
 };
 
 const OTHER_FEEDBACK = {
   'growth.converted': { kind: 'growth', icon: '★' },
+  'growth.rewound': { kind: 'rewind', icon: '★' },
   'checklist.rewarded': { kind: 'checklist', icon: '✓' },
   'goal.achieved': { kind: 'success', icon: '🏆' }
 };
@@ -50,8 +52,9 @@ function messageContent(event) {
   const { kind, icon } = OTHER_FEEDBACK[type];
   let title;
   let detail;
-  if (type === 'growth.converted') {
-    title = '학급 점수 +1';
+  if (type === 'growth.converted' || type === 'growth.rewound') {
+    const delta = payload.delta || 1;
+    title = '학급 점수 ' + (delta > 0 ? '+' : '−') + Math.abs(delta);
     detail = '황금알 ' + payload.classScoreAfter + '개';
   } else if (type === 'checklist.rewarded') {
     title = (payload.studentName || '학생') + ' 활동 보상';
@@ -100,10 +103,16 @@ export function mountGlobalFeedback(bus) {
   function next() {
     card?.remove();
     active = queue.shift() || null;
-    if (!active) { card = null; return; }
+    while (active?.growthSummary && document.body.dataset.classroomMode === 'growth') active = queue.shift() || null;
+    if (!active) {
+      card = null;
+      document.dispatchEvent(new Event('classroom-score-feedback-changed'));
+      return;
+    }
     card = document.createElement('div');
     render();
     host.appendChild(card);
+    document.dispatchEvent(new Event('classroom-score-feedback-changed'));
     const isScore = active.type === 'score.changed';
     const duration = isScore ? (active.payload.students?.length > 10 ? 5400 : 4100) : 2600;
     sound(isScore ? (Number(active.payload.delta) < 0 ? 'negative' : 'positive') : OTHER_FEEDBACK[active.type].kind);
@@ -120,6 +129,14 @@ export function mountGlobalFeedback(bus) {
   bus.subscribe(function (event) {
     if (event.type !== 'score.changed' && !Object.hasOwn(OTHER_FEEDBACK, event.type)) return;
     queue.push(event);
+    const trail = event.type === 'score.changed' ? event.payload.growth : null;
+    if (trail) {
+      const delta = trail.after.classScore - trail.before.classScore;
+      if (delta) queue.push({
+        type: delta > 0 ? 'growth.converted' : 'growth.rewound',
+        payload: { delta, classScoreAfter: trail.after.classScore }, growthSummary: true
+      });
+    }
     if (!active) next();
   });
 

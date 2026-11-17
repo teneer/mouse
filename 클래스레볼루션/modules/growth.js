@@ -1,80 +1,202 @@
-import { getAll, getRecord } from '../core/db.js';
+import { animatedAvatar, stillAvatar } from '../core/avatar.js';
+import { requestResult, transact } from '../core/db.js';
+import { PATH_LENGTH, sumDeductions } from '../core/growth-path.js';
+import { escapeHtml } from '../core/text.js';
 
-// Centers of the nine stars and the gold egg in bg-class-clouds-way.png.
 const POSITIONS = [
   [79.6, 26.0], [61.1, 19.4], [42.6, 26.0], [24.0, 19.4], [7.4, 41.3],
   [19.0, 70.4], [37.5, 77.1], [56.0, 70.4], [74.6, 77.1], [91.9, 75.2]
 ];
+const ENTRY_POSITION = [94, 25];
+const EMPTY_STATE = { classScore: 0, pending: [], totalContributions: 0, totalDeductions: 0 };
 
-function avatarPath(id) {
-  const number = String(Number(id) || 1).padStart(3, '0');
-  return 'assets/avatars/220/avatar_' + number + '_220.png';
-}
-function escapeHtml(value) {
-  return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
-    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+async function readBoard(classId) {
+  return transact(['growthStates', 'classes', 'scoreEvents'], 'readonly', async function (transaction) {
+    const [saved, classroom] = await Promise.all([
+      requestResult(transaction.objectStore('growthStates').get(classId)),
+      requestResult(transaction.objectStore('classes').get(classId))
+    ]);
+    const state = { ...EMPTY_STATE, ...saved };
+    if (!Number.isFinite(saved?.totalDeductions)) {
+      state.totalDeductions = sumDeductions(await requestResult(
+        transaction.objectStore('scoreEvents').index('classId').getAll(classId)
+      ));
+    }
+    state.pending = Array.isArray(state.pending) ? state.pending.slice(0, PATH_LENGTH - 1) : [];
+    return { state, className: classroom?.name || '우리 반' };
   });
 }
 
-export function mountGrowth(root, options) {
-  const classId = options.classId;
-  const bus = options.bus;
-  let state = { classScore: 0, pending: [], totalContributions: 0 };
-  let students = [];
-  let celebrationBatch = null;
-  let celebrationTimer = null;
+function actor(contribution, index, effect) {
+  if (!contribution) return '';
+  const [x, y] = POSITIONS[index];
+  const [previousX, previousY] = POSITIONS[index - 1] || ENTRY_POSITION;
+  const direction = effect.step === 'retreat' && effect.index === index ? ' is-leaving' :
+    effect.step === 'arrive' && effect.index === index ? ' is-arriving' :
+    effect.step === 'open' ? ' is-restored' : '';
+  const name = contribution.studentName || '';
+  const portrait = name
+    ? (effect.penalty ? stillAvatar(contribution.avatarId) : animatedAvatar(contribution.avatarId))
+    : '<span class="growth-archived-star" aria-label="이전 별">★</span>';
+  const opening = effect.step === 'open';
+  const [fromX, fromY] = opening ? POSITIONS[PATH_LENGTH - 1] : [previousX, previousY];
+  return '<div class="growth-actor' + direction + '" style="left:' + x + '%;top:' + y +
+    '%;--shift-x:' + (fromX - x) + 'cqw;--shift-y:' + (fromY - y) * .44 +
+    'cqw;--pace:' + (effect.pace || 1) + '">' + portrait + (name ? '<span class="growth-actor-name">' + escapeHtml(name) + '</span>' : '') + '</div>';
+}
 
-  async function refresh() {
-    const results = await Promise.all([getRecord('growthStates', classId), getAll('students')]);
-    state = results[0] || { classScore: 0, pending: [], totalContributions: 0 };
-    students = results[1].filter(function (student) { return student.classId === classId; });
-    render();
+export function mountGrowth(root, { classId }) {
+  let className = '우리 반';
+  let requested = 0;
+  let generation = 0;
+  let newestRevision = 0;
+  let playing = false;
+  const queue = [];
+  const visible = () => document.body.dataset.classroomMode === 'growth';
+  const popupOpen = () => Boolean(document.querySelector('#global-feedback .score-feedback-detail'));
+  const smallMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function render(frame, effect = {}) {
+    const marker = frame.pending.length;
+    const eggs = Number(frame.classScore) || 0;
+    const reward = effect.step === 'earn'
+      ? '<div class="growth-egg-celebration"><span class="score-wings" aria-hidden="true"></span><span class="growth-egg-art" aria-hidden="true"></span>' +
+        '<strong>황금알 ' + (effect.eggs || 1) + '개를 얻었어요!</strong></div>' : '';
+    root.innerHTML = '<section class="growth-world" aria-label="학급점수판"><div class="growth-sky">' +
+      '<h1 class="growth-class-label">' + escapeHtml(className) + '</h1><div class="growth-board">' +
+      '<div class="growth-path-art" aria-label="별길 ' + marker + ' / ' + PATH_LENGTH + '">' +
+      '<span class="growth-egg-count" aria-label="황금알 ' + eggs + '개">' + eggs + '</span>' +
+      frame.pending.map(function (contribution, index) { return actor(contribution, index, effect); }).join('') +
+      '</div><div class="growth-counts"><span><i aria-hidden="true">★</i> 상점 ' + (Number(frame.totalContributions) || 0) +
+      '</span><span><i aria-hidden="true">☁</i> 감점 ' + (Number(frame.totalDeductions) || 0) + '</span></div></div>' +
+      '<img class="growth-village-decoration" src="assets/visuals/sp_board_sky_village.png" alt="">' + reward +
+      '</div><aside class="growth-tree-strip" aria-label="황금알 누적"><div class="growth-tree-title">학급점수</div>' +
+      '<div class="growth-tree-egg"><span class="growth-egg-art" aria-hidden="true"></span><strong>' + eggs +
+      '</strong><small>황금알</small></div></aside></section>';
   }
 
-  function render() {
-    const pending = celebrationBatch || (Array.isArray(state.pending) ? state.pending : []);
-    const studentMap = new Map(students.map(function (student) { return [student.id, student]; }));
-    const slots = POSITIONS.map(function (position, index) {
-      const contribution = pending[index];
-      const student = contribution ? studentMap.get(contribution.studentId) : null;
-      const avatarId = contribution ? (contribution.avatarId || (student && student.avatarId)) : null;
-      const name = contribution ? (contribution.studentName || (student && student.name) || '기여 학생') : '';
-      let content = '<span class="slot-fallback">' + (index + 1) + '</span>';
-      if (avatarId) content = '<img src="' + avatarPath(avatarId) + '" alt="' + escapeHtml(name) + '"><span class="slot-fallback" hidden>' + escapeHtml(name.slice(0, 1)) + '</span>';
-      return '<div class="growth-slot ' + (contribution ? 'is-filled' : 'is-empty') + (index === 9 ? ' is-goal' : '') +
-        '" style="left:' + position[0] + '%;top:' + position[1] + '%" title="' + escapeHtml(contribution ? name : '기여 ' + (index + 1)) + '">' +
-        content + '</div>';
-    }).join('');
+  async function refresh() {
+    const request = ++requested;
+    const result = await readBoard(classId);
+    if (request !== requested) return;
+    const current = result.state;
+    className = result.className;
+    if (!playing && !queue.length) {
+      newestRevision = Math.max(newestRevision, Number(current.pathRevision) || 0);
+      render(current);
+    }
+  }
 
-    root.innerHTML = '<div class="module-heading"><div><h1>학급 성장 여정</h1><p>개인의 점수가 모여 우리 반의 성장이 됩니다.</p></div></div>' +
-      '<div class="growth-header"><div class="growth-score"><strong>' + Number(state.classScore || 0) +
-      '</strong><span>학급 점수</span></div><div class="growth-rule">개인 점수 10점 기여 → 학급 점수 1점</div></div>' +
-      '<section class="growth-scene" aria-label="별길 성장 경로">' + slots + '</section>' +
-      '<div class="growth-footer"><span>현재 별길 ' + (Array.isArray(state.pending) ? state.pending.length : 0) +
-      ' / 10 · 누적 기여 ' + Number(state.totalContributions || 0) + '</span>' +
-      '<img src="assets/visuals/sp_board_sky_village.png" alt="" onerror="this.hidden=true"></div>' +
-      '<p style="margin:10px 0;color:#7b8998;font-size:11px">별길의 10번째 기여가 도착하면 학급 점수로 전환되고 다음 여정이 시작됩니다.</p>';
+  function sound(earned) {
+    const file = earned ? 'Egg up.MP3' : 'Egg down.MP3';
+    const audio = new Audio('assets/audio/' + file);
+    audio.volume = .55;
+    audio.play().catch(function () {});
+  }
 
-    root.querySelectorAll('.growth-slot img').forEach(function (image) {
-      image.addEventListener('error', function () {
-        image.hidden = true;
-        if (image.nextElementSibling) image.nextElementSibling.hidden = false;
-      }, { once: true });
+  function wait(duration) {
+    return new Promise(function (resolve) { window.setTimeout(resolve, duration); });
+  }
+
+  function waitForPopup() {
+    return new Promise(function (resolve) {
+      function retry() {
+        document.removeEventListener('classroom-score-feedback-changed', retry);
+        document.removeEventListener('classroom-mode-changed', retry);
+        resolve();
+      }
+      document.addEventListener('classroom-score-feedback-changed', retry);
+      document.addEventListener('classroom-mode-changed', retry);
     });
   }
 
-  function handleEvent(event) {
-    if (event.type !== 'growth.converted') return;
-    celebrationBatch = Array.isArray(event.payload.contributions) ? event.payload.contributions : null;
-    render();
-    clearTimeout(celebrationTimer);
-    celebrationTimer = window.setTimeout(function () {
-      celebrationBatch = null;
-      refresh();
-    }, 2300);
+  async function pump() {
+    if (playing || !visible() || popupOpen() || !queue.length) return;
+    playing = true;
+    const session = generation;
+    try {
+      while (queue.length && session === generation && !popupOpen()) {
+        const trail = queue.shift();
+        const frame = { ...trail.before, pending: trail.before.pending.slice() };
+        const reduced = smallMotion();
+        const pace = Math.min(1, Math.max(.45, 20 / trail.steps.length));
+        const change = trail.after.classScore - trail.before.classScore;
+        if (trail.condensed || reduced) {
+          if (change) sound(change > 0);
+          if (change > 0 && !reduced) {
+            render(trail.after, { step: 'earn', eggs: change });
+            await wait(900);
+          }
+        }
+        for (const step of reduced ? [] : trail.steps) {
+          while (session === generation && popupOpen()) await waitForPopup();
+          if (session !== generation) return;
+          if (step.kind === 'arrive') {
+            frame.pending.push(step.contribution);
+            frame.totalContributions += 1;
+            render(frame, { step: 'arrive', index: frame.pending.length - 1, pace });
+            await wait(165 * pace);
+          } else if (step.kind === 'earn') {
+            frame.classScore = step.classScore;
+            sound(true);
+            render(frame, { step: 'earn' });
+            await wait(900 * pace);
+            frame.pending = [];
+          } else if (step.kind === 'open') {
+            frame.classScore = step.classScore;
+            frame.pending = step.contributions.slice();
+            sound(false);
+            render(frame, { step: 'open', penalty: true, pace });
+            await wait(570 * pace);
+          } else if (step.kind === 'retreat') {
+            frame.totalDeductions += 1;
+            render(frame, { step: 'retreat', index: frame.pending.length - 1, penalty: true, pace });
+            await wait(215 * pace);
+            frame.pending.pop();
+          }
+        }
+        if (session === generation) render(trail.after, { penalty: trail.after.totalDeductions > trail.before.totalDeductions });
+      }
+    } finally {
+      if (session === generation) {
+        playing = false;
+        if (!queue.length) await refresh();
+      }
+    }
   }
 
-  bus.subscribe(handleEvent);
-  refresh();
-  return { refresh: refresh, handleEvent: handleEvent };
+  function report(error) { console.error(error); }
+  function clearPlayback() {
+    generation += 1;
+    queue.length = 0;
+    playing = false;
+  }
+
+  function handleEvent(event) {
+    if (event.type === 'data.restored') {
+      clearPlayback();
+      newestRevision = 0;
+      return;
+    }
+    const trail = event.payload?.growth;
+    if (!trail || !visible()) {
+      void refresh().catch(report);
+      return;
+    }
+    if (trail.revision <= newestRevision) return;
+    newestRevision = trail.revision;
+    queue.push(trail);
+    void pump().catch(report);
+  }
+
+  document.addEventListener('classroom-score-feedback-changed', function () { void pump().catch(report); });
+  document.addEventListener('classroom-mode-changed', function () {
+    if (visible()) {
+      void pump().catch(report);
+    } else if (playing || queue.length) {
+      clearPlayback();
+      void refresh().catch(report);
+    }
+  });
+  return { refresh, handleEvent };
 }
