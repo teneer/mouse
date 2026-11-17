@@ -1,9 +1,9 @@
 import { openDatabase, getRecord, putRecord, exportAll, importAll } from './core/db.js';
 import { createEventBus } from './core/events.js';
-import { mountGlobalFeedback } from './core/feedback.js?v=growth-path';
-import { mountScoreboard } from './modules/scoreboard.js?v=growth-path';
-import { mountGrowth } from './modules/growth.js?v=growth-path';
-import { mountChecklist } from './modules/checklist.js?v=growth-path';
+import { mountGlobalFeedback } from './core/feedback.js?v=reference-20261117';
+import { mountScoreboard } from './modules/scoreboard.js?v=reference-20261117';
+import { mountGrowth } from './modules/growth.js?v=reference-20261117';
+import { mountChecklist } from './modules/checklist.js?v=reference-20261117';
 
 const CLASS_ID = 'class-default';
 const MODE_KEY = 'class-revolution.active-mode.v1';
@@ -25,8 +25,8 @@ function downloadJson(data, filename) {
 }
 
 function switchMode(mode) {
-  const allowed = ['whiteboard', 'scoreboard', 'growth', 'checklist'];
-  if (!allowed.includes(mode)) mode = 'whiteboard';
+  const allowed = ['scoreboard', 'growth', 'checklist'];
+  if (!allowed.includes(mode)) mode = 'scoreboard';
   document.querySelectorAll('[data-mode]').forEach(function (button) {
     button.classList.toggle('is-active', button.dataset.mode === mode);
     button.setAttribute('aria-current', button.dataset.mode === mode ? 'page' : 'false');
@@ -96,6 +96,7 @@ async function start() {
       growth.refresh();
       checklist.refresh();
     }
+    if (event.type === 'class.changed') growth.refresh();
     if (event.type === 'checklist.updated') checklist.refresh();
   });
 

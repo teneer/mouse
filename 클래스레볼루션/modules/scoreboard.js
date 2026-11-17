@@ -1,11 +1,12 @@
 import { AVATAR_COUNT, avatarNumber, stillAvatar } from '../core/avatar.js';
 import { groupPositions, importStudents, loadRoster, moveGroup, moveStudent, saveGroup, saveStudent, studentSeats } from '../core/roster.js';
-import { applyScoreBatch } from '../core/score-engine.js?v=growth-path';
+import { getRecord, getAll } from '../core/db.js';
+import { mountScoreComposer } from '../core/score-composer.js';
 import { escapeHtml } from '../core/text.js';
 
 const DIRECTION_KEY = 'class-revolution.room-reversed';
 const VIEW_KEY = 'class-revolution.student-view';
-const VIEWS = [['list', '학생카드'], ['seats', '자리배치'], ['manage', '학생관리']];
+const VIEWS = [['list', '목록보기'], ['seats', '자리배치보기'], ['manage', '학생관리']];
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch (error) { return null; }
@@ -38,7 +39,10 @@ export function mountScoreboard(root, { classId, bus }) {
   let students = [];
   let groups = [];
   let reason = '';
-  let points = '1';
+  let growth = { classScore: 0, pending: [] };
+  let sort = 'number';
+  let showNumbers = true;
+  let showAvatars = false;
   let notice = '';
   let busy = false;
   let revision = 0;
@@ -47,12 +51,14 @@ export function mountScoreboard(root, { classId, bus }) {
   root.innerHTML = '<div class="student-surface"></div><dialog class="student-dialog"></dialog>';
   const surface = root.querySelector('.student-surface');
   const dialog = root.querySelector('.student-dialog');
+  const composer = mountScoreComposer(root, { classId, bus, onApplied: () => { selected.clear(); void refresh(); } });
 
   async function refresh() {
     const current = ++revision;
-    const roster = await loadRoster(classId);
+    const [roster, progress] = await Promise.all([loadRoster(classId), getRecord('growthStates', classId)]);
+    growth = progress || { classScore: 0, pending: [] };
     if (current !== revision) return;
-    students = roster.students;
+    students = roster.students.sort((a, b) => sort === 'score' ? Number(b.score || 0) - Number(a.score || 0) : sort === 'name' ? a.name.localeCompare(b.name, 'ko') : Number(a.number) - Number(b.number));
     groups = roster.groups;
     const ids = new Set(students.map(function (student) { return student.id; }));
     selected.forEach(function (id) { if (!ids.has(id)) selected.delete(id); });
@@ -63,12 +69,14 @@ export function mountScoreboard(root, { classId, bus }) {
     const controls = '<nav class="student-view-switch" aria-label="학생 화면">' + VIEWS.map(function ([key, label]) {
       return '<button type="button" data-action="view" data-view="' + key + '" aria-pressed="' +
         (view === key) + '">' + label + '</button>';
-    }).join('') + '</nav>';
+    }).join('') + '</nav><div class="student-display-options"><label><input type="checkbox" data-option="numbers"' + (showNumbers ? ' checked' : '') + '> 번호 표시</label>' +
+      (view === 'seats' ? '<label><input type="checkbox" data-option="portraits"' + (showAvatars ? ' checked' : '') + '> 아바타 보기</label>' : '<label>정렬 <select data-option="sort"><option value="number"' + (sort === 'number' ? ' selected' : '') + '>번호순</option><option value="name"' + (sort === 'name' ? ' selected' : '') + '>이름순</option><option value="score"' + (sort === 'score' ? ' selected' : '') + '>점수순</option></select></label>') + '</div>';
     const content = view === 'manage' ? renderManagement() :
       view === 'seats' ? renderSeating() : '<div class="student-cards">' +
         students.map(function (student) { return studentCard(student, false); }).join('') +
         '<button class="student-add-card" type="button" data-action="add-student"><b>＋</b>학생 추가</button></div>';
-    surface.innerHTML = controls + content +
+    surface.classList.toggle('hide-numbers', !showNumbers);
+    surface.innerHTML = '<header class="student-view-header">' + controls + '</header>' + content +
       '<p class="student-notice" role="status">' + escapeHtml(notice) + '</p>' +
       (view !== 'manage' && !editing ? renderScoreBar() : '');
   }
@@ -78,7 +86,7 @@ export function mountScoreboard(root, { classId, bus }) {
       '" data-action="' + (management ? 'edit-student' : 'select-student') + '"' +
       (management ? '' : ' aria-pressed="' + selected.has(student.id) + '"') + '>' + stillAvatar(student.avatarId) +
       (management ? '' : '<strong class="tile-score">' + Number(student.score || 0) + '</strong>') +
-      '<span class="tile-name"><small>' + escapeHtml(student.number) + '</small> ' +
+      '<span class="tile-name"><small class="student-number-label">' + escapeHtml(student.number) + '</small> ' +
       escapeHtml(student.name) + '</span></button>';
   }
 
@@ -123,14 +131,14 @@ export function mountScoreboard(root, { classId, bus }) {
       ? '<button type="button" class="group-handle" draggable="true" aria-pressed="' + moving +
         '" aria-label="' + escapeHtml(group.name) + ' 위치 이동"' +
         attributes({ action: 'group-position', position, id: group.id }) + '>✥ ' + escapeHtml(group.name) + '</button>'
-      : '<strong>' + escapeHtml(group.name) + '</strong>';
+      : '<button type="button" class="group-select" data-action="select-group" data-id="' + escapeHtml(group.id) + '" aria-label="' + escapeHtml(group.name) + ' 학생 선택">' + escapeHtml(group.name) + '</button>';
     return '<section class="classroom-group"' +
       (position == null ? '' : attributes({ 'room-position': position, 'room-group': group.id })) + ' aria-label="' +
       escapeHtml(group.name) + '"><div class="seat-grid">' +
       slots(arrangement, 2, 4, reversed, editing ? 1 : 0).map(function (seat) {
         return renderSeat(group, seat, arrangement.get(seat));
       }).join('') + '</div><div class="classroom-group-footer">' + handle +
-      '<span aria-label="모둠 합계 ' + total + '점">' + total + ' <i aria-hidden="true">♣</i></span></div></section>';
+      '<span aria-label="모둠 합계 ' + total + '점">' + total + ' <i class="art-sprout" aria-hidden="true"></i></span></div></section>';
   }
 
   function renderEmptyGroup(position) {
@@ -148,21 +156,30 @@ export function mountScoreboard(root, { classId, bus }) {
       '" aria-pressed="' + Boolean(pressed) + '"' +
       attributes({ action: editing ? 'seat-position' : 'select-student', id, group: group.id, seat }) +
       (editing && student ? ' draggable="true"' : '') + '>' +
-      (student ? '<small>' + escapeHtml(student.number) + '</small><span>' + escapeHtml(student.name) +
+      (student ? '<small class="student-number-label">' + escapeHtml(student.number) + '</small>' + (showAvatars ? stillAvatar(student.avatarId) : '') + '<span>' + escapeHtml(student.name) +
         '</span><strong>' + Number(student.score || 0) + '</strong>' :
         '<span aria-label="' + escapeHtml(group.name) + ' 빈자리 ' + (seat + 1) + '">빈자리</span>') + '</button>';
   }
 
   function renderScoreBar() {
     const disabled = selected.size && !busy ? '' : ' disabled';
-    return '<form class="student-scorebar"><div class="student-selection">' +
-      '<button type="button" data-action="all">' + (selected.size ? selected.size + '명 선택취소' : '전체선택') + '</button>' +
-      '<button type="button" data-action="invert">선택반전</button></div><div class="student-scoring">' +
-      '<label>점수 사유<input name="reason" maxlength="120" value="' + escapeHtml(reason) +
-      '" placeholder="예: 발표 참여"></label><label>점수<input name="points" type="number" min="1" max="100" step="1" required value="' +
-      escapeHtml(points) + '"></label>' +
-      '<button type="submit" class="score-award" name="sign" value="1"' + disabled + '>★ 으쓱</button>' +
-      '<button type="submit" class="score-penalty" name="sign" value="-1"' + disabled + '>☁ 머쓱</button></div></form>';
+    return '<div class="student-scorebar"><button type="button" class="class-progress" data-action="growth" aria-label="학급점수 보기">' +
+      '<span class="art-egg" aria-hidden="true"></span><strong>' + Number(growth.classScore || 0) + '</strong>' +
+      '<span class="mini-path" aria-label="별길 ' + growth.pending.length + ' / 10">' +
+      Array.from({length:10}, (_,i) => '<i class="' + (i < growth.pending.length ? 'filled' : '') + '">★</i>').join('') + '</span></button>' +
+      '<div class="student-selection"><button type="button" data-action="all">' + (selected.size ? selected.size + '명 선택취소' : '전체선택') +
+      '</button><button type="button" data-action="invert">선택반전</button></div><div class="student-scoring">' +
+      '<button type="button" class="roster-control" data-action="history">이력관리</button>' +
+      '<button type="button" class="score-award" data-action="award"' + disabled + '><i class="art-positive" aria-hidden="true"></i> 으쓱</button>' +
+      '<button type="button" class="score-penalty" data-action="penalty"' + disabled + '><i class="art-negative" aria-hidden="true"></i> 머쓱</button></div></div>';
+  }
+
+  async function showHistory() {
+    const entries = (await getAll('scoreEvents')).filter(e => e.classId === classId)
+      .sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0,100);
+    dialog.innerHTML = '<div class="student-form"><div class="student-dialog-title"><h2>점수 이력</h2><button data-action="close-dialog" aria-label="닫기">×</button></div><div class="score-history">' +
+      (entries.map(e => '<article><strong>' + escapeHtml(e.studentName) + '</strong><b class="' + (e.delta < 0 ? 'minus' : '') + '">' + (e.delta > 0 ? '+' : '') + e.delta + '</b><p>' + escapeHtml(e.reason) + '</p><small>' + new Date(e.createdAt).toLocaleString('ko-KR') + '</small></article>').join('') || '<p>아직 점수 이력이 없습니다.</p>') + '</div></div>';
+    dialog.showModal();
   }
 
   function showDialog(kind, id) {
@@ -274,16 +291,24 @@ export function mountScoreboard(root, { classId, bus }) {
     if (!busy) { source = null; render(); }
   });
 
-  root.addEventListener('input', function (event) {
-    if (!event.target.closest('.student-scorebar')) return;
-    if (event.target.name === 'reason') reason = event.target.value;
-    if (event.target.name === 'points') points = event.target.value;
+  root.addEventListener('change', function (event) {
+    const option = event.target.dataset.option;
+    if (option === 'numbers') showNumbers = event.target.checked;
+    if (option === 'portraits') showAvatars = event.target.checked;
+    if (option === 'sort') { sort = event.target.value; void refresh(); return; }
+    if (option) render();
   });
 
   root.addEventListener('click', function (event) {
     const button = event.target.closest('[data-action]');
     if (!button || busy) return;
     const { action, id } = button.dataset;
+    if (action === 'growth') { document.querySelector('[data-mode="growth"]').click(); return; }
+    if (action === 'history') { void showHistory().catch(error => { notice = error.message; render(); }); return; }
+    if (action === 'award' || action === 'penalty') {
+      void composer.open({ students: students.filter(s => selected.has(s.id)), sign: action === 'penalty' ? -1 : 1, reason }).catch(error => { notice = error.message; render(); });
+      return;
+    }
     if (action === 'close-dialog') { dialog.close(); return; }
     if (['add-student', 'edit-student', 'add-group', 'edit-group', 'paste-roster'].includes(action)) {
       showDialog(action, id || '');
@@ -305,6 +330,10 @@ export function mountScoreboard(root, { classId, bus }) {
     } else if (action === 'select-student') {
       if (selected.has(id)) selected.delete(id);
       else selected.add(id);
+    } else if (action === 'select-group') {
+      const members = students.filter(s => (s.groupId || '') === id);
+      const allSelected = members.every(s => selected.has(s.id));
+      members.forEach(s => allSelected ? selected.delete(s.id) : selected.add(s.id));
     } else if (action === 'all') {
       if (selected.size) selected.clear();
       else students.forEach(function (student) { selected.add(student.id); });
@@ -329,6 +358,7 @@ export function mountScoreboard(root, { classId, bus }) {
 
   root.addEventListener('submit', async function (event) {
     const form = event.target;
+    if (!form.matches('.student-form')) return;
     event.preventDefault();
     if (busy) return;
     busy = true;
@@ -351,27 +381,6 @@ export function mountScoreboard(root, { classId, bus }) {
       return;
     }
 
-    try {
-      const amount = Number(values.get('points'));
-      const sign = Number(event.submitter?.value || 1);
-      if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new Error('1~100점 사이의 정수를 입력해 주세요.');
-      const result = await applyScoreBatch({
-        classId, studentIds: [...selected], delta: sign * amount, reason: reason.trim(), source: 'scoreboard'
-      });
-      selected.clear();
-      notice = '';
-      bus.publish('score.changed', {
-        batchId: result.events[0].batchId, delta: sign * amount, reason: reason.trim(), source: 'scoreboard', growth: result.trail,
-        students: result.students.map(function (student) {
-          return { id: student.id, name: student.name, avatarId: student.avatarId };
-        })
-      });
-    } catch (error) {
-      notice = error.message;
-    } finally {
-      busy = false;
-      await refresh();
-    }
   });
 
   return { refresh };

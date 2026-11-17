@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="stage1.css">
   <link rel="stylesheet" href="growth.css">
+  <link rel="stylesheet" href="restoration.css?v=20261117">
 </head>
 <body>
   <div class="app-shell">
@@ -28,15 +29,11 @@
 
     <div class="classroom-body">
       <nav class="mode-nav" aria-label="수업화면 메뉴">
-        <button class="mode-tab is-active" type="button" data-mode="scoreboard" aria-label="우리반 학생"><span class="nav-icon" aria-hidden="true">▦</span><span class="mode-label">우리반 학생</span></button>
-        <button class="mode-tab" type="button" data-mode="growth" aria-label="학급점수판"><span class="nav-icon" aria-hidden="true">♧</span><span class="mode-label">학급점수</span></button>
-        <button class="mode-tab" type="button" data-mode="whiteboard" aria-label="판서"><span class="nav-icon" aria-hidden="true">▱</span><span class="mode-label">판서</span></button>
-        <button class="mode-tab" type="button" data-mode="checklist" aria-label="명렬"><span class="nav-icon" aria-hidden="true">☷</span><span class="mode-label">명렬</span></button>
+        <button class="mode-tab is-active" type="button" data-mode="scoreboard" aria-label="우리반 학생"><span class="nav-icon" aria-hidden="true"><i class="art-students" aria-hidden="true"></i></span><span class="mode-label">우리반 학생</span></button>
+        <button class="mode-tab" type="button" data-mode="growth" aria-label="학급점수판"><span class="nav-icon" aria-hidden="true"><i class="art-sprout" aria-hidden="true"></i></span><span class="mode-label">학급점수</span></button>
+        <button class="mode-tab" type="button" data-mode="checklist" aria-label="명렬"><span class="nav-icon" aria-hidden="true"><i class="art-checklist" aria-hidden="true"></i></span><span class="mode-label">명렬</span></button>
       </nav>
       <main class="workspace">
-        <section class="mode-panel" id="mode-whiteboard" aria-label="전자칠판">
-          <iframe class="whiteboard-frame" src="modules/whiteboard/index.html" title="만능칠판 6.0 기반 전자칠판"></iframe>
-        </section>
         <section class="mode-panel is-active" id="mode-scoreboard" aria-label="점수판">
           <div id="scoreboard-root" class="module-root"></div>
         </section>
@@ -50,6 +47,6 @@
     </div>
   </div>
   <div id="global-feedback" class="global-feedback" aria-live="polite" aria-atomic="true"></div>
-  <script type="module" src="app.js?v=classroom-growth"></script>
+  <script type="module" src="app.js?v=reference-20261117"></script>
 </body>
 </html>
