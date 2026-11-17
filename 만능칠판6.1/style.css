@@ -820,3 +820,21 @@ body.score-modal-open #scoreFrame {background:transparent}
 .conflict-guide summary {color:#18536e}
 .conflict-guide h3 {margin:.7rem 0 .25rem}
 .conflict-guide ul {margin:.25rem 0 .6rem;padding-inline-start:1.2rem;line-height:1.55}
+
+/* 6.1: one-time view send target selector */
+.view-send-menu{min-width:250px;max-width:min(360px,calc(100vw - 16px))}
+.view-send-menu [data-view-tabs]{display:flex;flex-direction:column;gap:6px;max-height:min(42vh,360px);overflow:auto}
+.view-send-menu [data-view-tabs] label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;white-space:normal}
+.view-send-menu [data-view-tabs] label:hover{background:#f0f5fb}
+.view-send-menu [data-view-tabs] input{width:17px;height:17px;flex:0 0 auto}
+.view-send-menu #sendViewNow{width:100%;margin-top:4px}
+#scorePanelToggle[aria-pressed="true"]{background:#e7f3ff;border-color:#5a8dee;color:#2563eb;font-weight:700}
+.context-object-title{padding:7px 10px 9px;margin:0 0 4px;border-bottom:1px solid #e3e8ef;color:#26384a;font-weight:700;font-size:13px;max-width:260px;overflow-wrap:anywhere}
+#objectRenameForm{display:flex;flex-direction:column;gap:9px}
+#objectRenameForm input{width:100%;min-height:40px;box-sizing:border-box}
+#objectRenameHint{margin:0;color:#64748b;font-size:12px;line-height:1.45}
+#managedObjects{list-style:none;padding:0;margin:8px 0 18px;display:grid;gap:8px}
+#managedObjects>li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid #e2e8f0;border-radius:9px;background:#fff}
+#managedObjects strong{display:block;overflow-wrap:anywhere}
+#managedObjects p{margin:3px 0 0;color:#64748b;font-size:12px}
+#managedObjects .cloud-buttons{flex:0 0 auto}

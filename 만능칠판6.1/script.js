@@ -11,6 +11,7 @@ import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
+import {objectKind,objectName,objectDisplayName} from './js/object-names.js';
 import {CloudBoard} from './js/cloud.js?v=conflict-fields-1';
 import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=conflict-fields-1';
@@ -30,7 +31,7 @@ const isColor=value=>typeof value==='string' && /^#[0-9a-f]{6}$/i.test(value);
 const priorColor=parseQuickColors(JSON.stringify(readPreference('wb42.quickColors'))).find(color=>!QUICK_DEFAULTS.includes(color));
 const shared={color:'#000000',level:3,favoriteColor:readPreference('wb42.favoriteColor')??priorColor,
   favoriteSize:normalizeFavoriteSize(readPreference('wb42.favoriteSize'))};
-let favoriteDraft, favoriteColorDraft, favoriteSizeEnabled, textPropsTarget, contextTextTarget;
+let favoriteDraft, favoriteColorDraft, favoriteSizeEnabled, textPropsTarget, contextTextTarget, renameObjectIds=[];
 let textBoxDefaults=normalizeTextBoxStyle(readPreference('wb50.textBoxDefaults'));
 let favoriteBackground=readPreference('wb42.favoriteBackground'), localView, pageListGeneration=0, renamePageId=null;
 let groupSession=null,suppressSelection=false;
@@ -169,7 +170,7 @@ function updateFileInteraction() {
     const missing=containsUnavailableFile(object);
     if(object.type==='group' && object.getObjects().some(child=>child.wbAsset || child.type==='group'))object.objectCaching=false;
     object.wbAssetMissing=!!missing;
-    const locked=missing || object.wbPinned;
+    const locked=object.wbPinned;
     object.set({selectable:tools.mode==='select' && !locked,evented:!locked});
     if(locked && c.getActiveObjects().includes(object))c.discardActiveObject();
   });
@@ -737,6 +738,34 @@ function saveTextProps(event){
 }
 function layerToEdge(front){if(!allowed()||isTextEditing())return;const selection=c.getActiveObjects();if(!selection.length)return;const all=c.getObjects(),pinned=all.filter(o=>o.wbPinned),next=[...pinned,...orderedToEdge(all.filter(o=>!o.wbPinned),selection,front)];if(next.every((o,i)=>o===all[i]))return;next.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();changed();}
 function closeContext(){const menu=$('objectContextMenu');if(menu)menu.hidden=true;}
+function selectedRenameTargets(){
+  const active=c?.getActiveObject();
+  if(!active)return [];
+  return active.type==='activeSelection'?active.getObjects():[active];
+}
+function openObjectRename(){
+  if(!allowed())return;
+  const selected=selectedRenameTargets().filter(object=>c.getObjects().includes(object));
+  if(!selected.length)return;
+  renameObjectIds=selected.map(object=>object.id);
+  const input=$('objectNameInput');
+  input.value=selected.length===1?objectName(selected[0],c.getObjects().indexOf(selected[0])):'';
+  $('objectRenameHint').textContent=selected.length>1
+    ? selected.length+'개 개체에 입력한 이름을 적용하고 (1), (2), (3)… 번호를 붙입니다.'
+    : '이 개체의 종류와 함께 파일 관리 목록에 표시됩니다.';
+  openModal('objectRenameModal');
+  input.focus();input.select();
+}
+function saveObjectRename(event){
+  event.preventDefault();
+  const name=$('objectNameInput').value.trim();
+  if(!name || !allowed())return;
+  const selected=renameObjectIds.map(id=>c.getObjects().find(object=>object.id===id)).filter(Boolean);
+  if(!selected.length){closeModal('objectRenameModal');return;}
+  selected.forEach((object,index)=>{object.wbName=selected.length>1?name+' ('+(index+1)+')':name;});
+  c.requestRenderAll();changed();renameObjectIds=[];closeModal('objectRenameModal');
+  notify(selected.length>1?selected.length+'개 개체의 이름을 변경했습니다.':'개체 이름을 변경했습니다.');
+}
 function openContext(x,y,target=null,hit=target){
   if(!allowed()||isTextEditing()||(target && tools.mode!=='select'))return;
   closePopups();
@@ -745,10 +774,13 @@ function openContext(x,y,target=null,hit=target){
   menu.setAttribute('aria-label',active?'개체 메뉴':'배경 메뉴');
   menu.querySelectorAll('.context-palette').forEach(palette=>{palette.hidden=!active;});
   for(const id of ['contextBackground','contextBackgroundManage','contextLoad'])$(id).hidden=!!active;
-  for(const id of ['contextCopy','contextPin'])$(id).hidden=!active;
+  for(const id of ['contextCopy','contextPin','contextRename'])$(id).hidden=!active;
   $('contextGroup').hidden=active?.type!=='activeSelection';
   $('contextUngroup').hidden=active?.type!=='group';
   $('contextFront').hidden=$('contextBack').hidden=!active;
+  const nameRow=$('contextObjectTitle'),selected=selectedRenameTargets();
+  nameRow.hidden=!active;
+  nameRow.textContent=active?(selected.length===1?objectDisplayName(selected[0],c.getObjects().indexOf(selected[0])):selected.length+'개 개체 선택'):'';
   contextTextTarget=TEXT_TYPES.has(hit?.type)?hit:null;
   $('contextTextProps').hidden=!contextTextTarget;
   menu.hidden=false;
@@ -984,7 +1016,7 @@ async function refreshCloud() {
         await run(async()=>{
           await setPage(remote,true);
           tools.setMode(mode);
-          const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbAssetMissing && !object.wbPinned);
+          const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbPinned);
           if(mode==='select' && objects.length)c.setActiveObject(objects.length===1?objects[0]:new fabric.ActiveSelection(objects,{canvas:c}));
           c.requestRenderAll();
         });
@@ -1079,6 +1111,8 @@ function wireUI() {
   $('textBgEnabled').onchange=$('textBorderEnabled').onchange=updateTextPropInputs;
   $('textPropsForm').onsubmit=saveTextProps;
   $('moreTextPropsBtn').onclick=()=>openTextProps();
+  $('contextRename').onclick=()=>{closeContext();openObjectRename();};
+  $('objectRenameForm').onsubmit=saveObjectRename;
   $('contextGroup').onclick=()=>{closeContext();groupObjects();};$('contextUngroup').onclick=()=>{closeContext();groupObjects(true);};
   $('contextFront').onclick=()=>{closeContext();layerToEdge(true);};$('contextBack').onclick=()=>{closeContext();layerToEdge(false);};
   $('contextTextProps').onclick=()=>{if(contextTextTarget)openTextProps(contextTextTarget);};
@@ -1128,7 +1162,7 @@ function wireUI() {
   c.on('selection:cleared',()=>{if(!suppressSelection&&groupSession&&!isTextEditing())closeGroupSession();});
   surface.addEventListener('pointerdown',e=>{if(isTextEditing() && e.button!==2 && !c.findTarget(e)?.isEditing)finishText();},true);
   $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
-  const clearPage=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지에서 편집 가능한 개체를 모두 지울까요? 언두로 되돌릴 수 있습니다.',{title:'현재 페이지 전체 지우기',confirmText:'전체 지우기'})){finishText();c.discardActiveObject();const list=c.getObjects().filter(object=>!object.wbAssetMissing && !object.wbPinned);if(list.length){list.forEach(o=>c.remove(o));c.requestRenderAll();changed();}}};
+  const clearPage=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지에서 편집 가능한 개체를 모두 지울까요? 언두로 되돌릴 수 있습니다.',{title:'현재 페이지 전체 지우기',confirmText:'전체 지우기'})){finishText();c.discardActiveObject();const list=c.getObjects().filter(object=>!object.wbPinned);if(list.length){list.forEach(o=>c.remove(o));c.requestRenderAll();changed();}}};
   let deleteTimer=null,deleteLong=false;
   const cancelDeletePress=()=>{clearTimeout(deleteTimer);deleteTimer=null;};
   $('deleteSelectionBtn').addEventListener('pointerdown',e=>{if(e.button!==0)return;deleteLong=false;deleteTimer=setTimeout(()=>{deleteLong=true;clearPage().catch(fail);},600);});
@@ -1179,7 +1213,7 @@ function wireUI() {
     if(e.key==='F10'&&e.shiftKey&&c.getActiveObject()){e.preventDefault();const o=c.getActiveObject(),rect=o.getBoundingRect(true,true);openContext(rect.left+16,rect.top+16);return;}
     if(busy)return;
     else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
-    else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects().filter(object=>!object.wbAssetMissing && !object.wbPinned),{canvas:c}));c.requestRenderAll();}}
+    else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects().filter(object=>!object.wbPinned),{canvas:c}));c.requestRenderAll();}}
     else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
     else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}
     else if(e.code==='Space'&&!e.target.closest?.('button')&&!e.repeat&&!tools.gesture){e.preventDefault();spaceMode=tools.mode;tools.setMode('move');}
