@@ -759,7 +759,7 @@ function openObjectRename(){
 function saveObjectRename(event){
   event.preventDefault();
   const name=$('objectNameInput').value.trim();
-  if(!name || !allowed())return;
+  if(!name || !current || !canEditBoard() || busy)return;
   const selected=renameObjectIds.map(id=>c.getObjects().find(object=>object.id===id)).filter(Boolean);
   if(!selected.length){closeModal('objectRenameModal');return;}
   selected.forEach((object,index)=>{object.wbName=selected.length>1?name+' ('+(index+1)+')':name;});
