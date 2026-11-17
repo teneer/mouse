@@ -1,4 +1,4 @@
-import {applyFieldPatch,resolveFieldConflict,startFieldConflicts,trackFieldDelta} from './score-conflicts.js';
+import {applyFieldPatch,resolveFieldConflict,startFieldConflicts,trackFieldDelta} from './score-conflicts.js?v=server-order-1';
 import {changeGoals,completeReachedAutomaticGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=conflict-fields-1';
 const min = -10000, max = 10000;
 const empty = () => ({count:0,teams:[],scoreLink:{enabled:true,points:3}});

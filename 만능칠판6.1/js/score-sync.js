@@ -6,7 +6,7 @@ export function wireScoreSync(frame, cloud, store, notify) {
   let scoreChannel;
   try {scoreChannel = new BroadcastChannel('whiteboard.test.score-preview.v1');} catch {}
   if (scoreChannel) scoreChannel.onmessage = ({data}) => {
-    if (ready && cloud.options && !cloud.detaching && data?.boardId === cloud.options.boardId) {
+    if (ready && cloud.online && !cloud.hydrating && cloud.options && !cloud.detaching && data?.boardId === cloud.options.boardId) {
       api()?.preview?.(data);
     }
   };
@@ -27,18 +27,31 @@ export function wireScoreSync(frame, cloud, store, notify) {
         const shared = !!cloud.options;
         const model = shared ? cloud.projectedScore(drafts.values()) : null;
         const deviceNames=(cloud.devices||[]).map(({id,label})=>({id,label}));
-        const key = JSON.stringify([shared,model,deviceNames]);
-        if (!cloud.online || !wasOnline) catchingUp=true;
-        wasOnline=cloud.online;
-        const live=cloud.online&&!catchingUp;
-        if (cloud.online && cloud.state.revision>=cloud.head) catchingUp=false;
-        if (key === previous) return;
-        api().receive({shared,model,send,notice:notify,live,deviceNames});
+        const stable=cloud.online && !cloud.hydrating && cloud.state.revision>=cloud.head;
+        if(!stable || !wasOnline)catchingUp=true;
+        const live=stable && !catchingUp;
+        if(stable)catchingUp=false;
+        wasOnline=stable;
+        const offline=!cloud.online;
+        const offlineUndoPossible=offline && cloud.canCancelLastPendingScore();
+        const key=JSON.stringify([shared,model,deviceNames,offline,offlineUndoPossible,live]);
+        if(key===previous)return;
+        api().receive({shared,model,send,notice:notify,live,deviceNames,
+          offline,offlineUndoPossible,cancelOfflineUndo});
         previous = key;
       } catch (error) {notify(error.message);}
       finally {refreshQueued = false;}
     });
   }
+  async function cancelOfflineUndo() {
+    if(cloud.online || !cloud.options)return false;
+    await write;
+    const cancelled=await cloud.cancelLastPendingScore();
+    previous=null;
+    refresh();
+    return cancelled;
+  }
+
   function send(data,preview) {
     if (!cloud.options || cloud.detaching) return false;
     const connection = cloud.options;

@@ -1,4 +1,4 @@
-import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
+import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js?v=server-order-1';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=conflict-fields-1';
 import {wireGoals} from './goals-ui.js?v=conflict-fields-1';
 import {wireScoreAudio} from './score-audio.js';

@@ -66,46 +66,38 @@ export function scorePatch(before,after) {
 }
 
 export function applyFieldPatch(score,operation) {
+  // Server-confirmed order determines the outcome of direct edits.
   startFieldConflicts(score);
-  const {numbers=[],renamed=[],added=[],removed=[],link}=operation.patch;
-  const source={device:operation.device||'unknown',label:operation.deviceLabel,at:operation.authoredAt||0};
+  const {numbers=[],renamed=[],added=[],removed=[],link}=operation.patch||{};
   score.notice=null;
-  const ids=new Set(removed);
-  score.state.teams=score.state.teams.filter(team=>!ids.has(team.id));
-  for (const id of ids) {
+  const removedIds=new Set(removed);
+  score.state.teams=score.state.teams.filter(team=>!removedIds.has(team.id));
+  for(const id of removedIds) {
     delete score.fieldConflicts[teamField(id)];
     delete score.fieldOverwrites[teamField(id)];
   }
-  for (const entry of renamed) {
+  for(const entry of renamed) {
     const team=score.state.teams.find(item=>item.id===entry.id);
-    if (team) team.name=entry.name;
+    if(team)team.name=entry.name;
   }
-  for (const team of added) {
-    if (!score.state.teams.some(item=>item.id===team.id)) score.state.teams.push(structuredClone(team));
+  for(const team of added) {
+    if(!score.state.teams.some(item=>item.id===team.id))score.state.teams.push(structuredClone(team));
   }
-  if (link) score.state.scoreLink=structuredClone(link);
-  for (const {field,basedOn,value} of numbers) {
-    if (field!=='class' && (typeof field!=='string' || !field.startsWith('team:'))) continue;
-    const current=read(score.state,field);
-    if (current===undefined) {
+  if(link)score.state.scoreLink=structuredClone(link);
+  for(const {field,value} of numbers) {
+    if(field!=='class' && (typeof field!=='string'||!field.startsWith('team:')))continue;
+    if(!numberAllowed(value))continue;
+    if(read(score.state,field)===undefined) {
       score.notice={key:operation.key,text:'삭제된 모둠의 점수 변경은 적용하지 않았습니다.'};
       continue;
     }
-    if (!numberAllowed(value)) continue;
-    if (current===value) {
-      putCandidate(score,field,{...source,value});
-    } else if (current===basedOn && !score.fieldConflicts[field]) {
-      write(score.state,field,value);
-      score.fieldOverwrites[field]={key:operation.key,alternative:current};
-    } else {
-      putCandidate(score,field,{...source,value});
-    }
+    write(score.state,field,value);
+    delete score.fieldConflicts[field];
+    delete score.fieldOverwrites[field];
   }
 }
 
-export function scoreDeltaBasis(score) {
-  return Object.fromEntries(Object.entries(score.fieldOverwrites||{}).map(([field,entry])=>[field,entry.key]));
-}
+export function scoreDeltaBasis() { return {}; }
 
 // Undo and adjustments may change both team and linked class values.
 export function trackFieldDelta(score,before,operation) {
