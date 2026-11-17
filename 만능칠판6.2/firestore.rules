@@ -127,8 +127,7 @@ service cloud.firestore {
               && request.resource.data.ownerTab is string
               && request.resource.data.token is string)
             ||
-            (resource.data.ownerDevice == null
-              && resource.data.leaseUntil <= request.time
+            (resource.data.leaseUntil <= request.time
               && request.resource.data.ownerDevice == request.auth.uid
               && request.resource.data.ownerTab is string
               && request.resource.data.token is string)
