@@ -2,11 +2,13 @@ export const OBJECT_CONTROL_LEASE_MS = 5 * 60 * 1000;
 export const OBJECT_CONTROL_RENEW_MS = 60 * 1000;
 
 export function objectControlDocumentId(pageId, objectId) {
-  return String(pageId) + '__' + String(objectId);
+  const value=JSON.stringify([String(pageId),String(objectId)]);
+  const bytes=new TextEncoder().encode(value);
+  return 'obj_' + Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
 }
 
 export function objectControlKey(pageId, objectId) {
-  return String(pageId) + '::' + String(objectId);
+  return JSON.stringify([String(pageId),String(objectId)]);
 }
 
 export function timestampMillis(value) {
