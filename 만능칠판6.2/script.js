@@ -1373,7 +1373,7 @@ async function boot() {
   };
   c.on('selection:created',()=>{updateHistory();syncSelectionControls().catch(fail);});
   c.on('selection:updated',()=>{updateHistory();syncSelectionControls().catch(fail);});
-  c.on('selection:cleared',()=>{updateHistory();if(!suppressSelection&&!groupSession&&cloudActive())flush().then(()=>cloud.syncObjectControls(current?.id,[])).catch(fail);});
+  c.on('selection:cleared',()=>{updateHistory();if(!suppressSelection&&!groupSession&&cloudActive())flush().then(()=>{if(!c.getActiveObject())return cloud.syncObjectControls(current?.id,[]);}).catch(fail);});
   c.on('text:editing:exited',()=>{if(cancelledText)return;if(groupSession)closeGroupSession();else changed();flush().then(()=>{if(cloudActive())requestCloudRefresh();else return applyLocalView();}).catch(fail);});
 
   wireUI();setupIntegratedScorePanel();
@@ -1393,8 +1393,12 @@ async function boot() {
       if(cloud?.options&&!cloud.online&&c){
         c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
         if(tools?.gesture)tools.up();
+        if(isTextEditing())finishText();
+        if(dirty)flush().catch(fail);
       }else if(cloud?.online&&c){
         c.selection=tools?.mode==='select';c.skipTargetFind=tools?.mode==='move';
+        if(tools?.mode==='pen'||tools?.mode==='marker')c.isDrawingMode=true;
+        syncSelectionControls().catch(fail);
       }
       cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();
     },
