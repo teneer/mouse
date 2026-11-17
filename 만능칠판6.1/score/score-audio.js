@@ -33,29 +33,26 @@ export function wireScoreAudio() {
   unlock.onclick=enable;
   return async sound=>{
     if (!sound || settings.muted || settings.volume===0) return;
+    if(!preloaded.has(sound)){sound.preload='auto';sound.load();preloaded.add(sound);}
     const element=sound.cloneNode();
+    element.preload='auto';
     try {
-      const audio=audioContext();
-      if (audio) {
-        if (audio.state!=='running' && !navigator.userActivation?.hasBeenActive) {
-          unlock.hidden=false;return;
+      if(settings.volume<=100){
+        element.volume=settings.volume/100;
+      }else{
+        const audio=audioContext();
+        if(!audio)element.volume=1;
+        else{
+          if(audio.state!=='running'&&!navigator.userActivation?.hasBeenActive){unlock.hidden=false;return;}
+          if(audio.state!=='running')await audio.resume();
+          const source=audio.createMediaElementSource(element),gain=audio.createGain(),limiter=audio.createDynamicsCompressor();
+          gain.gain.value=settings.volume/100;limiter.threshold.value=-1;limiter.knee.value=0;limiter.ratio.value=20;limiter.attack.value=.001;
+          source.connect(gain).connect(limiter).connect(audio.destination);
+          const cleanup=()=>{source.disconnect();gain.disconnect();limiter.disconnect();};
+          element.addEventListener('ended',cleanup,{once:true});element.addEventListener('error',cleanup,{once:true});
         }
-        if (audio.state!=='running') await audio.resume();
-        const source=audio.createMediaElementSource(element), gain=audio.createGain(), limiter=audio.createDynamicsCompressor();
-        gain.gain.value=settings.volume/100;
-        limiter.threshold.value=-1;limiter.knee.value=0;limiter.ratio.value=20;limiter.attack.value=.001;
-        source.connect(gain);
-        if (settings.volume>100) gain.connect(limiter).connect(audio.destination);
-        else gain.connect(audio.destination);
-        const cleanup=()=>{source.disconnect();gain.disconnect();limiter.disconnect();};
-        element.addEventListener('ended',cleanup,{once:true});
-        element.addEventListener('error',cleanup,{once:true});
-        try {await element.play();} catch (error) {cleanup();throw error;}
-      } else {
-        element.volume=Math.min(1,settings.volume/100);
-        await element.play();
       }
-      unlock.hidden=true;
-    } catch (error) {if (error.name==='NotAllowedError') unlock.hidden=false;else console.warn(error);}
+      await element.play();unlock.hidden=true;
+    }catch(error){if(error.name==='NotAllowedError')unlock.hidden=false;else console.warn(error);}
   };
 }

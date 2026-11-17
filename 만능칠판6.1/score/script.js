@@ -135,7 +135,7 @@ function applySharedScore(model,live) {
   }
   if (live && previous) {
     const seen = new Set((previous.sounds || []).map(item=>item.key));
-    for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect);
+    for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key) && !previewedScoreEvents.has(item.key)) speakEffect(item.effect);
   }
   const {count: nextCount, teams: nextTeams, scoreLink, goalSystem: nextGoals} = model.state;
   const previewEffect = tabScorePreview?.effect;
