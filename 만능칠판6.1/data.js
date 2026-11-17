@@ -206,6 +206,7 @@ export class TabSync {
     const receive=message=>{
       if(!message || message.sender===this.id)return;
       if(message.view){
+        if(Array.isArray(message.view.targets) && !message.view.targets.includes(this.id))return;
         if(lastView!==message.nonce){lastView=message.nonce;onView?.(message.view);}
       }else onChange();
     };

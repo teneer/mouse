@@ -1,4 +1,5 @@
 const storageKey='whiteboard.score-audio.v1';
+const preloaded=new WeakSet();
 const tabKey=storageKey+':tab';
 
 export function wireScoreAudio() {
