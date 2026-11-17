@@ -195,7 +195,32 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     redraw = setTimeout(()=>drawFiles().catch(error=>notify(message(error))),150);
   }
 
+  function objectRows(){
+    const result=[];
+    for(const [pageIndex,page] of pages().entries()){
+      for(const [index,object] of (page.content.canvas.objects||[]).entries()){
+        result.push({pageId:page.id,pageLabel:(pageIndex+1)+'쪽',index,object});
+      }
+    }
+    const kind=o=>o.wbAsset?.type==='pdf'?'PDF':o.wbAsset?'이미지':({path:'필기',text:'텍스트','i-text':'텍스트',textbox:'텍스트',group:'그룹',rect:'도형',circle:'도형',ellipse:'도형',polygon:'도형',polyline:'도형',line:'도형',triangle:'도형'})[o.type]||'개체';
+    const name=(o,i)=>o.wbName||o.wbAsset?.name||(['text','i-text','textbox'].includes(o.type)?String(o.text||'').replace(/\\s+/g,' ').slice(0,36):kind(o)+' '+(i+1));
+    return result.sort((a,b)=>kind(a.object).localeCompare(kind(b.object),'ko')||name(a.object,a.index).localeCompare(name(b.object,b.index),'ko'));
+  }
+  function drawObjects(){
+    const list=$('managedObjects'),rows=objectRows();
+    text('emptyManagedObjects',rows.length?'':'칠판에 개체가 없습니다.');
+    list.replaceChildren(...rows.map(({pageId,pageLabel,index,object})=>{
+      const entry=document.createElement('li'),info=document.createElement('div');
+      const title=document.createElement('strong');title.textContent=(object.wbAsset?.type==='pdf'?'PDF':object.wbAsset?'이미지':object.type)+' · '+(object.wbName||object.wbAsset?.name||(['text','i-text','textbox'].includes(object.type)?String(object.text||'').replace(/\\s+/g,' ').slice(0,36):'개체 '+(index+1)));
+      const detail=document.createElement('p');detail.textContent=pageLabel+(object.wbAsset?' · 파일 참조':'');
+      info.append(title,detail);
+      const actions=document.createElement('div');actions.className='cloud-buttons';
+      const go=document.createElement('button');go.type='button';go.className='action-btn';go.textContent='위치 보기';go.onclick=()=>goTo(pageId);
+      actions.append(go);entry.append(info,actions);return entry;
+    }));
+  }
   async function drawFiles() {
+    drawObjects();
     const list = $('managedFiles');
     const found = allFiles();
     text('emptyManagedFiles',found.size ? '' : '칠판에 배치된 이미지나 PDF가 없습니다.');

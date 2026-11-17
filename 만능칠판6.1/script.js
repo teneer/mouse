@@ -65,10 +65,10 @@ function rememberView(publish=false) {
   try {sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));} catch {}
   $('zoomLabel').textContent=`${Math.round(c.getZoom()*100)}%`;
   if (publish) tabViews?.refresh();
-  if(publish && sync && !applyingView && $('viewSync').checked) {
+  if(publish && sync && !applyingView && activeView(viewState(),sync.id)) {
     clearTimeout(viewTimer);
     viewTimer=setTimeout(()=>{
-      if($('viewSync').checked && !applyingView)publishView().catch(fail);
+      if(activeView(viewState(),sync.id) && !applyingView)publishView().catch(fail);
     },350);
   }
 }
@@ -965,7 +965,6 @@ function requestCloudRefresh(delay=25) {
 }
 async function refreshCloud() {
   if(!cloudActive() || !current)return;
-  $('viewSync').checked=activeView(cloud.latestView,sync.id);
   if(cloudRefresh){requestCloudRefresh();return;}
   const board=cloud.projected();
   const remote=board.pages[current.id];
@@ -1046,7 +1045,6 @@ function applyViewport(view){
 function restoreLocalView(){
   const state=sync.readView();
   localView=validViewState(state)?state:null;
-  $('viewSync').checked=activeView(localView,sync.id);
   applyLocalView().catch(fail);
 }
 async function applyLocalView(){
@@ -1261,7 +1259,7 @@ function setupIntegratedScorePanel(){
     frame.dataset.panelPercent=String(scoreFull?100:100-scoreShare);
     panel.inert=!scoreOpen;panel.setAttribute('aria-hidden',String(!scoreOpen));
     toggle.setAttribute('aria-expanded',String(scoreOpen));
-    $('scorePanelLabel').textContent=scoreOpen?'점수판 닫기':'점수판 열기';
+
     splitter.tabIndex=scoreOpen?0:-1;
     splitter.setAttribute('aria-valuenow',String(Math.round(scoreShare)));
     // 패널 토글/드래그는 캔버스의 좌표계를 변경하지 않는다.
@@ -1351,7 +1349,6 @@ async function boot() {
     if(!validViewState(view))return;
     localView=view;
     if(!cloudActive()){
-      $('viewSync').checked=activeView(view,sync.id);
       tabViews?.render();
       applyLocalView().catch(fail);
     }
