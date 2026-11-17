@@ -137,7 +137,7 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     const label = linked
       ? cloud.revoked ? '이 기기의 연결이 해제되었습니다'
       : cloud.online ? waiting ? `동기화 중 · 전송 대기 ${waiting}건` : '연결됨'
-      : `오프라인 · 전송 대기 ${waiting}건`
+      : `오프라인 · 편집 불가 · 전송 대기 ${waiting}건`
       : '로컬 모드';
     text('deviceStatus',label);
     $('deviceStatus').dataset.online=String(linked && cloud.online);
