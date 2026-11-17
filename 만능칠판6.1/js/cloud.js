@@ -1,7 +1,7 @@
 import {startFieldConflicts} from './score-conflicts.js?v=server-order-1';
 import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=conflict-fields-1';
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=server-order-1';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=sound-tabs-1';
 import {applyScoreOperation} from './shared-score.js?v=server-order-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
@@ -21,6 +21,7 @@ export class CloudBoard {
     this.options = null;
     this.subscriptions = [];
     this.devices = [];
+    this.tabs = [];
     this.deviceInvite = undefined;
     this.inviteError = null;
     this.revoked = false;
@@ -240,6 +241,10 @@ export class CloudBoard {
       this.devices = snapshot.docs.map(device => ({id:device.id, ...device.data()}));
       this.events.status();
     }, this.events.error));
+    this.subscriptions.push(fs.onSnapshot(this.collection('viewTabs'), snapshot => {
+      this.tabs=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
+      this.events.status();
+    },this.events.error));
     this.subscriptions.push(fs.onSnapshot(this.ref('control','view'), {includeMetadataChanges:true}, snapshot => {
       if (isReady(snapshot) && (validViewState(snapshot.data()) || validView(snapshot.data()))) {
         this.latestView = snapshot.data();
@@ -293,6 +298,7 @@ export class CloudBoard {
     this.inviteError = null;
     this.revoked = false;
     this.latestView = null;
+    this.tabs=[];
     this.state = newBoard();
     this.pending.clear();
     this.events.status();

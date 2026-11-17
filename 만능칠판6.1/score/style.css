@@ -844,3 +844,6 @@ body.score-modal-open .container {visibility:hidden}
   border:0;background:transparent;color:#216a91;font:inherit;
   font-size:clamp(.65rem,9cqw,1.05rem);line-height:1;white-space:nowrap;cursor:pointer;
 }
+
+#score-sound-targets:not([hidden]){display:grid;gap:4px;max-height:155px;overflow-y:auto;padding:4px 0}
+#score-sound-targets .score-setting-row{gap:8px;justify-content:flex-start}

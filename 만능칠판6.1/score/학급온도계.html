@@ -122,6 +122,14 @@
                 <h4>효과음</h4>
                 <label class="score-setting-row">음량 <input id="score-volume" type="range" min="0" max="120" step="1" value="100"><output id="score-volume-level">100%</output></label>
                 <label class="score-setting-row">음소거 <input id="score-mute" type="checkbox"></label>
+                <label class="score-setting-row">재생 위치
+                  <select id="score-sound-policy" aria-label="효과음 재생 위치">
+                    <option value="all">모든 탭 (기본값)</option>
+                    <option value="device">기기마다 한 탭</option>
+                    <option value="selected">선택한 탭만</option>
+                  </select>
+                </label>
+                <div id="score-sound-targets" hidden aria-label="소리를 재생할 탭"></div>
             </section>
             <section class="score-settings-section" aria-labelledby="manage-settings-title">
                 <h4 id="manage-settings-title">관리</h4>
@@ -211,6 +219,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=server-order-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
+    <script type="module" src="script.js?v=sound-tabs-1"></script><script type="module" src="panel-ui.js?v=class-summary-1"></script>
 </body>
 </html>

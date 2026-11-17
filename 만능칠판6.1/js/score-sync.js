@@ -1,8 +1,43 @@
-export function wireScoreSync(frame, cloud, store, notify) {
+export function wireScoreSync(frame, cloud, store, notify, tabId) {
   const drafts = new Map();
   let write = Promise.resolve(), refreshQueued = false;
   let ready = false;
   let previous, wasOnline=false, catchingUp=true;
+  const localSoundKey='whiteboard.score-sound-policy:'+new URL('.',location.href).pathname;
+  const tabPrefix='whiteboard.view-tab:'+new URL('.',location.href).pathname+':';
+  const localTabs=()=>{
+    const rows=[];
+    try{for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key?.startsWith(tabPrefix))continue;
+      const row=JSON.parse(localStorage.getItem(key)||'null');
+      if(row?.id && Date.now()-row.time<75000)rows.push(row);
+    }}catch{}
+    return rows;
+  };
+  function soundContext() {
+    const state=cloud.options?cloud.projected():null;
+    const raw=cloud.options?state?.soundPolicy:(()=>{
+      try{return JSON.parse(localStorage.getItem(localSoundKey)||'null')}catch{return null}
+    })();
+    const soundPolicy=['all','device','selected'].includes(raw?.mode)
+      ?{mode:raw.mode,selected:Array.isArray(raw.selected)?raw.selected:[]}
+      :{mode:'all',selected:[]};
+    const tabs=(cloud.options?cloud.tabs:localTabs()).filter(row=>row?.id && Date.now()-row.time<75000)
+      .map(row=>({...row,tabName:state?.tabNames?.[row.id]||row.tabName||'',
+        deviceLabel:cloud.devices.find(device=>device.id===row.owner)?.label||row.label||'이 브라우저'}));
+    if(!tabs.some(row=>row.id===tabId))tabs.push({id:tabId,owner:cloud.deviceId||'local',
+      tabName:state?.tabNames?.[tabId]||'',deviceLabel:cloud.options?.label||'이 브라우저',opened:Date.now(),time:Date.now()});
+    return {soundPolicy,tabs,deviceId:cloud.deviceId||'local',tabId};
+  }
+  async function changeSoundPolicy({mode,selected=[]}) {
+    if(!['all','device','selected'].includes(mode))return;
+    const normalized=[...new Set(selected.filter(id=>typeof id==='string'))].slice(0,100);
+    if(cloud.options)await cloud.enqueue({kind:'sound-policy',mode,selected:normalized});
+    else localStorage.setItem(localSoundKey,JSON.stringify({mode,selected:normalized}));
+    previous=null;refresh();
+  }
+  window.addEventListener('storage',event=>{if(event.key===localSoundKey)refresh();});
   let scoreChannel;
   try {scoreChannel = new BroadcastChannel('whiteboard.test.score-preview.v1');} catch {}
   if (scoreChannel) scoreChannel.onmessage = ({data}) => {
@@ -34,10 +69,11 @@ export function wireScoreSync(frame, cloud, store, notify) {
         wasOnline=stable;
         const offline=!cloud.online;
         const offlineUndoPossible=offline && cloud.canCancelLastPendingScore();
-        const key=JSON.stringify([shared,model,deviceNames,offline,offlineUndoPossible,live]);
+        const sound=soundContext();
+        const key=JSON.stringify([shared,model,deviceNames,offline,offlineUndoPossible,live,sound]);
         if(key===previous)return;
         api().receive({shared,model,send,notice:notify,live,deviceNames,
-          offline,offlineUndoPossible,cancelOfflineUndo});
+          offline,offlineUndoPossible,cancelOfflineUndo,...sound,changeSoundPolicy});
         previous = key;
       } catch (error) {notify(error.message);}
       finally {refreshQueued = false;}

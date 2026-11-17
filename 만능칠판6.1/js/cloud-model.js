@@ -62,6 +62,22 @@ export function applyOperation(board, operation, revision) {
     applyScoreOperation(board,operation);
     return;
   }
+  if(kind==='sound-policy') {
+    const {mode,selected}=operation;
+    if(['all','device','selected'].includes(mode) && Array.isArray(selected)
+      && selected.length<=100 && selected.every(id=>typeof id==='string')) {
+      board.soundPolicy={mode,selected:[...new Set(selected)]};
+    }
+    return;
+  }
+  if(kind==='tab-rename') {
+    const name=typeof operation.name==='string'?operation.name.trim().slice(0,40):'';
+    if(typeof operation.tabId==='string' && operation.tabId.length<=100 && name) {
+      board.tabNames??={};
+      board.tabNames[operation.tabId]=name;
+    }
+    return;
+  }
   if (kind === 'seed' && operation.score) {
     applyScoreOperation(board,{kind:'score-seed',snapshot:operation.score,key:'first-score'});
   }

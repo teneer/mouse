@@ -1,9 +1,21 @@
+// The default is intentionally all tabs; sound ownership is a user choice.
+export function shouldPlaySound({mode='all',selected=[],tabs=[],tabId,deviceId}={}) {
+  if(mode==='all')return true;
+  if(mode==='selected')return selected.includes(tabId);
+  if(mode!=='device')return true;
+  const peers=tabs.filter(row=>row.owner===deviceId && row.id);
+  if(!peers.length)return true;
+  peers.sort((a,b)=>(a.opened||0)-(b.opened||0)||a.id.localeCompare(b.id));
+  return peers[0].id===tabId;
+}
+
 const storageKey='whiteboard.score-audio.v1';
 const preloaded=new WeakSet();
 const tabKey=storageKey+':tab';
 
 export function wireScoreAudio() {
   let settings={volume:100,muted:false}, context;
+  let policy={mode:'all'};
   try {
     const stored=JSON.parse(sessionStorage.getItem(tabKey)||localStorage.getItem(storageKey)||'null');
     if (stored) settings={...settings,...stored};
@@ -31,8 +43,8 @@ export function wireScoreAudio() {
     } catch {unlock.hidden=false;}
   }
   unlock.onclick=enable;
-  return async sound=>{
-    if (!sound || settings.muted || settings.volume===0) return;
+  const play=async sound=>{
+    if (!sound || settings.muted || settings.volume===0 || !shouldPlaySound(policy)) return;
     if(!preloaded.has(sound)){sound.preload='auto';sound.load();preloaded.add(sound);}
     const element=sound.cloneNode();
     element.preload='auto';
@@ -55,4 +67,6 @@ export function wireScoreAudio() {
       await element.play();unlock.hidden=true;
     }catch(error){if(error.name==='NotAllowedError')unlock.hidden=false;else console.warn(error);}
   };
+  play.setPolicy=next=>{policy=next||{mode:'all'};};
+  return play;
 }

@@ -1,7 +1,7 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js?v=server-order-1';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=conflict-fields-1';
 import {wireGoals} from './goals-ui.js?v=conflict-fields-1';
-import {wireScoreAudio} from './score-audio.js';
+import {wireScoreAudio} from './score-audio.js?v=sound-tabs-1';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
@@ -60,6 +60,34 @@ let lastAppliedVersion = null;
 let initialized = false;
 let sharedMode = false, sharedScore = null, sharedSend, sharedNotice, managementBase;
 let sharedOffline=false, canUndoOffline=false, cancelOfflineUndo;
+let changeSoundPolicy=null, lastSoundView='';
+const soundModeControl=document.getElementById('score-sound-policy');
+const soundTargetList=document.getElementById('score-sound-targets');
+function renderSoundPolicy(policy={mode:'all',selected:[]},tabs=[]) {
+  const selected=Array.isArray(policy.selected)?policy.selected:[];
+  const signature=JSON.stringify([policy,tabs.map(row=>[row.id,row.deviceLabel,row.tabName,row.page])]);
+  if(signature===lastSoundView)return;
+  lastSoundView=signature;
+  soundModeControl.value=policy.mode||'all';
+  soundTargetList.hidden=policy.mode!=='selected';
+  soundTargetList.replaceChildren(...tabs.map(row=>{
+    const label=document.createElement('label');
+    label.className='score-setting-row';
+    const box=document.createElement('input');
+    box.type='checkbox';box.dataset.tabId=row.id;box.checked=selected.includes(row.id);
+    box.onchange=()=>{
+      const next=new Set(selected);
+      if(box.checked)next.add(row.id);else next.delete(row.id);
+      Promise.resolve(changeSoundPolicy?.({mode:'selected',selected:[...next]})).catch(e=>sharedNotice?.(e.message));
+    };
+    label.append(box,document.createTextNode((row.deviceLabel||'기기')+' · '+(row.tabName||row.page+'쪽')));
+    return label;
+  }));
+}
+soundModeControl.onchange=()=>{
+  const selected=Array.from(soundTargetList.querySelectorAll('input:checked'),element=>element.dataset.tabId).filter(Boolean);
+  Promise.resolve(changeSoundPolicy?.({mode:soundModeControl.value,selected})).catch(e=>sharedNotice?.(e.message));
+};
 let scoreGroup, migrationSnapshot, deviceNames=new Map(), conflictViewKey;
 const sharedBanner = document.getElementById('shared-score-banner');
 const sharedMessage = document.getElementById('shared-score-message');
@@ -175,12 +203,17 @@ window.whiteboardScore = {
     ? structuredClone(sharedMode ? readStoredState() || migrationSnapshot : snapshot(undefined)) : null,
   preview: previewTabScore,
   receive({shared, model, send, notice, live, deviceNames:registered,
-    offline=false,offlineUndoPossible=false,cancelOfflineUndo:cancelOffline}) {
+    offline=false,offlineUndoPossible=false,cancelOfflineUndo:cancelOffline,
+    soundPolicy={mode:'all',selected:[]},tabs=[],deviceId,tabId,
+    changeSoundPolicy:changeSound}) {
     sharedSend = send;
     sharedNotice = notice;
     sharedOffline=offline;
     canUndoOffline=offlineUndoPossible;
     cancelOfflineUndo=cancelOffline;
+    changeSoundPolicy=changeSound;
+    playSound.setPolicy({...soundPolicy,tabs,deviceId,tabId});
+    renderSoundPolicy(soundPolicy,tabs);
     deviceNames=new Map((registered||[]).map(({id,label})=>[id,label]));
     if (shared) {
       if (!sharedMode) {

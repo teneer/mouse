@@ -1,10 +1,10 @@
 import {mountGoalCelebration} from './score/goal-celebration.js';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=6.1.1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=sound-tabs-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
-import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=server-order-1';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=sound-tabs-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js';
 import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
@@ -12,9 +12,9 @@ import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedT
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
 import {objectKind,objectName,objectDisplayName} from './js/object-names.js';
-import {CloudBoard} from './js/cloud.js?v=server-order-1';
-import {wireScoreSync} from './js/score-sync.js?v=server-order-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=server-order-1';
+import {CloudBoard} from './js/cloud.js?v=sound-tabs-1';
+import {wireScoreSync} from './js/score-sync.js?v=sound-tabs-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=sound-tabs-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=6.1.1';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
@@ -1370,11 +1370,11 @@ async function boot() {
   };
   reloadLocalAfterDisconnect = useLocal;
   cloud=new CloudBoard(store,{
-    board:()=>{requestCloudRefresh();scoreSync?.refresh();},
+    board:()=>{requestCloudRefresh();scoreSync?.refresh();tabViews?.render();},
     view:()=>{requestCloudRefresh();tabViews?.render();},error:fail,
     status:()=>{cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
   });
-  scoreSync=wireScoreSync($('scoreFrame'),cloud,store,notify);
+  scoreSync=wireScoreSync($('scoreFrame'),cloud,store,notify,sync.id);
   cloudUI=wireCloudUI({cloud,files:boardFiles,openModal,notify,flush,scoreSync,
     finishEdits:async()=>{
       c.getActiveObject()?.exitEditing?.();

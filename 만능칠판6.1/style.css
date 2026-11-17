@@ -838,3 +838,10 @@ body.score-modal-open #scoreFrame {background:transparent}
 #managedObjects strong{display:block;overflow-wrap:anywhere}
 #managedObjects p{margin:3px 0 0;color:#64748b;font-size:12px}
 #managedObjects .cloud-buttons{flex:0 0 auto}
+
+/* Per-tab labels, editable independently of the device label. */
+#viewSyncMenu .view-tab-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:7px}
+#viewSyncMenu .view-tab-row:hover{background:#edf5fa}
+#viewSyncMenu .view-tab-row label{min-width:0;flex:1;cursor:pointer}
+#viewSyncMenu .view-tab-rename{border:0;background:transparent;color:#275975;cursor:pointer;font-size:1rem;padding:3px 6px}
+#viewSyncMenu .view-tab-name-input{min-width:90px;max-width:160px}
