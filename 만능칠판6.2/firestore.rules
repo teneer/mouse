@@ -91,6 +91,50 @@ service cloud.firestore {
           && request.resource.data.token is string
           && request.resource.data.token.matches('[0-9a-f]{48}');
       }
+      match /objectLocks/{lock} {
+        allow read: if member(board);
+        allow create: if member(board)
+          && request.resource.data.keys().hasOnly([
+            'pageId','objectId','ownerDevice','ownerTab','token','leaseUntil',
+            'requestDevice','requestTab','requestId','requestedAt','updatedAt'
+          ])
+          && request.resource.data.pageId is string
+          && request.resource.data.objectId is string
+          && request.resource.data.ownerDevice == request.auth.uid
+          && request.resource.data.ownerTab is string
+          && request.resource.data.token is string
+          && request.resource.data.leaseUntil is timestamp;
+        allow update: if member(board)
+          && request.resource.data.keys().hasOnly([
+            'pageId','objectId','ownerDevice','ownerTab','token','leaseUntil',
+            'requestDevice','requestTab','requestId','requestedAt','updatedAt'
+          ])
+          && request.resource.data.pageId == resource.data.pageId
+          && request.resource.data.objectId == resource.data.objectId
+          && (
+            (resource.data.ownerDevice == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'ownerDevice','ownerTab','token','leaseUntil','requestDevice','requestTab','requestId','requestedAt','updatedAt'
+              ]))
+            ||
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'requestDevice','requestTab','requestId','requestedAt'
+            ]) && request.resource.data.requestDevice == request.auth.uid)
+            ||
+            (resource.data.ownerDevice == null
+              && resource.data.requestDevice == request.auth.uid
+              && request.resource.data.ownerDevice == request.auth.uid
+              && request.resource.data.ownerTab is string
+              && request.resource.data.token is string)
+            ||
+            (resource.data.ownerDevice == null
+              && resource.data.leaseUntil <= request.time
+              && request.resource.data.ownerDevice == request.auth.uid
+              && request.resource.data.ownerTab is string
+              && request.resource.data.token is string)
+          );
+        allow delete: if member(board) && resource.data.ownerDevice == request.auth.uid;
+      }
       match /viewTabs/{tab} {
         allow read: if member(board);
         allow create: if member(board) && request.resource.data.owner == request.auth.uid
