@@ -1373,7 +1373,16 @@ async function boot() {
   };
   c.on('selection:created',()=>{updateHistory();syncSelectionControls().catch(fail);});
   c.on('selection:updated',()=>{updateHistory();syncSelectionControls().catch(fail);});
-  c.on('selection:cleared',()=>{updateHistory();if(!suppressSelection&&!groupSession&&cloudActive())flush().then(()=>{if(!c.getActiveObject())return cloud.syncObjectControls(current?.id,[]);}).catch(fail);});
+  c.on('selection:cleared',()=>{
+    updateHistory();
+    if(suppressSelection||groupSession||!cloudActive())return;
+    queueMicrotask(async()=>{
+      try{
+        if(dirty)await flush();
+        if(!c.getActiveObject()&&!dirty&&cloudActive())await cloud.syncObjectControls(current?.id,[]);
+      }catch(error){fail(error);}
+    });
+  });
   c.on('text:editing:exited',()=>{if(cancelledText)return;if(groupSession)closeGroupSession();else changed();flush().then(()=>{if(cloudActive())requestCloudRefresh();else return applyLocalView();}).catch(fail);});
 
   wireUI();setupIntegratedScorePanel();
