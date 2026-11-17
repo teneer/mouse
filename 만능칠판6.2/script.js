@@ -1367,7 +1367,7 @@ async function boot() {
     if(!cloudActive()||!current||!cloud.online)return;
     const active=c.getActiveObject();
     const selected=active?.type==='activeSelection'?(active.getObjects?.()||[]):active?[active]:[];
-    const ids=selected.map(object=>object.id).filter(id=>typeof id==='string'&&id);
+    const ids=groupSession?[groupSession.id]:selected.map(object=>object.id).filter(id=>typeof id==='string'&&id);
     await flush();
     if(cloudActive()&&current)await cloud.syncObjectControls(current.id,ids);
   };
@@ -1422,6 +1422,12 @@ async function boot() {
     },
     controlLost:held=>{
       if(held.pageId!==current?.id||!c)return;
+      if(groupSession?.id===held.objectId){
+        suppressSelection=true;
+        try{closeGroupSession();c.discardActiveObject();c.requestRenderAll();}
+        finally{suppressSelection=false;}
+        updateHistory();return;
+      }
       const active=c.getActiveObject();
       if(!active)return;
       const remaining=(active.type==='activeSelection'?(active.getObjects?.()||[]):[active])
