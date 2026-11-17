@@ -59,6 +59,7 @@ let serial = 0;
 let lastAppliedVersion = null;
 let initialized = false;
 let sharedMode = false, sharedScore = null, sharedSend, sharedNotice, managementBase;
+let sharedOffline=false, canUndoOffline=false, cancelOfflineUndo;
 let scoreGroup, migrationSnapshot, deviceNames=new Map(), conflictViewKey;
 const sharedBanner = document.getElementById('shared-score-banner');
 const sharedMessage = document.getElementById('shared-score-message');
@@ -135,7 +136,7 @@ function applySharedScore(model,live) {
   }
   if (live && previous) {
     const seen = new Set((previous.sounds || []).map(item=>item.key));
-    for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key) && !previewedScoreEvents.has(item.key)) speakEffect(item.effect);
+    for (const item of model.sounds || []) if (!item.replay && !seen.has(item.key) && !ownScoreEvents.has(item.key) && !previewedScoreEvents.has(item.key)) speakEffect(item.effect);
   }
   const {count: nextCount, teams: nextTeams, scoreLink, goalSystem: nextGoals} = model.state;
   const previewEffect = tabScorePreview?.effect;
@@ -162,10 +163,10 @@ function applySharedScore(model,live) {
     renderBatchControls();
     return;
   }
-  const effect = previous && previous.version !== model.version && !previewedScoreEvents.has(model.version) && model.effect?.oldCount === count
+  const effect = live && !document.hidden && !model.effect?.replay && previous && previous.version !== model.version && !previewedScoreEvents.has(model.version) && model.effect?.oldCount === count
     && (model.effect.kind !== 'team' || model.effect.oldTotal === totalTeamScore()) ? model.effect : null;
   applyStateFields(structuredClone(model.state));
-  renderCurrentState(effect,announce,keepPreview);
+  renderCurrentState(effect,announce,live && keepPreview);
 
 }
 
@@ -173,9 +174,13 @@ window.whiteboardScore = {
   localSnapshot: () => initialized
     ? structuredClone(sharedMode ? readStoredState() || migrationSnapshot : snapshot(undefined)) : null,
   preview: previewTabScore,
-  receive({shared, model, send, notice, live, deviceNames:registered}) {
+  receive({shared, model, send, notice, live, deviceNames:registered,
+    offline=false,offlineUndoPossible=false,cancelOfflineUndo:cancelOffline}) {
     sharedSend = send;
     sharedNotice = notice;
+    sharedOffline=offline;
+    canUndoOffline=offlineUndoPossible;
+    cancelOfflineUndo=cancelOffline;
     deviceNames=new Map((registered||[]).map(({id,label})=>[id,label]));
     if (shared) {
       if (!sharedMode) {
@@ -408,7 +413,12 @@ function recordScoreChange(key = null) {
 function undoScore() {
   if (sharedMode) {
     scoreGroup = null;
-    sendScore({kind:'score-undo',base:sharedScore?.version});
+    if(sharedOffline) {
+      undoButton.disabled=true;
+      Promise.resolve(cancelOfflineUndo?.()).then(cancelled=>{
+        if(!cancelled)sharedNotice?.('아직 전송되지 않은 점수 조작만 오프라인에서 취소할 수 있습니다.');
+      }).catch(error=>sharedNotice?.(error.message)).finally(()=>renderBatchControls());
+    } else sendScore({kind:'score-undo'});
     return;
   }
   syncFromStorage();
@@ -549,7 +559,7 @@ function renderBatchControls() {
     card.classList.toggle('team-selected', selected);
     card.querySelector('.team-select-btn').setAttribute('aria-pressed', String(selected));
   });
-  const canUndo = sharedMode ? !!sharedScore?.undo : !!lastScoreChange;
+  const canUndo = sharedMode ? (sharedOffline ? canUndoOffline : !!(sharedScore?.undoStack?.length || sharedScore?.undo)) : !!lastScoreChange;
   batchForm.hidden = teams.length === 0 && !canUndo;
   selectAllButton.textContent = selectedTeams.size ? '전체해제' : '전체선택';
   selectAllButton.disabled = !teams.length;
@@ -717,6 +727,7 @@ function collectPendingConversions(group) {
 }
 
 function presentScoreEffect(effect,audible=false) {
+  if(document.hidden) {resetConversion();renderClassNumber(count);updateScoreProgress();return;}
   if(!['class','team'].includes(effect?.kind) || !Number.isSafeInteger(effect.oldCount)){
     resetConversion();renderClassNumber(count);updateScoreProgress();return;
   }
@@ -978,6 +989,9 @@ document.addEventListener('keydown', e => {
 
   e.preventDefault();
   changeTeamScore(teamIndex, e.shiftKey ? -step : step);
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) {resetConversion();renderClassNumber(count);updateScoreProgress();}
 });
 window.addEventListener('load', () => {
   loadFromStorage();

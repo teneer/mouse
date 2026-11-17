@@ -964,7 +964,8 @@ function requestCloudRefresh(delay=25) {
   cloudRefreshTimer=setTimeout(()=>refreshCloud().catch(fail),typeof delay==='number'?delay:25);
 }
 async function refreshCloud() {
-  if(!cloudActive() || !current)return;
+  // Initial catch-up and reconnect only render the final confirmed canvas.
+  if(!cloudActive() || !current || cloud.hydrating)return;
   if(cloudRefresh){requestCloudRefresh();return;}
   const board=cloud.projected();
   const remote=board.pages[current.id];

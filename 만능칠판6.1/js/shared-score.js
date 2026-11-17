@@ -7,6 +7,27 @@ const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 const inRange = score => Number.isSafeInteger(score) && score >= min && score <= max;
 const bounded = score => inRange(score) ? score : 0;
 const total = state => state.teams.reduce((sum,team)=>sum+team.score,0);
+function undoHistory(score) {
+  if(!Array.isArray(score.undoStack)) {
+    score.undoStack=score.undo?.amount?[{key:score.version,group:score.undo.group,
+      amount:score.undo.amount,targets:score.undo.targets||null}]:[];
+  }
+  return score.undoStack;
+}
+function invalidateUndoForDirectEdit(score,patch={}) {
+  const stack=undoHistory(score);
+  if(patch.link||(patch.numbers||[]).some(item=>item.field==='class')){stack.length=0;return;}
+  const changed=new Set([...(patch.removed||[]),
+    ...(patch.numbers||[]).filter(item=>item.field?.startsWith('team:')).map(item=>item.field.slice(5))]);
+  if(changed.size)score.undoStack=stack.filter(item=>!item.targets?.some(id=>changed.has(id)));
+}
+function rememberEffect(score,key,effect,replay=false) {
+  score.version=key;
+  score.effect=replay?{...effect,replay:true}:effect;
+  score.sounds??=[];
+  score.sounds.push({key,effect,replay});
+  if(score.sounds.length>64)score.sounds.shift();
+}
 
 export function scoreSnapshot(value, key) {
   const initial = empty(), {scoreLink} = value || initial;
@@ -43,7 +64,7 @@ function applyDelta(state, operation) {
 export function applyScoreOperation(board, operation) {
   const {kind, key} = operation;
   if (kind === 'score-seed') {
-    board.score ??= {state:scoreSnapshot(operation.snapshot,key),version:key,epoch:key,overwrite:null,undo:null,conflicts:[],notice:null,effect:null};
+    board.score ??= {state:scoreSnapshot(operation.snapshot,key),version:key,epoch:key,overwrite:null,undo:null,conflicts:[],notice:null,effect:null,undoStack:[]};
     return;
   }
   const score = board.score;
@@ -58,8 +79,7 @@ export function applyScoreOperation(board, operation) {
   }
 
   if (kind === 'score-delta') {
-    if (operation.fieldBasis) startFieldConflicts(score);
-    const activeTargets=operation.fieldBasis && operation.targets
+    const activeTargets=operation.targets
       ? operation.targets.filter(id=>score.state.teams.some(team=>team.id===id)) : operation.targets;
     const missed=activeTargets?.length!==operation.targets?.length;
     const effect = applyDelta(score.state,{...operation,targets:activeTargets});
@@ -67,65 +87,45 @@ export function applyScoreOperation(board, operation) {
       score.notice = {key,text:'모둠이 삭제되었거나 점수 범위를 벗어나 대기 중이던 점수 조작을 적용하지 못했습니다.'};
       return;
     }
-    if (score.overwrite) {
-      const {id,before} = score.overwrite;
-      applyDelta(before,operation);
-      if (operation.epoch && operation.epoch !== score.epoch && !score.conflicts.some(item=>item.id===id)) {
-        score.conflicts.push({id,candidate:before});
-      }
-    }
-    if (score.fieldConflicts) trackFieldDelta(score,before,operation);
     reconcileGoals(score.state,before,operation);
     score.notice=missed?{key,text:'삭제된 모둠을 제외한 점수 변경을 반영했습니다.'}:null;
-    if (score.undo?.group !== operation.group || !equal(score.undo.targets,activeTargets||null)) {
-      score.undo={group:operation.group,amount:0,targets:activeTargets||null};
-    }
-    score.undo.amount += operation.amount;
-    score.version = key;
-    score.effect = effect;
-    score.sounds ??= [];
-    score.sounds.push({key,effect});
-    if (score.sounds.length>64) score.sounds.shift();
+    const stack=undoHistory(score), previous=stack[stack.length-1], targets=activeTargets||null;
+    if(previous && previous.group===operation.group && equal(previous.targets,targets)) {
+      previous.amount+=operation.amount;
+      previous.key=key;
+      if(!previous.amount)stack.pop();
+    } else stack.push({key,group:operation.group,amount:operation.amount,targets});
+    if(stack.length>500)stack.shift();
+    score.undo=null;
+    rememberEffect(score,key,effect,operation.replay===true);
     return;
   }
   if (kind === 'score-undo') {
-    if (score.version !== operation.base || !score.undo) {
-      score.notice = {key,text:'다른 기기에서 점수를 바꿨습니다. 현재 점수를 확인한 뒤 되돌리기를 다시 선택하세요.'};
+    const stack=undoHistory(score),last=stack[stack.length-1];
+    if(!last)return;
+    const effect=applyDelta(score.state,{amount:-last.amount,targets:last.targets});
+    if(!effect) {
+      score.notice={key,text:'대상 모둠 또는 점수 범위가 변경되어 되돌릴 수 없습니다.'};
       return;
     }
-    const undo = score.undo;
-    if (undo.targets) {
-      const teams = undo.targets.map(id=>score.state.teams.find(team=>team.id===id));
-      const oldTotal = total(score.state), newTotal = oldTotal - undo.amount*teams.length;
-      const rate = score.state.scoreLink.enabled ? score.state.scoreLink.points : 0;
-      const change = rate ? Math.floor(newTotal/rate)-Math.floor(oldTotal/rate) : 0;
-      if (teams.some(team=>!team || !inRange(team.score-undo.amount)) || !inRange(score.state.count+change)) return;
-      for (const team of teams) team.score -= undo.amount;
-      score.state.count += change;
-    } else score.state.count -= undo.amount;
-    if (score.overwrite) applyDelta(score.overwrite.before,{amount:-undo.amount,targets:undo.targets});
-    if (score.fieldConflicts) trackFieldDelta(score,before,operation);
+    stack.pop();
+    score.undo=null;
+    reconcileGoals(score.state,before,operation);
+    score.notice=null;
+    rememberEffect(score,key,effect,operation.replay===true);
+    return;
   } else if (kind === 'score-patch') {
     const link=score.state.scoreLink;
     applyFieldPatch(score,operation);
+    invalidateUndoForDirectEdit(score,operation.patch);
     if (score.state.count===before.count && equal(score.state.teams,before.teams) && equal(score.state.scoreLink,link)) return;
   } else if (kind === 'score-field-choice') {
     if (!resolveFieldConflict(score,operation)) return;
   } else if (kind === 'score-edit') {
-    const candidate = scoreSnapshot({...operation.snapshot,goalSystem:score.state.goalSystem},key);
-    if (equal(score.state,candidate)) return;
-    if (score.version !== operation.base) {
-      score.conflicts.push({id:key,candidate,device:operation.device,label:operation.deviceLabel,at:operation.authoredAt});
-      return;
-    }
-    const previous = score.state;
-    if (previous.count !== candidate.count || previous.teams.some(team=>
-      (candidate.teams.find(next=>next.id===team.id)?.score ?? 0) !== team.score) ||
-      candidate.teams.some(team=>team.score && !previous.teams.some(old=>old.id===team.id))) {
-      score.overwrite = {id:key,before:copy(previous)};
-      score.epoch = key;
-    }
-    score.state = candidate;
+    const candidate=scoreSnapshot({...operation.snapshot,goalSystem:score.state.goalSystem},key);
+    if(equal(score.state,candidate))return;
+    score.state=candidate;
+    undoHistory(score).length=0;
   } else if (kind === 'score-resolve') {
     const entry = score.conflicts.find(item=>item.id===operation.conflict);
     if (!entry) return;
@@ -136,6 +136,7 @@ export function applyScoreOperation(board, operation) {
     if (operation.useCandidate) {
       score.state = {...copy(entry.candidate),goalSystem:score.state.goalSystem};
       score.epoch = key;
+      undoHistory(score).length=0;
     }
     score.overwrite = null;
     score.conflicts = score.conflicts.filter(item=>item!==entry);

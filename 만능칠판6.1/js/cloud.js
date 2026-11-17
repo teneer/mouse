@@ -16,6 +16,8 @@ export class CloudBoard {
     this.events = events;
     this.state = newBoard();
     this.pending = new Map();
+    this.inFlight = new Set();
+    this.hydrating = false;
     this.options = null;
     this.subscriptions = [];
     this.devices = [];
@@ -192,6 +194,7 @@ export class CloudBoard {
     this.state = await this.store.getMeta('cloud-state:' + options.boardId) || newBoard();
     this.pending = new Map((await this.store.listCloudOperations(options.boardId)).map(operation => [operation.id, operation]));
     this.head = this.state.revision;
+    this.hydrating = true;
     this.boardReady = boardPages(this.projected()).length > 0;
     if (this.boardReady) this.events.board();
     this.events.status();
@@ -225,6 +228,11 @@ export class CloudBoard {
       if (this.revoked) return;
       this.online = true;
       this.head = Math.max(this.head || 0,snapshot.data().head);
+      if(this.state.revision < this.head) this.hydrating=true;
+      else if(this.hydrating) {
+        this.hydrating=false;
+        this.events.board();
+      }
       this.events.status();
       this.pull().catch(error=>this.retrySync(error));
     }, statusError));
@@ -277,6 +285,7 @@ export class CloudBoard {
     this.cancelApproval();
     this.options = null;
     this.boardReady = false;
+    this.hydrating = false;
     this.online = false;
     this.head = 0;
     this.devices = [];
@@ -317,7 +326,8 @@ export class CloudBoard {
 
   async enqueue(operation, startPush = true, initialConnection) {
     if (!this.options) throw Error('기기 연결을 확인해주세요.');
-    const record = {...structuredClone(operation), id:uid(), boardId:this.options.boardId, time:Date.now()};
+    const record = {...structuredClone(operation), id:uid(), boardId:this.options.boardId,
+      time:Date.now(), ...(operation.kind?.startsWith('score-') && !this.online?{replay:true}:{})};
     await this.store.putCloudOperation(record,initialConnection);
     this.pending.set(record.id, record);
     if (startPush) {
@@ -356,11 +366,33 @@ export class CloudBoard {
         this.state=nextState;
         for (const id of confirmed) this.pending.delete(id);
         this.boardReady = boardPages(this.state).length > 0;
-        this.events.board();
+        if(this.state.revision>=this.head) {
+          this.hydrating=false;
+          this.events.board();
+        } else if(!this.hydrating)this.events.board();
       }
     })().finally(() => {this.pulling = null;this.events.status();});
     await this.pulling;
     this.push().catch(error=>this.retrySync(error));
+  }
+
+  canCancelLastPendingScore() {
+    if(this.online || this.pushing || this.pulling || !this.options || this.detaching)return false;
+    const last=this.projectedScore()?.undoStack?.at(-1);
+    if(!last)return false;
+    return [...this.pending.values()].some(op=>op.kind==='score-delta' && op.key===last.key
+      && !op.sent && !this.inFlight.has(op.id));
+  }
+
+  async cancelLastPendingScore() {
+    if(!this.canCancelLastPendingScore())return false;
+    const last=this.projectedScore().undoStack.at(-1);
+    const record=[...this.pending.values()].find(op=>op.kind==='score-delta' && op.key===last.key && !op.sent);
+    if(!record)return false;
+    await this.store.deleteCloudOperation(record.id);
+    this.pending.delete(record.id);
+    this.events.board();
+    return true;
   }
 
   async push() {
@@ -374,6 +406,7 @@ export class CloudBoard {
         const permission = await this.store.getMeta('cloudConnection');
         if (permission?.boardId !== operation.boardId || this.detaching) break;
         const {time, boardId, id, sent, ...content} = operation;
+        if(operation.kind?.startsWith('score-') && Date.now()-time>12000)content.replay=true;
         const payload = JSON.stringify(content);
         const parts = [];
         if (payload.length > chunkSize) {
@@ -384,7 +417,9 @@ export class CloudBoard {
             start = end;
           }
         }
-        const revision = await fs.runTransaction(db, async tx => {
+        this.inFlight.add(id);
+        let revision;
+        try {revision = await fs.runTransaction(db, async tx => {
           const board = await tx.get(this.ref());
           const receipt = this.ref('receipts', id);
           const existing = await tx.get(receipt);
@@ -400,7 +435,7 @@ export class CloudBoard {
           tx.set(receipt, {revision});
           tx.update(this.ref(), {head:revision, last:ref.id});
           return revision;
-        });
+        });} finally {this.inFlight.delete(id);}
         operation.sent = true;
         this.head = Math.max(this.head ?? 0, revision);
       }

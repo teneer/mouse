@@ -120,6 +120,9 @@ export class BoardStore {
     const rows = await this.request('cloudOperations','readonly',s=>s.index('boardId').getAll(boardId));
     return rows.sort((a,b)=>a.time-b.time);
   }
+  deleteCloudOperation(id) {
+    return this.request('cloudOperations','readwrite',s=>s.delete(id));
+  }
   cacheCloudState(boardId,state,confirmed) {
     return new Promise((resolve,reject)=>{
       const tx=this.db.transaction(['meta','cloudOperations'],'readwrite');
