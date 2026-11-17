@@ -4,6 +4,11 @@ import {uid} from './constants.js';
 import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=sound-tabs-1';
 import {applyScoreOperation} from './shared-score.js?v=server-order-1';
 import {parseFirebaseConfig} from './cloud-config.js';
+import {
+  OBJECT_CONTROL_LEASE_MS, OBJECT_CONTROL_RENEW_MS, objectControlDocumentId,
+  objectControlKey, objectControlLeaseExpired, objectControlOwnerMatches,
+  objectControlRequestMatches
+} from './object-control.js?v=object-control-1';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';
 const sequence = revision => String(revision).padStart(12, '0');
@@ -29,6 +34,13 @@ export class CloudBoard {
     this.boardReady = false;
     this.online = false;
     this.retryDelay = 1000;
+    this.tabId = null;
+    this.objectLocks = new Map();
+    this.ownedControls = new Map();
+    this.pendingControlRequests = new Map();
+    this.handledControlRequests = new Set();
+    this.claimingControls = new Set();
+    this.controlRenewTimer = null;
   }
 
   async authenticate(config) {
@@ -50,6 +62,201 @@ export class CloudBoard {
   ref(...parts) {return this.fs.doc(this.db, 'wbBoards', this.options.boardId, ...parts);}
   collection(...parts) {return this.fs.collection(this.db, 'wbBoards', this.options.boardId, ...parts);}
   get deviceId() {return this.user?.uid;}
+
+  setTabId(tabId) {this.tabId=tabId;}
+
+  hasObjectControl(pageId, objectId) {
+    return !!this.online && this.ownedControls.has(objectControlKey(pageId,objectId));
+  }
+
+  objectControlToken(pageId, objectId) {
+    return this.hasObjectControl(pageId,objectId)
+      ? this.ownedControls.get(objectControlKey(pageId,objectId))?.token || null : null;
+  }
+
+  async acquireObjectControl(pageId, objectId) {
+    if (!this.options || !this.online || !this.boardReady || !this.tabId) return false;
+    const key=objectControlKey(pageId,objectId);
+    if (this.ownedControls.has(key)) return true;
+    const {fs,db,deviceId}=this;
+    const ref=this.ref('objectLocks',objectControlDocumentId(pageId,objectId));
+    const requestId=uid(),token=uid(),now=Date.now();
+    let outcome=null;
+    await fs.runTransaction(db,async tx=>{
+      const snapshot=await tx.get(ref);
+      const current=snapshot.exists()?snapshot.data():null;
+      if (objectControlOwnerMatches(current,deviceId,this.tabId)) {
+        const existingToken=current.token||token;
+        tx.update(ref,{leaseUntil:fs.Timestamp.fromMillis(now+OBJECT_CONTROL_LEASE_MS),updatedAt:fs.serverTimestamp()});
+        outcome={granted:true,token:existingToken};
+        return;
+      }
+      if (objectControlLeaseExpired(current,now)) {
+        tx.set(ref,{
+          pageId,objectId,ownerDevice:deviceId,ownerTab:this.tabId,token,
+          leaseUntil:fs.Timestamp.fromMillis(now+OBJECT_CONTROL_LEASE_MS),
+          requestDevice:null,requestTab:null,requestId:null,updatedAt:fs.serverTimestamp()
+        });
+        outcome={granted:true,token};
+        return;
+      }
+      const sameRequest=current.requestDevice===deviceId && current.requestTab===this.tabId;
+      const nextRequestId=sameRequest&&current.requestId?current.requestId:requestId;
+      tx.update(ref,{requestDevice:deviceId,requestTab:this.tabId,requestId:nextRequestId,requestedAt:fs.serverTimestamp()});
+      outcome={granted:false,requestId:nextRequestId};
+    });
+    if (outcome?.granted) {
+      this.ownedControls.set(key,{pageId,objectId,token:outcome.token});
+      this.pendingControlRequests.delete(key);
+    } else if (outcome?.requestId) {
+      this.pendingControlRequests.set(key,outcome.requestId);
+    }
+    this.events.controlState?.();
+    return !!outcome?.granted;
+  }
+
+  async syncObjectControls(pageId, objectIds=[]) {
+    if (!this.options) return true;
+    const selected=new Set(objectIds.filter(id=>typeof id==='string'&&id));
+    const stale=[...this.ownedControls.values()].filter(item=>item.pageId!==pageId||!selected.has(item.objectId));
+    await Promise.allSettled(stale.map(item=>this.releaseObjectControl(item.pageId,item.objectId)));
+    const results=await Promise.all([...selected].map(id=>this.acquireObjectControl(pageId,id)));
+    return results.every(Boolean);
+  }
+
+  async ensureObjectControls(pageId, objectIds=[]) {
+    const tokens={};
+    for (const objectId of [...new Set(objectIds)]) {
+      if (!this.hasObjectControl(pageId,objectId)) {
+        const granted=await this.acquireObjectControl(pageId,objectId);
+        if (!granted) throw Error('다른 기기에서 이 개체를 편집하고 있습니다. 제어권을 넘겨받은 뒤 다시 시도해주세요.');
+      }
+      const token=this.objectControlToken(pageId,objectId);
+      if (!token) throw Error('개체 편집 권한을 확인하지 못했습니다. 다시 선택해주세요.');
+      tokens[objectId]=token;
+    }
+    return tokens;
+  }
+
+  async releaseObjectControl(pageId, objectId) {
+    if (!this.options || !this.online || !this.tabId) return false;
+    const key=objectControlKey(pageId,objectId);
+    const held=this.ownedControls.get(key);
+    const requestId=this.pendingControlRequests.get(key);
+    const ref=this.ref('objectLocks',objectControlDocumentId(pageId,objectId));
+    const {fs,db,deviceId}=this;
+    let changed=false;
+    await fs.runTransaction(db,async tx=>{
+      const snapshot=await tx.get(ref);
+      if (!snapshot.exists()) return;
+      const current=snapshot.data();
+      if (held && objectControlOwnerMatches(current,deviceId,this.tabId,held.token)) {
+        tx.update(ref,{ownerDevice:null,ownerTab:null,token:null,
+          leaseUntil:fs.Timestamp.fromMillis(0),updatedAt:fs.serverTimestamp()});
+        changed=true;
+      } else if (requestId && objectControlRequestMatches(current,deviceId,this.tabId,requestId)) {
+        tx.update(ref,{requestDevice:null,requestTab:null,requestId:null,requestedAt:null,updatedAt:fs.serverTimestamp()});
+        changed=true;
+      }
+    });
+    this.ownedControls.delete(key);
+    this.pendingControlRequests.delete(key);
+    if (changed) this.events.controlState?.();
+    return changed;
+  }
+
+  async handoffObjectControl(request) {
+    if (!this.options || !this.online || !this.tabId) return false;
+    const {pageId,objectId,requestId}=request;
+    const key=objectControlKey(pageId,objectId);
+    const held=this.ownedControls.get(key);
+    if (!held) return false;
+    const ref=this.ref('objectLocks',objectControlDocumentId(pageId,objectId));
+    const {fs,db,deviceId}=this;
+    let transferred=false;
+    await fs.runTransaction(db,async tx=>{
+      const snapshot=await tx.get(ref);
+      if (!snapshot.exists()) return;
+      const current=snapshot.data();
+      if (!objectControlOwnerMatches(current,deviceId,this.tabId,held.token) ||
+          !objectControlRequestMatches(current,request.requestDevice,request.requestTab,requestId)) return;
+      tx.update(ref,{ownerDevice:null,ownerTab:null,token:null,
+        leaseUntil:fs.Timestamp.fromMillis(0),updatedAt:fs.serverTimestamp()});
+      transferred=true;
+    });
+    if (transferred) {
+      this.ownedControls.delete(key);
+      this.events.controlState?.();
+    }
+    return transferred;
+  }
+
+  async claimRequestedObjectControl(pageId, objectId, requestId) {
+    const key=objectControlKey(pageId,objectId);
+    if (this.claimingControls.has(key) || !this.options || !this.online || !this.tabId) return false;
+    this.claimingControls.add(key);
+    try {
+      const ref=this.ref('objectLocks',objectControlDocumentId(pageId,objectId));
+      const {fs,db,deviceId}=this,token=uid(),now=Date.now();
+      let claimed=false;
+      await fs.runTransaction(db,async tx=>{
+        const snapshot=await tx.get(ref);
+        if (!snapshot.exists()) return;
+        const current=snapshot.data();
+        if (!objectControlLeaseExpired(current,now) ||
+            !objectControlRequestMatches(current,deviceId,this.tabId,requestId)) return;
+        tx.update(ref,{
+          ownerDevice:deviceId,ownerTab:this.tabId,token,
+          leaseUntil:fs.Timestamp.fromMillis(now+OBJECT_CONTROL_LEASE_MS),
+          requestDevice:null,requestTab:null,requestId:null,requestedAt:null,updatedAt:fs.serverTimestamp()
+        });
+        claimed=true;
+      });
+      if (claimed) {
+        this.ownedControls.set(key,{pageId,objectId,token});
+        this.pendingControlRequests.delete(key);
+        this.events.controlState?.();
+      }
+      return claimed;
+    } finally {this.claimingControls.delete(key);}
+  }
+
+  async renewObjectControls() {
+    if (!this.options || !this.online || !this.tabId || !this.ownedControls.size) return;
+    const {fs,db,deviceId}=this;
+    for (const [key,held] of [...this.ownedControls]) {
+      const ref=this.ref('objectLocks',objectControlDocumentId(held.pageId,held.objectId));
+      let renewed=false;
+      await fs.runTransaction(db,async tx=>{
+        const snapshot=await tx.get(ref);
+        if (!snapshot.exists() || !objectControlOwnerMatches(snapshot.data(),deviceId,this.tabId,held.token)) return;
+        tx.update(ref,{leaseUntil:fs.Timestamp.fromMillis(Date.now()+OBJECT_CONTROL_LEASE_MS),updatedAt:fs.serverTimestamp()});
+        renewed=true;
+      });
+      if (!renewed) {
+        this.ownedControls.delete(key);
+        this.events.controlLost?.(held);
+      }
+    }
+    this.events.controlState?.();
+  }
+
+  async releaseAllObjectControls() {
+    clearInterval(this.controlRenewTimer);
+    this.controlRenewTimer=null;
+    if (this.online) {
+      await Promise.allSettled([...this.ownedControls.values()].map(item=>this.releaseObjectControl(item.pageId,item.objectId)));
+    }
+    this.ownedControls.clear();
+    this.pendingControlRequests.clear();
+  }
+
+  async flushPending() {
+    if (!this.online || !this.options) throw Error('서버 연결이 확인된 뒤 변경사항을 확정할 수 있습니다.');
+    await this.push();
+    await this.pull();
+    if (this.pending.size) throw Error('서버에서 변경사항 확정을 확인하지 못했습니다. 연결 상태를 확인해주세요.');
+  }
 
   async create(config, label, pages, score) {
     await this.authenticate(parseFirebaseConfig(config));
@@ -245,6 +452,48 @@ export class CloudBoard {
       this.tabs=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
       this.events.status();
     },this.events.error));
+    this.subscriptions.push(fs.onSnapshot(this.collection('objectLocks'), {includeMetadataChanges:true}, snapshot => {
+      if (this.options!==options || snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) return;
+      const next=new Map();
+      for (const document of snapshot.docs) {
+        const lock=document.data();
+        if (typeof lock.pageId==='string' && typeof lock.objectId==='string') {
+          next.set(objectControlKey(lock.pageId,lock.objectId),lock);
+        }
+      }
+      this.objectLocks=next;
+      for (const [key,held] of [...this.ownedControls]) {
+        const lock=next.get(key);
+        if (!objectControlOwnerMatches(lock,this.deviceId,this.tabId,held.token)) {
+          this.ownedControls.delete(key);
+          this.events.controlLost?.(held);
+        }
+      }
+      for (const [key,lock] of next) {
+        if (objectControlOwnerMatches(lock,this.deviceId,this.tabId)) {
+          this.ownedControls.set(key,{pageId:lock.pageId,objectId:lock.objectId,token:lock.token});
+          if (lock.requestDevice && lock.requestTab && lock.requestId &&
+              !(lock.requestDevice===this.deviceId && lock.requestTab===this.tabId)) {
+            const marker=key+':'+lock.requestId;
+            if (!this.handledControlRequests.has(marker)) {
+              this.handledControlRequests.add(marker);
+              if (this.handledControlRequests.size>500) this.handledControlRequests.delete(this.handledControlRequests.values().next().value);
+              this.events.controlRequest?.({
+                pageId:lock.pageId,objectId:lock.objectId,requestId:lock.requestId,
+                requestDevice:lock.requestDevice,requestTab:lock.requestTab
+              });
+            }
+          }
+        } else if (!lock.ownerDevice && objectControlRequestMatches(
+          lock,this.deviceId,this.tabId,this.pendingControlRequests.get(key))) {
+          this.claimRequestedObjectControl(lock.pageId,lock.objectId,lock.requestId).catch(this.events.error);
+        }
+      }
+      this.events.controlState?.();
+    }, this.events.error));
+    if (!this.controlRenewTimer) {
+      this.controlRenewTimer=setInterval(()=>this.renewObjectControls().catch(this.events.error),OBJECT_CONTROL_RENEW_MS);
+    }
     this.subscriptions.push(fs.onSnapshot(this.ref('control','view'), {includeMetadataChanges:true}, snapshot => {
       if (isReady(snapshot) && (validViewState(snapshot.data()) || validView(snapshot.data()))) {
         this.latestView = snapshot.data();
@@ -278,6 +527,7 @@ export class CloudBoard {
     try {
       await waitForChanges();
       await Promise.allSettled([this.pulling,this.pushing]);
+      await this.releaseAllObjectControls();
       await this.store.saveLocalHandoff(this.options.boardId,previous);
     } finally {this.detaching = false;}
     this.clearConnection();
@@ -286,6 +536,8 @@ export class CloudBoard {
   clearConnection() {
     clearTimeout(this.retryTimer);
     clearTimeout(this.authRetry);
+    clearInterval(this.controlRenewTimer);
+    this.controlRenewTimer=null;
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
     this.cancelApproval();
     this.options = null;
@@ -299,6 +551,11 @@ export class CloudBoard {
     this.revoked = false;
     this.latestView = null;
     this.tabs=[];
+    this.objectLocks.clear();
+    this.ownedControls.clear();
+    this.pendingControlRequests.clear();
+    this.handledControlRequests.clear();
+    this.claimingControls.clear();
     this.state = newBoard();
     this.pending.clear();
     this.events.status();
@@ -424,24 +681,46 @@ export class CloudBoard {
           }
         }
         this.inFlight.add(id);
-        let revision;
-        try {revision = await fs.runTransaction(db, async tx => {
-          const board = await tx.get(this.ref());
-          const receipt = this.ref('receipts', id);
-          const existing = await tx.get(receipt);
-          if (existing.exists()) return existing.data().revision;
-          const revision = board.data().head + 1;
-          const ref = this.ref('operations', sequence(revision));
-          const header = {operationId:id, author:this.deviceId, revision};
-          if (parts.length) {
-            for (const [index, data] of parts.entries()) tx.set(this.ref('operations', ref.id, 'parts', sequence(index)), {payload:data});
-            header.parts = parts.length;
-          } else header.payload = payload;
-          tx.set(ref, header);
-          tx.set(receipt, {revision});
-          tx.update(this.ref(), {head:revision, last:ref.id});
-          return revision;
-        });} finally {this.inFlight.delete(id);}
+        let revision,rejected=false;
+        try {
+          revision = await fs.runTransaction(db, async tx => {
+            const board = await tx.get(this.ref());
+            const receipt = this.ref('receipts', id);
+            const existing = await tx.get(receipt);
+            if (existing.exists()) return existing.data().revision;
+            const required=Array.isArray(operation.requiresControl)?operation.requiresControl:[];
+            const lockSnapshots=await Promise.all(required.map(objectId=>
+              tx.get(this.ref('objectLocks',objectControlDocumentId(operation.pageId,objectId)))));
+            for (let index=0;index<required.length;index++) {
+              const objectId=required[index],lock=lockSnapshots[index].exists()?lockSnapshots[index].data():null;
+              const token=operation.controlTokens?.[objectId];
+              if (!token || !objectControlOwnerMatches(lock,this.deviceId,operation.tabId||this.tabId,token)) {
+                const error=Error('다른 기기에서 개체 제어권을 가져갔습니다.');
+                error.code='object-control-lost';
+                throw error;
+              }
+            }
+            const revision = board.data().head + 1;
+            const ref = this.ref('operations', sequence(revision));
+            const header = {operationId:id, author:this.deviceId, revision};
+            if (parts.length) {
+              for (const [index, data] of parts.entries()) tx.set(this.ref('operations', ref.id, 'parts', sequence(index)), {payload:data});
+              header.parts = parts.length;
+            } else header.payload = payload;
+            tx.set(ref, header);
+            tx.set(receipt, {revision});
+            tx.update(this.ref(), {head:revision, last:ref.id});
+            return revision;
+          });
+        } catch (error) {
+          if (error.code==='object-control-lost') {
+            await this.store.deleteCloudOperation(id);
+            this.pending.delete(id);
+            this.events.controlRejected?.(operation);
+            rejected=true;
+          } else throw error;
+        } finally {this.inFlight.delete(id);}
+        if (rejected) continue;
         operation.sent = true;
         this.head = Math.max(this.head ?? 0, revision);
       }
