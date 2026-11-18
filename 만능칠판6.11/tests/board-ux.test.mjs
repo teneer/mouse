@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fitScoreFont, conversionFrame, conversionStarFlight, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
-import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
+import {applyOperation, boardPages, newBoard, pagePatch, validView, validScreenTransfer} from '../js/cloud-model.js';
 import {movePageId} from '../js/board-navigation.js';
 import {normalizeFavoriteSize, scaleFavoriteSize} from '../js/board-options.js';
 import {validateContent} from '../js/validation.js';
@@ -87,21 +87,24 @@ test('shared views support valid scoreboard sizes and older messages without siz
   assert.equal(validView({...view,scoreScale:0}),false);
 });
 
-test('shared screen state supports a global off signal and a full on snapshot', () => {
-  assert.equal(validViewState({enabled:false,epoch:'off'}),true);
-  assert.equal(validViewState({enabled:true,epoch:'on'}),false);
-  const view={enabled:true,epoch:'on',pageId:'p',zoom:1,x:0,y:0,scoreOpen:false,scoreShare:70,scoreScale:100};
-  assert.equal(validViewState(view),true);
-  assert.equal(validViewState({...view,scoreOpen:'false'}),false);
+test('screen transfer requires an explicit one-shot message and excludes its sender', () => {
+  const view={kind:'screen-transfer',epoch:'transfer',sourceTab:'pc',targets:['tablet'],pageId:'p',
+    zoom:1,x:0,y:0,scoreOpen:false,scoreShare:70,scoreScale:100};
+  assert.equal(validScreenTransfer(view),true);
+  assert.equal(validScreenTransfer({...view,kind:undefined,enabled:true}),false);
+  assert.equal(validScreenTransfer({...view,targets:['pc','tablet']}),false);
+  assert.equal(validScreenTransfer({...view,targets:[]}),false);
+  assert.equal(validScreenTransfer({...view,scoreOpen:'false'}),false);
 });
 
-test('only the explicitly selected tabs follow the shared viewport',async()=>{
-  const {activeView}=await import('../js/view-tabs.js');
-  const selected={enabled:true,targets:['pc1','tablet1'],scoreFull:true};
-  assert.equal(activeView(selected,'pc1'),true);
-  assert.equal(activeView(selected,'pc2'),false);
-  assert.equal(activeView({...selected,enabled:false},'pc1'),false);
-  assert.equal(activeView({enabled:true},'pc1'),false);
+test('a screen transfer is applied only to its targets and only once per tab',async()=>{
+  const {screenTransferFor}=await import('../js/view-tabs.js');
+  const selected={kind:'screen-transfer',epoch:'sent',sourceTab:'pc1',targets:['pc1','tablet1']};
+  assert.equal(screenTransferFor(selected,'pc1'),false);
+  assert.equal(screenTransferFor(selected,'tablet1'),true);
+  assert.equal(screenTransferFor({...selected},'tablet1','sent'),false);
+  assert.equal(screenTransferFor({...selected,epoch:'sent-again'},'tablet1','sent'),true);
+  assert.equal(screenTransferFor(selected,'pc2'),false);
 });
 
 test('deduction stars leave the class score, rise and fade; earned stars still arrive from the bar',()=>{

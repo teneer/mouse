@@ -1,7 +1,7 @@
 import {startFieldConflicts} from './score-conflicts.js?v=server-order-1';
 import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=conflict-fields-1';
 import {uid} from './constants.js';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=sound-tabs-1';
+import {applyOperation, boardPages, newBoard, validScreenTransfer} from './cloud-model.js?v=one-shot-611';
 import {applyScoreOperation} from './shared-score.js?v=server-order-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
@@ -246,7 +246,7 @@ export class CloudBoard {
       this.events.status();
     },this.events.error));
     this.subscriptions.push(fs.onSnapshot(this.ref('control','view'), {includeMetadataChanges:true}, snapshot => {
-      if (isReady(snapshot) && (validViewState(snapshot.data()) || validView(snapshot.data()))) {
+      if (isReady(snapshot) && validScreenTransfer(snapshot.data())) {
         this.latestView = snapshot.data();
         this.events.view(this.latestView);
       }
@@ -483,28 +483,9 @@ export class CloudBoard {
     this.retryDelay=Math.min(this.retryDelay*2,60000);
   }
 
-  async sendSharedView(state,toggle,changeTargets) {
-    if (!this.online || !this.boardReady) {
-      if (toggle!==undefined || changeTargets) throw Error('기기가 온라인일 때 화면 동기화를 변경할 수 있습니다.');
-      return false;
-    }
-    const ref=this.ref('control','view');
-    return this.fs.runTransaction(this.db,async tx=>{
-      const before=(await tx.get(ref)).data();
-      const existing=Array.isArray(before?.targets)?before.targets:undefined;
-      const targets=changeTargets?[...new Set(changeTargets(existing))]:(existing||[]);
-      if (toggle===undefined && !changeTargets &&
-        (!before?.enabled || before.epoch!==state.epoch || !targets.includes(state.sourceTab))) return false;
-      const enabled=targets.length>0 && (toggle??(changeTargets?true:before?.enabled));
-      const view=changeTargets && !targets.includes(state.sourceTab) && before?.pageId ? before : state;
-      tx.set(ref,{...view,enabled,targets,epoch:changeTargets||toggle!==undefined?state.epoch:before.epoch,
-        device:this.deviceId,at:this.fs.serverTimestamp()});
-      return true;
-    });
-  }
-
   async sendView(view) {
-    if (!this.boardReady || !this.online || !validView(view)) return;
+    if (!this.boardReady || !this.online) throw Error('온라인 상태에서 화면을 전송할 수 있습니다.');
+    if (!validScreenTransfer(view)) throw Error('화면 전송 정보가 올바르지 않습니다.');
     await this.fs.setDoc(this.ref('control','view'), {...view, device:this.deviceId, at:this.fs.serverTimestamp()});
   }
 }

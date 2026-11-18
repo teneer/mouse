@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=device-groups-611';
+import {screenTransferFor,wireViewTabs} from './js/view-tabs.js?v=one-shot-611';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
@@ -12,9 +12,9 @@ import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedT
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
 import {objectKind,objectName,objectDisplayName} from './js/object-names.js';
-import {CloudBoard} from './js/cloud.js?v=sound-tabs-1';
+import {CloudBoard} from './js/cloud.js?v=one-shot-611';
 import {wireScoreSync} from './js/score-sync.js?v=sound-tabs-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=sound-tabs-1';
+import {boardPages, pagePatch, pageTitle, validScreenTransfer} from './js/cloud-model.js?v=one-shot-611';
 import {wireCloudUI} from './js/cloud-ui.js?v=6.1.1';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
@@ -35,8 +35,8 @@ let favoriteDraft, favoriteColorDraft, favoriteSizeEnabled, textPropsTarget, con
 let textBoxDefaults=normalizeTextBoxStyle(readPreference('wb50.textBoxDefaults'));
 let favoriteBackground=readPreference('wb42.favoriteBackground'), localView, pageListGeneration=0, renamePageId=null;
 let groupSession=null,suppressSelection=false;
-let cloud, boardFiles, cloudUI, cloudBase, reloadLocalAfterDisconnect, cloudRefresh=false, cloudRefreshTimer, viewTimer, applyingView=false;
-let cancelledText=false, cloudHistory=null, seenView=null;
+let cloud, boardFiles, cloudUI, cloudBase, reloadLocalAfterDisconnect, cloudRefresh=false, cloudRefreshTimer, applyingView=false;
+let cancelledText=false, cloudHistory=null;
 const cloudActive=()=>!!cloud?.options && cloud.boardReady;
 try {session=JSON.parse(sessionStorage.getItem(SESSION_KEY)) || session;} catch {}
 if(!session.views || typeof session.views!=='object')session.views={};
@@ -59,18 +59,12 @@ function isFormEditing() {
 }
 const canEditBoard = ()=>!cloud?.options || !!cloudBase && !cloud.detaching;
 function allowed() {return !!current&&canEditBoard()&&!busy&&!modalOpen()&&!tools?.gesture;}
-function rememberView(publish=false) {
+function rememberView(announce=false) {
   if(!current || !c)return;
   session.activeId=current.id;session.views[current.id]=c.viewportTransform.slice();
   try {sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));} catch {}
   $('zoomLabel').textContent=`${Math.round(c.getZoom()*100)}%`;
-  if (publish) tabViews?.refresh();
-  if(publish && sync && !applyingView && activeView(viewState(),sync.id)) {
-    clearTimeout(viewTimer);
-    viewTimer=setTimeout(()=>{
-      if(activeView(viewState(),sync.id) && !applyingView)publishView().catch(fail);
-    },350);
-  }
+  if (announce) tabViews?.refresh();
 }
 function currentView(){
   const [zoom,,,,left,top]=c.viewportTransform;
@@ -84,23 +78,6 @@ function currentView(){
     if(scale>=60 && scale<=150)view.scoreScale=scale;
   }
   return view;
-}
-const viewState=()=>cloud?.options?cloud.latestView:sync.readView() || localView;
-async function publishView(toggle,changeTargets){
-  const shared=viewState();
-  if(toggle===undefined && !changeTargets && !activeView(shared,sync.id))return;
-  const epoch=toggle===undefined && !changeTargets?shared.epoch:uid();
-  const state={epoch,sourceTab:sync.id,...currentView()};
-  if(cloud?.options){
-    await cloud.sendSharedView(state,toggle,changeTargets);
-  }else{
-    const old=shared?.targets;
-    const targets=changeTargets?[...new Set(changeTargets(old))]:(old||[]);
-    const enabled=targets.length>0&&(toggle??(!!changeTargets||shared?.enabled===true));
-    localView={...(changeTargets && !targets.includes(sync.id) && shared?.pageId ? shared:state),epoch,enabled,targets};
-    sync.sendView(localView);
-  }
-  tabViews?.render();
 }
 function normalizedObjects(objects) {
   const ids=new Set();
@@ -1023,17 +1000,7 @@ async function refreshCloud() {
       }
     }
     renderPages();updateHistory();
-    const view=cloud.latestView;
-    if(activeView(view,sync.id) && view!==seenView && (view.sourceTab ? view.sourceTab===sync.id : view.device===cloud.deviceId))seenView=view;
-    if(activeView(view,sync.id) && view!==seenView && pages.some(page=>page.id===view.pageId) && !isTextEditing() && !modalOpen()){
-      seenView=view;applyingView=true;
-      try{
-        if(current.id!==view.pageId)await run(()=>activatePage(view.pageId));
-        if(current.id===view.pageId){
-          applyViewport(view);
-        }
-      }finally{applyingView=false;}
-    }
+    await applyScreenTransfer(cloud.latestView);
     cloudUI?.boardChanged().catch(fail);
   }finally{cloudRefresh=false;}
 }
@@ -1045,19 +1012,25 @@ function applyViewport(view){
 }
 function restoreLocalView(){
   const state=sync.readView();
-  localView=validViewState(state)?state:null;
+  localView=validScreenTransfer(state)?state:null;
   applyLocalView().catch(fail);
 }
-async function applyLocalView(){
-  const view=localView;
-  if(!current || cloudActive() || !activeView(view,sync.id) || seenView===view || applyingView || dirty || saving || busy || modalOpen() || tools.gesture || isTextEditing())return;
-  if(!pages.some(page=>page.id===view.pageId))return;
-  seenView=view;applyingView=true;
-  try{
+async function applyScreenTransfer(view) {
+  if(!current || applyingView || busy || modalOpen() || tools.gesture || isTextEditing())return;
+  if(!screenTransferFor(view,sync.id,session.lastScreenTransfer) || !pages.some(page=>page.id===view.pageId))return;
+  applyingView=true;
+  try {
     if(current.id!==view.pageId)await run(()=>activatePage(view.pageId));
     if(current.id!==view.pageId)return;
+    session.lastScreenTransfer=view.epoch;
     applyViewport(view);
-  }finally{applyingView=false;if(view!==localView)queueMicrotask(()=>applyLocalView().catch(fail));}
+  } finally {applyingView=false;}
+}
+async function applyLocalView(){
+  if(cloudActive() || dirty || saving)return;
+  const view=localView;
+  await applyScreenTransfer(view);
+  if(view!==localView)queueMicrotask(()=>applyLocalView().catch(fail));
 }
 async function refreshRemote() {
   if (cloud?.options && !cloud.detaching && !cloud.pulling && !cloud.pushing && !busy && !dirty && !saving && !tools?.gesture && !isTextEditing()) {
@@ -1347,7 +1320,7 @@ async function boot() {
   await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   const tabIdentity=await acquireTabIdentity(SESSION_KEY+':identity');
   sync=new TabSync(tabIdentity,refreshRemote,view=>{
-    if(!validViewState(view))return;
+    if(!validScreenTransfer(view))return;
     localView=view;
     if(!cloudActive()){
       tabViews?.render();
@@ -1363,7 +1336,7 @@ async function boot() {
   let scoreSync;
   const useLocal = async()=>{
     await scoreSync.restoreLocal().catch(fail);
-    clearTimeout(viewTimer);seenView=null;cloudHistory=null;
+    cloudHistory=null;
     pages=await store.listPages();
     await setPage(pages.find(page=>page.id===session.activeId)||pages[0],true);
     restoreLocalView();
@@ -1392,7 +1365,7 @@ async function boot() {
     goTo:id=>{closeModal('fileManagerModal');return run(()=>activatePage(id));}
   });
   busy=false;syncSharedUI();updateHistory();updateFeedbackPosition();
-  tabViews=wireViewTabs({sync,cloud,currentView,pages:()=>pages,togglePopup,closePopups,publish:publishView,readState:viewState,fail});
+  tabViews=wireViewTabs({sync,cloud,currentView,pages:()=>pages,togglePopup,closePopups,fail});
   restoreLocalView();
   const reconnect=cloud.resume();
   reconnect.catch(fail).finally(()=>scoreSync.ready().catch(fail));

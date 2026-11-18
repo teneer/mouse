@@ -136,9 +136,11 @@ export function validView(view) {
     (view.scoreScale===undefined || Number.isFinite(view.scoreScale) && view.scoreScale>=60 && view.scoreScale<=150);
 }
 
-export function validViewState(value) {
-  return typeof value?.enabled==='boolean' && typeof value.epoch==='string' &&
-    (!value.enabled || validView(value)) &&
-    (value.targets===undefined || Array.isArray(value.targets) && value.targets.every(target=>typeof target==='string')) &&
-    (value.scoreFull===undefined || typeof value.scoreFull==='boolean') && (value.scoreOpen===undefined || typeof value.scoreOpen==='boolean');
+export function validScreenTransfer(view) {
+  return view?.kind==='screen-transfer' && typeof view.epoch==='string' && !!view.epoch &&
+    typeof view.sourceTab==='string' && !!view.sourceTab && validView(view) &&
+    Array.isArray(view.targets) && view.targets.length>0 &&
+    view.targets.every(target=>typeof target==='string' && !!target && target!==view.sourceTab) &&
+    (view.scoreFull===undefined || typeof view.scoreFull==='boolean') &&
+    (view.scoreOpen===undefined || typeof view.scoreOpen==='boolean');
 }

@@ -1,7 +1,10 @@
 import {uid} from './constants.js';
-export const activeView=(view,id)=>!!view?.enabled&&Array.isArray(view.targets)&&view.targets.includes(id);
-export function screenTransferTargets(selected, rows) {
-  return rows.filter(row=>selected.has(row.id)).map(row=>row.id);
+export function screenTransferFor(view,id,lastEpoch) {
+  return view?.kind==='screen-transfer' && view.sourceTab!==id &&
+    view.epoch!==lastEpoch && view.targets.includes(id);
+}
+export function screenTransferTargets(selected, rows, sourceTab) {
+  return rows.filter(row=>row.id!==sourceTab && selected.has(row.id)).map(row=>row.id);
 }
 
 const compareTabOrder=(a,b)=>a.opened-b.opened || a.id.localeCompare(b.id);
@@ -51,7 +54,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const focus=document.activeElement?.dataset.viewTab;
     const rows=available();
     const names=defaultTabNames(rows);
-    selected=new Set(screenTransferTargets(selected,rows));
+    selected=new Set(screenTransferTargets(selected,rows,sync.id));
     const groups=new Map();
     for(const row of rows){
       const name=displayName(row,names.get(row.id));
@@ -59,6 +62,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       line.className='view-tab-row';
       const input=document.createElement('input');
       input.type='checkbox';input.checked=selected.has(row.id);input.dataset.viewTab=row.id;
+      input.disabled=row.id===sync.id;
       input.onchange=()=>{if(input.checked)selected.add(row.id);else selected.delete(row.id);sendButton.disabled=sending||!selected.size;};
       const owner=row.owner||'local';
       const deviceName=row.label||'이 기기';
@@ -121,7 +125,12 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
           if(field.value.trim()!==name)renameTab(row,field.value).catch(fail);
         };
       };
-      line.append(input,details,currentTab,edit);
+      if(row.id===sync.id){
+        const placeholder=document.createElement('span');
+        placeholder.className='view-tab-selection-space';
+        line.append(placeholder);
+      } else line.append(input);
+      line.append(details,currentTab,edit);
       groups.get(owner).append(line);
     }
     list.replaceChildren(...groups.values());
@@ -135,7 +144,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   function show(){togglePopup('viewSyncMenu',opener);announce();}
   opener.onclick=e=>{e.preventDefault();show();};opener.oncontextmenu=e=>{e.preventDefault();show();};
   root.querySelector('[data-view-all]').onclick=()=>{
-    selected=new Set(available().map(row=>row.id));
+    selected=new Set(available().filter(row=>row.id!==sync.id).map(row=>row.id));
     render();
   };
   root.querySelector('[data-view-none]').onclick=()=>{
@@ -144,12 +153,12 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   };
   sendButton.onclick=async()=>{
     if(sending)return;
-    const targets=screenTransferTargets(selected,available());
+    const targets=screenTransferTargets(selected,available(),sync.id);
     if(!targets.length){render();return;}
     sending=true;
     sendButton.disabled=true;
     try {
-      const state={...currentView(),epoch:uid(),sourceTab:sync.id,enabled:true,targets,sentAt:Date.now()};
+      const state={...currentView(),epoch:uid(),sourceTab:sync.id,kind:'screen-transfer',targets,sentAt:Date.now()};
       if(cloud.options)await cloud.sendView(state);
       else sync.sendView(state);
       root.style.display='none';

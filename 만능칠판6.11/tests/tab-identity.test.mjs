@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {acquireTabIdentity} from '../js/tab-identity.js';
-import {activeView,defaultTabNames,screenTransferTargets} from '../js/view-tabs.js';
+import {screenTransferFor,defaultTabNames,screenTransferTargets} from '../js/view-tabs.js';
 
 const key='whiteboard:tab-identity';
 const store=(value=null)=>({
@@ -14,7 +14,7 @@ test('refreshing keeps the tab ID, open order, and existing sync selection',asyn
   const first=await acquireTabIdentity(key,{storage,navigation:'navigate'});
   const after=await acquireTabIdentity(key,{storage,navigation:'reload'});
   assert.deepEqual(after,first);
-  assert.equal(activeView({enabled:true,targets:[first.id]},after.id),true);
+  assert.equal(screenTransferFor({kind:'screen-transfer',epoch:'sent',sourceTab:'other',targets:[first.id]},after.id),true);
 });
 
 test('a new tab receiving a copy of session storage gets its own ID',async()=>{
@@ -39,6 +39,7 @@ test('one-shot screen transfer includes only selected tabs still in the list',()
   assert.deepEqual(screenTransferTargets(new Set(['pc','tablet']),available),['pc','tablet']);
   assert.deepEqual(screenTransferTargets(new Set(['old','tablet']),available),['tablet']);
   assert.deepEqual(screenTransferTargets(new Set(['old']),available),[]);
+  assert.deepEqual(screenTransferTargets(new Set(['pc','tablet']),available,'pc'),['tablet']);
 });
 
 test('default tab names follow opening order independently for each device',()=>{
