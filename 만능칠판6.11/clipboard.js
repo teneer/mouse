@@ -61,7 +61,7 @@ export class SystemClipboard {
   }
   async copy(cut=false) {
     if(!this.allowed() || this.isTextEditing()) return;
-    try {const pack=this.capture();await this.writeSystem(pack);if(cut)this.remove(pack);this.notify('시스템 클립보드에 복사했습니다.');}
+    try {const pack=this.capture();await this.writeSystem(pack);if(cut)this.remove(pack);}
     catch(e) {this.notify(`복사하지 못했습니다. ${e.message}`);}
   }
   nativePaste(event) {

@@ -368,7 +368,7 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
     reconnectOptions=previous;status();
     stage('start');await useLocal();
   });
-  function approved() {stage('connected');notify('기기 승인 완료 · 칠판을 불러오는 중입니다.');}
+  function approved() {stage('connected');}
   function waiting(code) {
     if (activeStage === 'key') return;
     manuallyChanged = true;

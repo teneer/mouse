@@ -163,9 +163,6 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       else sync.sendView(state);
       root.style.display='none';
       opener.setAttribute('aria-expanded','false');
-      const toast=document.getElementById('toast');
-      toast.textContent=targets.length+'개 탭에 현재 상태를 전송했습니다.';
-      toast.hidden=false;
     } catch(error) {
       fail(error);
     } finally {

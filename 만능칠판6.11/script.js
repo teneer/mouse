@@ -1,12 +1,12 @@
 import {mountGoalCelebration} from './score/goal-celebration.js';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {screenTransferFor,wireViewTabs} from './js/view-tabs.js?v=one-shot-611';
+import {screenTransferFor,wireViewTabs} from './js/view-tabs.js?v=quiet-feedback-611';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=sound-tabs-1';
 import {PageHistory} from './history.js';
-import {SystemClipboard} from './clipboard.js';
+import {SystemClipboard} from './clipboard.js?v=quiet-feedback-611';
 import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
@@ -15,7 +15,7 @@ import {objectKind,objectName,objectDisplayName} from './js/object-names.js';
 import {CloudBoard} from './js/cloud.js?v=one-shot-611';
 import {wireScoreSync} from './js/score-sync.js?v=sound-tabs-1';
 import {boardPages, pagePatch, pageTitle, validScreenTransfer} from './js/cloud-model.js?v=one-shot-611';
-import {wireCloudUI} from './js/cloud-ui.js?v=6.1.1';
+import {wireCloudUI} from './js/cloud-ui.js?v=quiet-feedback-611';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
@@ -93,7 +93,7 @@ function changed({recordHistory=true}={}) {
   if(!current || cancelledText || isTextEditing())return;
   current.content=capture();dirty=true;generation++;
   if(recordHistory && !cloudActive())history.push(current.id,current.content);
-  status('저장 대기 중입니다.');updateHistory();
+  updateHistory();
   clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>flush().catch(fail),350);
 }
 async function flush() {
@@ -104,7 +104,6 @@ async function flush() {
   saving=(async()=>{
     while(dirty) {
       const local=clone(current),g=generation;
-      status('자동저장 중입니다.');
       if(cloudActive() && cloudBase){
         if(cloud.projected().pages[local.id]?.deleted){dirty=false;requestCloudRefresh();break;}
         const normalized=(await prepareCloudPage(local)).content;
@@ -129,7 +128,7 @@ async function flush() {
       if(g===generation)dirty=false;
       sync?.notify();rememberView();
     }
-    pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();renderPages();cloudUI?.boardChanged().catch(fail);succeeded=true;if(!dirty)status('자동저장 완료');
+    pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();renderPages();cloudUI?.boardChanged().catch(fail);succeeded=true;
   })().catch(error=>{status('저장 실패 · JSON 백업을 해주세요.','error');throw error;}).finally(()=>{saving=null;if(succeeded&&dirty){clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>flush().catch(fail),100);}else if(succeeded && !cloudActive())queueMicrotask(()=>applyLocalView().catch(fail));});
   return saving;
 }
@@ -161,7 +160,7 @@ async function run(fn,label='처리 중입니다.') {
   if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
   finishText();busy=true;closePopups();
   c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
-  try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
+  try {await fn();}catch(e){if(e?.name!=='AbortError')fail(e);}
   finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
 }
 async function setPage(page,reset=false,keepView=true) {
@@ -179,7 +178,7 @@ async function setPage(page,reset=false,keepView=true) {
     try{tools.home(current.content.frame);}finally{applyingView=wasApplying;}
   }
   if(reset || !history.pages.has(page.id) || knownVersions.get(page.id)!==page.version)history.reset(page.id,current.content);
-  knownVersions.set(page.id,page.version);renderPages();updateHistory();status('자동저장 완료');
+  knownVersions.set(page.id,page.version);renderPages();updateHistory();
 }
 async function activatePage(id) {
   await flush();const p=cloudActive()?cloud.projected().pages[id]:await store.getPage(id);
@@ -460,7 +459,6 @@ async function importFiles(files,point) {
     added.forEach(image=>c.add(image));
     orderPinnedObjects();
     c.requestRenderAll();changed();await flush();
-    notify(columns?`${added.length}개 항목을 ${columns}열로 배치했습니다.`:`${added.length}개 항목을 한곳에 배치했습니다.`);
   } catch(error) {
     for(const id of saved){await store.deleteAsset(id).catch(console.warn);boardFiles.invalidate(id);}
     const entry=history.pages.get(current.id);if(entry){entry.index=beforeIndex;entry.items.splice(beforeIndex+1);}
@@ -741,7 +739,6 @@ function saveObjectRename(event){
   if(!selected.length){closeModal('objectRenameModal');return;}
   selected.forEach((object,index)=>{object.wbName=selected.length>1?name+' ('+(index+1)+')':name;});
   c.requestRenderAll();changed();renameObjectIds=[];closeModal('objectRenameModal');
-  notify(selected.length>1?selected.length+'개 개체의 이름을 변경했습니다.':'개체 이름을 변경했습니다.');
 }
 function openContext(x,y,target=null,hit=target){
   if(!allowed()||isTextEditing()||(target && tools.mode!=='select'))return;
@@ -893,7 +890,6 @@ async function importBackup(file) {
   if(imported.length && cloudActive())await cloud.enqueue({kind:'add',pages:await Promise.all(imported.map(prepareCloudPage))});
   sync.notify();pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   if(imported.length)await setPage(pages.find(page=>page.id===imported[0].id),true,false);else renderPages();
-  notify(`페이지 ${imported.length}개와 저장 화면 ${screens.length}개를 추가했습니다. 기존 데이터는 유지했습니다.`);
 }
 async function importLegacy() {
   if(await store.getMeta('legacyImported') && !(await askConfirm('이전 데이터를 이미 가져온 적이 있습니다. 다시 가져오면 중복될 수 있습니다. 계속할까요?',{title:'이전 데이터 가져오기',confirmText:'계속'})))return;
@@ -911,7 +907,6 @@ async function importLegacy() {
   if(imported.length && cloudActive())await cloud.enqueue({kind:'add',pages:await Promise.all(imported.map(prepareCloudPage))});
   await store.setMeta('legacyImported',true);sync.notify();pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   if(imported.length)await setPage(pages.find(page=>page.id===imported[0].id),true,false);else renderPages();
-  notify(`이전 자동저장 ${imported.length}개와 저장 화면 ${screens.length}개를 가져왔습니다. 원본 데이터는 유지했습니다.`);
 }
 function hasLegacyImage(object){return object.type==='image' || object.objects?.some(hasLegacyImage);}
 async function prepareCloudPage(page) {
@@ -1052,7 +1047,7 @@ async function refreshRemote() {
         const next=remote || all[0] || await store.ensurePage(emptyContent(c.width,c.height));
         if(!all.length)pages=await store.listPages();
         const mode=tools.mode;
-        await setPage(next,true);tools.setMode(mode);status('다른 탭의 변경을 반영했습니다.');
+        await setPage(next,true);tools.setMode(mode);
       },'다른 탭의 변경을 반영하는 중입니다.');
     } else {current.order=remote.order;renderPages();}
   } catch(e){console.error('탭 동기화 오류',e);status('동기화 확인 실패','error');}
@@ -1145,7 +1140,7 @@ function wireUI() {
   $('saveBtn').onclick=()=>{if(!allowed())return;$('saveScreenNameInput').value=displayPageTitle(pages.find(page=>page.id===current.id),pages.findIndex(page=>page.id===current.id));openModal('saveConfirmModal');$('saveScreenNameInput').focus();$('saveScreenNameInput').select();};
   $('confirmSaveBtn').onclick=()=>run(async()=>{
     const name=$('saveScreenNameInput').value.trim() || '제목 없음';await flush();const content=capture(),view={viewportTransform:c.viewportTransform.slice(),width:c.width,height:c.height},thumbnail=await makeCurrentViewportThumbnail();
-    await store.putScreen({id:uid(),name,savedAt:Date.now(),content,view,thumbnail});sync.notify();closeModal('saveConfirmModal');notify('현재 페이지를 저장 화면으로 보관했습니다.');
+    await store.putScreen({id:uid(),name,savedAt:Date.now(),content,view,thumbnail});sync.notify();closeModal('saveConfirmModal');
   },'저장 화면을 만드는 중입니다.');
   $('saveScreenNameInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmSaveBtn').click();}});
   $('loadGeneralBtn').onclick=()=>run(async()=>{await renderSavedScreens();openModal('loadSavedScreenModal');});
