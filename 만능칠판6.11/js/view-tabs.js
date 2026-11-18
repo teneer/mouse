@@ -32,7 +32,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     return (cloud.options?cloud.projected().tabNames?.[row.id]:null)||savedName(row.id)||row.tabName||defaultName;
   }
   async function renameTab(row,name){
-    name=name.trim().slice(0,40);
+    name=name.replace(/[\r\n]+/g,' ').trim().slice(0,40);
     if(!name)return;
     if(cloud.options)await cloud.enqueue({kind:'tab-rename',tabId:row.id,name});
     else {localStorage.setItem(namePrefix+row.id,name);channel?.postMessage('renamed');}
@@ -44,7 +44,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const rows=scope?members.filter(row=>Date.now()-row.time<heartbeat*5):(()=>{const a=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith(prefix)){const v=JSON.parse(localStorage.getItem(k));if(v?.id&&Date.now()-v.time<heartbeat*5)a.push(v);}}}catch{}return a;})();
     if(!rows.some(r=>r.id===sync.id))rows.push(presence());return rows.sort(compareTabOrder);
   }
-  function position(){if(root.style.display!=='block')return;const edge=toolbar.getBoundingClientRect().top-8,r=opener.getBoundingClientRect();root.style.top='auto';root.style.bottom=(innerHeight-edge)+'px';root.style.maxHeight=Math.max(0,edge-8)+'px';root.style.left=Math.max(8,Math.min(innerWidth-root.offsetWidth-8,r.left+(r.width-root.offsetWidth)/2))+'px';}
+  function position(){if(root.style.display!=='block')return;const edge=toolbar.getBoundingClientRect().top-8,r=opener.getBoundingClientRect();root.style.top='auto';root.style.bottom=(innerHeight-edge)+'px';root.style.setProperty('--view-menu-height',Math.max(0,edge-30)+'px');root.style.left=Math.max(8,Math.min(innerWidth-root.offsetWidth-8,r.left+(r.width-root.offsetWidth)/2))+'px';}
   function render(){
     if(root.style.display!=='block')return;
     if(nameEditor && document.activeElement===nameEditor){position();return;}
@@ -52,36 +52,55 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const rows=available();
     const names=defaultTabNames(rows);
     selected=new Set(screenTransferTargets(selected,rows));
-    list.replaceChildren(...rows.map(row=>{
+    const groups=new Map();
+    for(const row of rows){
       const name=displayName(row,names.get(row.id));
       const line=document.createElement('div');
       line.className='view-tab-row';
-      const label=document.createElement('label'),input=document.createElement('input');
+      const input=document.createElement('input');
       input.type='checkbox';input.checked=selected.has(row.id);input.dataset.viewTab=row.id;
       input.onchange=()=>{if(input.checked)selected.add(row.id);else selected.delete(row.id);sendButton.disabled=sending||!selected.size;};
+      const owner=row.owner||'local';
       const deviceName=row.label||'이 기기';
+      if(!groups.has(owner)){
+        const group=document.createElement('section');
+        group.className='view-device-group';
+        const heading=document.createElement('h3');
+        heading.textContent=deviceName;
+        group.append(heading);
+        groups.set(owner,group);
+      }
       input.setAttribute('aria-label',deviceName+' · '+name);
-      const deviceText=document.createElement('span');
-      deviceText.textContent=deviceName+' ·';
-      label.append(input,deviceText);
       const details=document.createElement('div');
       details.className='view-tab-details';
       const nameText=document.createElement('span');
       nameText.className='view-tab-name';
       nameText.textContent=name;
-      details.append(label,nameText);
-      if(row.id===sync.id)details.append(document.createTextNode(' (이 탭)'));
+      nameText.title=name;
+      details.append(nameText);
+      const currentTab=document.createElement('span');
+      currentTab.className='view-tab-current';
+      if(row.id===sync.id)currentTab.textContent='(이 탭)';
 
       const edit=document.createElement('button');
       edit.type='button';edit.className='view-tab-rename';edit.textContent='✎';
       edit.title='탭 이름 변경';edit.setAttribute('aria-label',name+' 이름 변경');
       edit.onclick=()=>{
         if(details.querySelector('.view-tab-name-input'))return;
-        const field=document.createElement('input');
-        field.type='text';field.maxLength=40;field.value=name;
+        const editor=document.createElement('div');
+        editor.className='view-tab-editor';
+        const ruler=document.createElement('span');
+        ruler.setAttribute('aria-hidden','true');
+        const field=document.createElement('textarea');
+        field.rows=1;field.maxLength=40;field.value=name;
         field.setAttribute('aria-label','탭 이름 변경');field.className='view-tab-name-input';
+        field.enterKeyHint='done';
+        const resize=()=>{ruler.textContent=field.value+' ';};
+        field.oninput=resize;
+        resize();
+        editor.append(ruler,field);
         nameEditor=field;
-        nameText.replaceWith(field);
+        nameText.replaceWith(editor);
         field.focus();
         field.select();
         field.onkeydown=event=>{
@@ -92,20 +111,21 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
             event.stopPropagation();
             field.onblur=null;
             nameEditor=undefined;
-            field.replaceWith(nameText);
+            editor.replaceWith(nameText);
             edit.focus();
           }
         };
         field.onblur=()=>{
           if(nameEditor===field)nameEditor=undefined;
-          field.replaceWith(nameText);
+          editor.replaceWith(nameText);
           if(field.value.trim()!==name)renameTab(row,field.value).catch(fail);
         };
       };
-      line.append(details,edit);
-      if(focus===row.id)input.focus({preventScroll:true});
-      return line;
-    }));
+      line.append(input,details,currentTab,edit);
+      groups.get(owner).append(line);
+    }
+    list.replaceChildren(...groups.values());
+    if(focus)Array.from(list.querySelectorAll('[data-view-tab]')).find(input=>input.dataset.viewTab===focus)?.focus({preventScroll:true});
     sendButton.disabled=sending||!selected.size;position();
   }
   function announce(){if(!present)return;const next=cloud.options?.boardId||null;if(scope!==next){unsubscribe?.();unsubscribe=null;members=[];selected.clear();scope=next;}
