@@ -692,14 +692,14 @@ function renderProgress(value,rate) {
   conversionProgress.textContent=`${value} / ${rate}`;
 }
 
-async function moveProgress(from,to,rate,reduced,signal) {
+async function moveProgress(from,to,rate,signal) {
   renderProgress(from,rate);
-  if(!reduced && from!==to)await animateEffect(progress.firstElementChild,
+  if(from!==to)await animateEffect(progress.firstElementChild,
     [{transform:`scaleX(${from/rate})`},{transform:`scaleX(${to/rate})`}],{duration:340,easing:'ease-in-out'},signal);
   renderProgress(to,rate);
 }
 
-async function sendStars(rate,direction,reduced,signal) {
+async function sendStars(rate,direction,signal) {
   const bar=progress.getBoundingClientRect();
   if(!bar.width){await waitForEffect(200,signal);return;}
   const score=numberElement.getBoundingClientRect();
@@ -714,14 +714,13 @@ async function sendStars(rate,direction,reduced,signal) {
     node.style.left=from.x+'px';node.style.top=from.y+'px';
     document.body.append(node);
     try{
-      if(reduced){await waitForEffect(360,signal);return;}
       await animateEffect(node,frames,
         {duration:680,delay:Math.min(55,220/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
     }finally{node.remove();}
   }));
 }
 
-function showClassDelta(delta,audible,reduced) {
+function showClassDelta(delta,audible) {
   renderClassNumber(displayedClassScore+delta);
   if(audible)playSound(delta>0?sounds.mainIncrease:sounds.mainDecrease);
   const label=document.createElement('span');
@@ -736,12 +735,12 @@ function showClassDelta(delta,audible,reduced) {
   const color=getComputedStyle(label).color;
   const baseColor=getComputedStyle(numberElement).color;
   void Promise.all([
-    reduced ? waitForEffect(600,signal) : animateEffect(label,[
+    animateEffect(label,[
       {opacity:1,transform:'translate(0, 0)'},
       {opacity:1,transform:'translate(0, 0)',offset:.55},
       {opacity:0,transform:'translate(0, -20px)'}
     ],{duration:750,fill:'both'},signal),
-    reduced ? Promise.resolve() : animateEffect(numberElement,[
+    animateEffect(numberElement,[
       {transform:'scale(1)',color},{transform:'scale(1.2)',color},{transform:'scale(1)',color:baseColor}
     ],{duration:200},signal)
   ]).catch(error=>{
@@ -765,7 +764,7 @@ function presentScoreEffect(effect,audible=false) {
     resetConversion();renderClassNumber(count);updateScoreProgress();return;
   }
   if(effect.kind==='class'){
-    showClassDelta(effect.classDiff,audible,window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    showClassDelta(effect.classDiff,audible);
     return;
   }
   queuedConversions.push({effect,audible});
@@ -783,19 +782,18 @@ function presentScoreEffect(effect,audible=false) {
         await waitForEffect(120,signal);
         group=collectPendingConversions(group);
         let frame=conversionFrame(group.effect.oldTotal,group.effect.newTotal,rate);
-        const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        await moveProgress(frame.from,frame.to,rate,reduced,signal);
+        await moveProgress(frame.from,frame.to,rate,signal);
         if(!frame.delta)continue;
         progress.setAttribute('data-converting','');
         await waitForEffect(300,signal);
-        await sendStars(rate,frame.delta,reduced,signal);
+        await sendStars(rate,frame.delta,signal);
         // Include same-direction input received during the star animation.
         group=collectPendingConversions(group);
         frame=conversionFrame(group.effect.oldTotal,group.effect.newTotal,rate);
         progress.removeAttribute('data-converting');
-        showClassDelta(frame.delta,group.audible,reduced);
-        if(frame.delta<0)await moveProgress(rate,frame.rest,rate,reduced,signal);
-        else if(frame.rest)await moveProgress(0,frame.rest,rate,reduced,signal);
+        showClassDelta(frame.delta,group.audible);
+        if(frame.delta<0)await moveProgress(rate,frame.rest,rate,signal);
+        else if(frame.rest)await moveProgress(0,frame.rest,rate,signal);
         else renderProgress(0,rate);
         await waitForEffect(320,signal);
       }
