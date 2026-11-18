@@ -100,7 +100,11 @@ export function mountChecklist(root, { classId, bus }) {
     // Preserve rapid successive edits; filtering waits for the last committed value.
     entryWrites = entryWrites.then(async () => {
       try {
-        await transact(['checklistEntries'], 'readwrite', tx => {
+        await transact(['students', 'checklistEntries'], 'readwrite', async tx => {
+          const student = await requestResult(tx.objectStore('students').get(sid));
+          if (!student || student.classId !== classId || student.status === 'deleted') {
+            throw new Error('명단에서 해당 학생을 찾을 수 없습니다.');
+          }
           tx.objectStore('checklistEntries').put({ id: classId+'|'+recordDate+'|'+did+'|'+sid, classId, date:recordDate,
             studentId:sid, definitionId:did, value, updatedAt:new Date().toISOString() });
         });

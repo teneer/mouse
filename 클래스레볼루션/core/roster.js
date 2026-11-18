@@ -38,6 +38,7 @@ async function readRoster(transaction, classId) {
   }));
   return {
     students: students.filter(function (student) { return student.status !== 'deleted'; }).sort(sortBy('number')),
+    deletedStudents: students.filter(function (student) { return student.status === 'deleted'; }).sort(sortBy('number')),
     groups: groups.sort(sortBy('order'))
   };
 }
@@ -104,6 +105,41 @@ export function saveStudent(classId, values) {
     }
     students.put(student);
     return student;
+  });
+}
+
+export function trashStudent(classId, studentId) {
+  return updateRoster(classId, function (roster, students) {
+    const student = roster.students.find(function (record) { return record.id === studentId; });
+    if (!student) throw new Error('명단에서 해당 학생을 찾을 수 없습니다.');
+    const seats = seatsFor(roster, groupIdInRoster(student, roster.groups));
+    seats.forEach(function (member, seat) {
+      if (member.id === studentId) {
+        students.put({ ...member, seat, status: 'deleted', updatedAt: new Date().toISOString() });
+      } else if (member.seat !== seat) {
+        students.put({ ...member, seat });
+      }
+    });
+  });
+}
+
+export function restoreStudent(classId, studentId) {
+  return updateRoster(classId, function (roster, students) {
+    const student = roster.deletedStudents.find(function (record) { return record.id === studentId; });
+    if (!student) throw new Error('휴지통에서 해당 학생을 찾을 수 없습니다.');
+    const number = Number(student.number);
+    if (roster.students.some(function (member) { return Number(member.number) === number; })) {
+      throw new Error(number + '번을 사용 중인 학생의 번호를 바꾼 뒤 다시 복원해 주세요.');
+    }
+    const groupId = groupIdInRoster(student, roster.groups);
+    const seats = seatsFor(roster, groupId);
+    const savedSeat = student.seat;
+    const canUseSavedSeat = Number.isInteger(savedSeat) && savedSeat >= 0 &&
+      savedSeat < STUDENT_SEAT_LIMIT && !seats.has(savedSeat);
+    students.put({
+      ...student, groupId: groupId || null, seat: canUseSavedSeat ? savedSeat : firstEmptySeat(seats),
+      status: 'active', updatedAt: new Date().toISOString()
+    });
   });
 }
 

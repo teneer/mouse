@@ -305,6 +305,22 @@ button.empty-room-position {
 .student-form-error { margin: 0; color: #a12439; font-size: 12px; }
 .student-form-error:empty { display: none; }
 .student-form-save { margin: 0 -16px; padding: 11px; border: 0; background: #ffdd42; color: #4c3b19; font-weight: 800; }
+.student-form-actions { display: flex; gap: 8px; padding-bottom: 16px; }
+.student-form-actions .student-form-save { flex: 1; margin: 0; border-radius: 4px; }
+.student-trash-action { color: #a12439; }
+.student-trash { padding-bottom: 16px; }
+.student-trash-list ul { list-style: none; padding: 0; margin: 0; }
+.student-trash-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e4dfd2;
+}
+.student-trash-list li span { min-width: 0; overflow-wrap: anywhere; }
+.student-trash-list li button { flex: none; }
+.student-trash-list p { margin: 0; }
 
 .global-feedback { inset: 0; display: block; pointer-events: none; }
 .global-feedback > .feedback-card {

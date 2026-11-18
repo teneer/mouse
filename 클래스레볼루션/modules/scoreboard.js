@@ -1,5 +1,8 @@
 import { AVATAR_COUNT, avatarNumber, stillAvatar } from '../core/avatar.js';
-import { groupPositions, importStudents, loadRoster, moveGroup, moveStudent, saveGroup, saveStudent, studentSeats } from '../core/roster.js';
+import {
+  groupPositions, importStudents, loadRoster, moveGroup, moveStudent, restoreStudent,
+  saveGroup, saveStudent, studentSeats, trashStudent
+} from '../core/roster.js';
 import { getRecord, getAll } from '../core/db.js';
 import { mountScoreComposer } from '../core/score-composer.js';
 import { escapeHtml } from '../core/text.js';
@@ -37,6 +40,7 @@ export function mountScoreboard(root, { classId, bus }) {
   let source = null;
   let dragTarget = null;
   let students = [];
+  let deletedStudents = [];
   let groups = [];
   let reason = '';
   let growth = { classScore: 0, pending: [] };
@@ -48,21 +52,24 @@ export function mountScoreboard(root, { classId, bus }) {
   let revision = 0;
   const selected = new Set();
 
-  root.innerHTML = '<div class="student-surface"></div><dialog class="student-dialog"></dialog>';
+  root.innerHTML = '<div class="student-surface"></div><dialog class="student-dialog" aria-labelledby="student-dialog-title"></dialog>';
   const surface = root.querySelector('.student-surface');
   const dialog = root.querySelector('.student-dialog');
   const composer = mountScoreComposer(root, { classId, bus, onApplied: () => { selected.clear(); void refresh(); } });
+  dialog.addEventListener('cancel', function (event) { if (busy) event.preventDefault(); });
 
   async function refresh() {
     const current = ++revision;
     const [roster, progress] = await Promise.all([loadRoster(classId), getRecord('growthStates', classId)]);
-    growth = progress || { classScore: 0, pending: [] };
     if (current !== revision) return;
+    growth = progress || { classScore: 0, pending: [] };
     students = roster.students.sort((a, b) => sort === 'score' ? Number(b.score || 0) - Number(a.score || 0) : sort === 'name' ? a.name.localeCompare(b.name, 'ko') : Number(a.number) - Number(b.number));
+    deletedStudents = roster.deletedStudents;
     groups = roster.groups;
     const ids = new Set(students.map(function (student) { return student.id; }));
     selected.forEach(function (id) { if (!ids.has(id)) selected.delete(id); });
     render();
+    if (dialog.open) renderTrash();
   }
 
   function render() {
@@ -97,7 +104,8 @@ export function mountScoreboard(root, { classId, bus }) {
     }).join('');
     return '<section class="roster-stage" aria-label="학생관리"><div class="roster-tools">' +
       '<button type="button" class="roster-control" data-action="paste-roster">명단 붙여넣기</button>' +
-      '<button type="button" class="roster-control" data-action="add-group">모둠 추가</button></div>' +
+      '<button type="button" class="roster-control" data-action="add-group">모둠 추가</button>' +
+      '<button type="button" class="roster-control" data-action="show-trash">학생 휴지통</button></div>' +
       '<div class="roster-groups" aria-label="모둠 이름 편집">' + teamButtons + '</div>' +
       '<div class="student-cards">' + students.map(function (student) { return studentCard(student, true); }).join('') +
       '<button class="student-add-card" type="button" data-action="add-student"><b>＋</b>학생 추가</button></div></section>';
@@ -177,7 +185,7 @@ export function mountScoreboard(root, { classId, bus }) {
   async function showHistory() {
     const entries = (await getAll('scoreEvents')).filter(e => e.classId === classId)
       .sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0,100);
-    dialog.innerHTML = '<div class="student-form"><div class="student-dialog-title"><h2>점수 이력</h2><button data-action="close-dialog" aria-label="닫기">×</button></div><div class="score-history">' +
+    dialog.innerHTML = '<div class="student-form"><div class="student-dialog-title"><h2 id="student-dialog-title">점수 이력</h2><button data-action="close-dialog" aria-label="닫기">×</button></div><div class="score-history">' +
       (entries.map(e => '<article><strong>' + escapeHtml(e.studentName) + '</strong><b class="' + (e.delta < 0 ? 'minus' : '') + '">' + (e.delta > 0 ? '+' : '') + e.delta + '</b><p>' + escapeHtml(e.reason) + '</p><small>' + new Date(e.createdAt).toLocaleString('ko-KR') + '</small></article>').join('') || '<p>아직 점수 이력이 없습니다.</p>') + '</div></div>';
     dialog.showModal();
   }
@@ -210,12 +218,40 @@ export function mountScoreboard(root, { classId, bus }) {
             '" aria-label="아바타 ' + value + '"' + (value === current ? ' checked' : '') + '>' + stillAvatar(value) + '</label>';
         }).join('') + '</div></fieldset>';
     }
-    dialog.setAttribute('aria-labelledby', 'student-dialog-title');
+    const save = '<button class="student-form-save" type="submit">저장</button>';
+    const actions = kind === 'edit-student' && student
+      ? '<div class="student-form-actions">' + save +
+        '<button class="roster-control student-trash-action" type="submit" name="intent" value="trash" formnovalidate>휴지통으로 이동</button></div>'
+      : save;
     dialog.innerHTML = '<form class="student-form" data-kind="' + kind + '" data-id="' + escapeHtml(id) +
       '"><div class="student-dialog-title"><h2 id="student-dialog-title">' + title +
       '</h2><button type="button" data-action="close-dialog" aria-label="닫기">×</button></div>' + fields +
-      '<p class="student-form-error" role="alert"></p><button class="student-form-save" type="submit">저장</button></form>';
+      '<p class="student-form-error" role="alert"></p>' + actions + '</form>';
     dialog.showModal();
+  }
+
+  function showTrash() {
+    dialog.innerHTML = '<form class="student-form student-trash" data-kind="restore-student">' +
+      '<div class="student-dialog-title"><h2 id="student-dialog-title">학생 휴지통</h2>' +
+      '<button type="button" data-action="close-dialog" aria-label="닫기">×</button></div>' +
+      '<div class="student-trash-list"></div><p class="student-form-error" role="alert"></p></form>';
+    renderTrash();
+    dialog.showModal();
+  }
+
+  function renderTrash() {
+    const list = dialog.querySelector('.student-trash-list');
+    if (!list) return;
+    const focused = document.activeElement;
+    list.innerHTML = deletedStudents.length ? '<ul>' + deletedStudents.map(function (student) {
+      const label = student.number + '번 ' + student.name;
+      return '<li><span>' + escapeHtml(label) + '</span><button class="roster-control" type="submit" name="studentId" value="' +
+        escapeHtml(student.id) + '" aria-label="' + escapeHtml(label + ' 복원') + '">복원</button></li>';
+    }).join('') + '</ul>' : '<p>휴지통이 비어 있습니다.</p>';
+    if (focused?.name === 'studentId' && !focused.isConnected) {
+      const equivalent = Array.from(list.querySelectorAll('button')).find(button => button.value === focused.value);
+      (equivalent || dialog.querySelector('[data-action="close-dialog"]')).focus();
+    }
   }
 
   function positionAt(element, kind) {
@@ -310,6 +346,7 @@ export function mountScoreboard(root, { classId, bus }) {
       return;
     }
     if (action === 'close-dialog') { dialog.close(); return; }
+    if (action === 'show-trash') { showTrash(); return; }
     if (['add-student', 'edit-student', 'add-group', 'edit-group', 'paste-roster'].includes(action)) {
       showDialog(action, id || '');
       return;
@@ -363,24 +400,38 @@ export function mountScoreboard(root, { classId, bus }) {
     if (busy) return;
     busy = true;
     const values = new FormData(form);
-    if (form.matches('.student-form')) {
-      const { kind, id } = form.dataset;
-      try {
-        if (kind === 'paste-roster') await importStudents(classId, values.get('roster'));
-        else if (kind.endsWith('group')) await saveGroup(classId, { id, name: values.get('name') });
-        else await saveStudent(classId, { id, ...Object.fromEntries(values) });
-        dialog.close();
-        notice = '저장했습니다.';
-        bus.publish('students.changed', { classId });
-      } catch (error) {
-        form.querySelector('.student-form-error').textContent = error.message;
-      } finally {
-        busy = false;
-        await refresh();
+    const { kind, id } = form.dataset;
+    const errorNode = form.querySelector('.student-form-error');
+    const movingToTrash = kind === 'edit-student' && event.submitter?.value === 'trash';
+    const restoring = kind === 'restore-student';
+    let message = '저장했습니다.';
+    errorNode.textContent = '';
+    try {
+      if (movingToTrash) {
+        await trashStudent(classId, id);
+        message = '학생을 휴지통으로 옮겼습니다.';
+      } else if (restoring) {
+        await restoreStudent(classId, event.submitter?.value);
+        message = '학생을 명단에 복원했습니다.';
+      } else if (kind === 'paste-roster') {
+        await importStudents(classId, values.get('roster'));
+      } else if (kind.endsWith('group')) {
+        await saveGroup(classId, { id, name: values.get('name') });
+      } else {
+        await saveStudent(classId, { id, ...Object.fromEntries(values) });
       }
-      return;
+      dialog.close();
+      notice = message;
+      bus.publish('students.changed', { classId });
+    } catch (error) {
+      errorNode.textContent = error.message;
+    } finally {
+      busy = false;
+      await refresh();
     }
-
+    if ((movingToTrash || restoring) && !dialog.open) {
+      surface.querySelector('[data-action="show-trash"]')?.focus();
+    }
   });
 
   return { refresh };
