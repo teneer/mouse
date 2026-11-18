@@ -24,6 +24,8 @@
 [class^="art-"], [class*=" art-"] { display:inline-block; flex-shrink:0; background-repeat:no-repeat; vertical-align:middle; font-style:normal; }
 .art-sprout { width:28px; height:25px; background-image:url('assets/visuals/sp_board_layout.png'); background-size:266px 399px; background-position:-105px -74px; }
 .art-students { width:26px; height:28px; background-image:url('assets/visuals/sp_board_layout.png'); background-size:285px 427.5px; background-position:-45px -117px; }
+.art-roster { display:grid; place-items:center; width:29px; height:29px; border-radius:50%; background:#79c830; }
+.art-roster::before { content:""; width:21px; height:17px; background:url('assets/visuals/sp_board_layout.png') -115px -138px / 247px 370.5px no-repeat; }
 .art-checklist { width:28px; height:28px; background-image:url('assets/visuals/sp_board_layout.png'); background-size:266px 399px; background-position:-41px -207px; }
 .art-positive { width:28px; height:28px; background-image:url('assets/visuals/sp_board_images.png'); background-size:664px 232px; background-position:-560px -28px; }
 .art-negative { width:28px; height:28px; background-image:url('assets/visuals/sp_board_images.png'); background-size:664px 232px; background-position:-604px -20px; }
