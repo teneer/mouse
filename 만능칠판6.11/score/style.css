@@ -1,0 +1,849 @@
+/* 모든 요소의 크기 계산을 직관적으로 변경 */
+* {
+  box-sizing: border-box;
+}
+:root {
+  --primary-color: #3498db; --primary-dark: #2980b9; --secondary-color: #2ecc71;
+  --accent-color: #e74c3c; --text-color: #2d3a4b; --light-bg: #f9fafb;
+  --card-bg: #ffffff; --shadow-color: rgba(0, 0, 0, 0.1);
+}
+html { height: 100%; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif; background: var(--light-bg);
+  background-image: linear-gradient(to bottom right, #f1f9fe, #eafaf1);
+  margin: 0; min-height: 100vh;
+  overflow-x: hidden; /* 가로 스크롤 방지 */
+  overflow-y: auto;   /* 내용이 넘칠 때만 세로 스크롤 생성 */
+}
+h1, h2 { color: var(--text-color); text-align: center; }
+h1 { margin-top: 36px; text-shadow: 1px 1px 2px var(--shadow-color); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.main-scoreboard {
+  background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 20px var(--shadow-color);
+  padding: 32px 24px 24px 24px; margin: 36px auto 32px auto; max-width: 400px;
+  text-align: center; position: relative; border-top: 5px solid var(--primary-color);
+}
+.main-controls { display: flex; justify-content: center; align-items: center; gap: 24px; margin-bottom: 8px; }
+.main-btn {
+  font-size: 34px; padding: 12px 30px; background: #e6eaf0; border: none;
+  border-radius: 8px; cursor: pointer; transition: background 0.2s, transform 0.1s;
+}
+.main-btn:active { background: #d1d8e0; transform: scale(0.95); }
+#number { font-size: 72px; min-width: 90px; margin: 0 16px; display: inline-block; transition: color 0.2s, transform 0.2s; color: var(--text-color); }
+#change {
+  font-size: 32px; color: var(--secondary-color); position: absolute; left: 50%;
+  top: 55px; transform: translateX(-50%); opacity: 0;
+  transition: opacity 0.4s, top 0.4s; pointer-events: none;
+}
+.increase { color: var(--secondary-color) !important; animation: pop 0.2s; }
+.decrease { color: var(--accent-color) !important; animation: pop 0.2s; }
+.scoreboard { 
+  margin: 48px auto 0 auto; display: flex; flex-wrap: wrap; 
+  justify-content: center; gap: 28px; max-width: 1200px; 
+}
+.team-card {
+  background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 15px var(--shadow-color);
+  padding: 10px 25px 25px 25px; min-width: 190px; max-width: 210px; flex: 0 0 auto;
+  position: relative; margin-bottom: 18px; cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.1s; user-select: none; box-sizing: border-box;
+  border-top: 4px solid var(--secondary-color);
+}
+.team-card:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); }
+.team-card:active { transform: scale(0.98); }
+.team-name {
+    font-size: 18px; margin-bottom: 8px; font-weight: normal; color: var(--text-color);
+    padding: 2px 8px; border-radius: 6px; max-width: calc(100% - 16px);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; 
+}
+.team-controls { display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 10px; }
+.team-number { font-size: 40px; margin: 0; text-align: center; transition: color 0.2s, transform 0.2s; color: var(--text-color); }
+.team-change {
+    font-size: 24px; color: var(--secondary-color); position: absolute; left: 50%;
+    top: 10px; transform: translateX(-50%); opacity: 0;
+    transition: opacity 0.4s, top 0.4s; pointer-events: none;
+}
+.team-minus-btn {
+    position: absolute; left: 0; bottom: 0; z-index: 2; width: 38px; height: 38px;
+    background: rgba(0, 0, 0, 0.05); color: var(--text-color); border: none;
+    border-radius: 0 0 0 16px; font-size: 26px; font-weight: bold; display: flex;
+    align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s, color 0.2s;
+}
+.team-minus-btn:hover { background: rgba(0, 0, 0, 0.1); color: var(--accent-color); }
+.team-increase, .team-decrease { animation: pop 0.2s; }
+.team-card:nth-child(10n+1){--card-accent:#1561ad;background-color:rgba(21,97,173,0.1);}
+.team-card:nth-child(10n+2){--card-accent:#2ecc71;background-color:rgba(46,204,113,0.1);}
+.team-card:nth-child(10n+3){--card-accent:#e74c3c;background-color:rgba(231,76,60,0.1);}
+.team-card:nth-child(10n+4){--card-accent:#f39c12;background-color:rgba(243,156,18,0.1);}
+.team-card:nth-child(10n+5){--card-accent:#9b59b6;background-color:rgba(155,89,182,0.1);}
+.team-card:nth-child(10n+6){--card-accent:#12343b;background-color:rgba(18,52,59,0.1);}
+.team-card:nth-child(10n+7){--card-accent:#c7af6b;background-color:rgba(199,175,107,0.1);}
+.team-card:nth-child(10n+8){--card-accent:#3d7c47;background-color:rgba(61,124,71,0.1);}
+.team-card:nth-child(10n+9){--card-accent:#431c5d;background-color:rgba(67,28,93,0.1);}
+.team-card:nth-child(10n+10){--card-accent:#eb1736;background-color:rgba(235,23,54,0.1);}
+#conversion-rule { display: inline-block; font-size: 14px; font-weight: 500; color: #555; background-color: rgba(0, 0, 0, 0.05); padding: 4px 10px; border-radius: 12px; margin-left: 10px; vertical-align: middle; }
+@keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@media (max-width: 700px) { .scoreboard { max-width: 400px; justify-content: center; gap: 18px; } .team-card { min-width: 120px; max-width: 150px; padding: 18px 10px 14px 10px; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-background { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 2000; justify-content: center; align-items: center; animation: fadeIn 0.3s; }
+.modal-box { background: var(--card-bg); border-radius: 16px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); width: 500px; box-sizing: border-box; max-height: 85vh; display: flex; flex-direction: column; }
+.modal-box h3 { margin: 0; padding: 20px 30px; border-bottom: 1px solid #eee; font-size: 18px; flex-shrink: 0; }
+.modal-content { padding: 20px 30px; overflow-y: auto; flex-grow: 1; }
+.modal-box label { display: block; margin-bottom: 10px; color: var(--text-color); }
+.modal-buttons { display: flex; justify-content: flex-end; gap: 15px; padding: 20px 30px; border-top: 1px solid #eee; flex-shrink: 0; }
+.modal-buttons button { padding: 10px 25px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; transition: background-color .2s; }
+.modal-buttons button#save-management-btn, .modal-buttons button:not(.cancel) { background-color: var(--primary-color); color: white; }
+.modal-buttons button#save-management-btn:hover, .modal-buttons button:not(.cancel):hover { background-color: var(--primary-dark); }
+.modal-buttons button.cancel { background-color: #f0f0f0; color: #333; }
+.modal-buttons button.cancel:hover { background-color: #e0e0e0; }
+.management-box { text-align: left; }
+.management-section { margin-bottom: 25px; } .management-section:last-child { margin-bottom: 0; }
+.management-section h4 { margin: 0 0 10px 0; font-size: 16px; color: var(--text-color); }
+#manage-main-score { width: 100%; box-sizing: border-box; font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
+#team-management-list .team-manage-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.manage-input { font-size: 16px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+.manage-input:focus { border-color: var(--primary-color); outline: none; }
+#team-management-list .manage-name { flex-grow: 1; }
+#team-management-list .manage-score { width: 80px; text-align: center; }
+#team-management-list .delete-team-btn { background: #fce8e6; color: var(--accent-color); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 18px; cursor: pointer; line-height: 32px; flex-shrink: 0; }
+.add-team-btn { width: 100%; padding: 10px; margin-top: 10px; background: #e8f5e9; color: var(--secondary-dark); border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 500; }
+.fullscreen-view { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--light-bg); z-index: 3000; flex-direction: column; }
+.goal-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: var(--card-bg); border-bottom: 1px solid #ddd; flex-shrink: 0; }
+.goal-header h2 { margin: 0; }
+.close-btn { padding: 10px 25px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; background-color: var(--primary-color); color: white; }
+.goal-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; padding: 30px; overflow-y: auto; flex-grow: 1; }
+.goal-column { background-color: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: 0 2px 10px var(--shadow-color); }
+.goal-column h3 { margin-top: 0; }
+.goal-list { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+.goal-list-header { display: grid; grid-template-columns: 60px 1fr 40px; gap: 10px; font-size: 14px; color: #555; font-weight: 500; padding: 0 10px; }
+.goal-row { display: grid; grid-template-columns: 60px 1fr 40px; gap: 10px; align-items: center; background: #f9f9f9; padding: 10px; border-radius: 8px; }
+.goal-row input { font-size: 15px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
+.delete-row-btn { background: #fce8e6; color: var(--accent-color); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 18px; cursor: pointer; }
+.add-row-btn { width: 100%; padding: 12px; margin-top: 20px; background: #e8f5e9; color: var(--secondary-dark); border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; }
+.goal-alert { position: fixed; top: -150px; left: 50%; transform: translateX(-50%); background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 9999; transition: top 0.5s ease-in-out; }
+.goal-alert.show { top: 30px; }
+.goal-alert-content { display: flex; align-items: center; }
+.goal-alert-icon { font-size: 32px; margin-right: 20px; animation: tada 1s; }
+.goal-alert-message { font-size: 18px; font-weight: 500; margin: 0; }
+@keyframes tada { from{transform:scale3d(1,1,1)} 10%,20%{transform:scale3d(.9,.9,.9) rotate3d(0,0,1,-3deg)} 30%,50%,70%,90%{transform:scale3d(1.1,1.1,1.1) rotate3d(0,0,1,3deg)} 40%,60%,80%{transform:scale3d(1.1,1.1,1.1) rotate3d(0,0,1,-3deg)} to{transform:scale3d(1,1,1)} }
+
+/* --- style.css 맨 아래에 추가 (크기 매칭 및 레이아웃 수정) --- */
+
+/* 1. 기본 설정 */
+body {
+    overflow-x: hidden;
+    width: 100vw;
+}
+
+#display-area {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 20px;
+    position: relative;
+    padding-bottom: 20px;
+}
+
+/* [1행] 상단 영역 (높이는 내부 콘텐츠인 학급 점수판에 의해 결정됨) */
+#top-row {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    /* min-height 제거: 학급 점수판 크기에 딱 맞춤 */
+    transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* 학급 점수판 영역 */
+#class-area {
+    width: 100%;
+    max-width: 600px;
+    transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+    z-index: 10;
+    /* 점수판 높이가 유지되도록 설정 */
+    display: flex; 
+    flex-direction: column;
+}
+
+/* 목표 달성판 (학급 점수판과 동일한 높이 적용) */
+#goal-panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0; /* 위아래 꽉 채우기 */
+    
+    width: 48%; 
+    height: 100%; /* 부모(#top-row) 높이인 학급 점수판 높이와 동일 */
+    
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border: 1px solid #eee;
+    
+    /* 패딩을 줄여서 더 컴팩트하게 */
+    padding: 15px;
+    
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    
+    opacity: 0;
+    transform: translateX(120%);
+    transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* [2행] 하단 영역 (모둠 점수판) */
+#bottom-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: margin-top 0.6s;
+}
+
+
+/* === 활성화 상태 (목표 달성 시) === */
+
+/* 상단 영역: 내용을 왼쪽 정렬 */
+body.goal-active #top-row {
+    justify-content: flex-start; 
+}
+
+/* 학급 점수판: 너비를 절반으로 줄임 */
+body.goal-active #class-area {
+    width: 49%; /* 여백 고려하여 절반 */
+    max-width: none; 
+    margin-right: auto;
+}
+
+/* 목표 달성판: 등장 */
+body.goal-active #goal-panel {
+    opacity: 1;
+    transform: translateX(0);
+    right: 0;
+    pointer-events: auto;
+    width: 49%; /* 학급 점수판과 대칭 */
+}
+
+/* 목표 달성판 내부 폰트 크기 조정 (너무 크지 않게) */
+.goal-content .goal-icon {
+    font-size: 60px; /* 기존 80px -> 60px 축소 */
+    margin-bottom: 10px;
+}
+#goal-panel-message {
+    font-size: 1.8em; /* 글자 크기 약간 축소 */
+}
+
+
+/* 모바일/작은 화면 대응 */
+@media (max-width: 800px) {
+    body.goal-active #top-row {
+        flex-direction: column;
+        align-items: center;
+    }
+    body.goal-active #class-area {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    body.goal-active #goal-panel {
+        position: relative;
+        width: 100%;
+        height: auto; /* 모바일에서는 내용에 맞게 높이 조절 */
+        transform: none;
+        opacity: 1;
+    }
+}
+
+
+
+/* 통합 점수판 */
+:root {
+  --text-color:#142e3d;
+  --muted-text:#45616d;
+  --light-bg:#f7fbfb;
+  --card-bg:#fff;
+  --summary-bg:#e6f2f5;
+  --control-bg:#edf4f6;
+  --panel-line:#cadce0;
+  --primary-color:#125771;
+  --primary-dark:#0e455a;
+  --score-gold:#f3c13e;
+  --score-gold-edge:#b77e13;
+}
+html, body {width:100%;max-width:100%;overflow-x:hidden}
+body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
+.container {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  width:100%;
+  min-height:0;
+  max-width:none;
+  padding:0 0 var(--toolbar-clearance, 0px);
+}
+#display-area {flex:1;min-height:0;gap:0;max-width:none;padding-bottom:0}
+#top-row, #bottom-row, #class-area {min-width:0;max-width:100%}
+#top-row {flex:none}
+#class-area {max-width:none;transition:none}
+.main-scoreboard {
+  box-sizing:border-box;
+  container-type:inline-size;
+  width:100%;
+  max-width:none;
+  margin:0;
+  padding:clamp(6px, 1.4dvh, 14px) clamp(3px, 4vw, 24px) clamp(8px, 1.8dvh, 16px);
+  border:0;
+  border-bottom:1px solid var(--panel-line);
+  border-radius:0;
+  background:var(--summary-bg);
+  box-shadow:none;
+}
+.class-heading, .team-heading {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.class-heading {gap:min(8px, 4cqw)}
+.class-heading h1 {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.class-heading h1, .team-heading h2 {
+  margin:0;
+  color:var(--text-color);
+  font-size:clamp(13px, 5vw, 17px);
+  font-weight:700;
+  text-align:left;
+  text-shadow:none;
+  overflow-wrap:anywhere;
+}
+#settings-toggle-btn, #score-maximize, .main-btn {
+  min-width:0;
+  width:min(44px, 24cqw);
+  min-height:36px;
+  padding:0;
+  color:var(--text-color);
+  background:var(--card-bg);
+  border:1px solid var(--panel-line);
+  border-radius:10px;
+  cursor:pointer;
+}
+#settings-toggle-btn, #score-maximize {flex:none;width:min(44px, 24cqw);min-height:36px;font-size:clamp(12px, 12cqw, 21px);line-height:1}
+.main-controls {gap:min(12px, 3cqw);margin:clamp(4px, 1dvh, 10px) 0 0;min-width:0}
+.main-btn {flex:0 0 auto;font-size:clamp(13px, 8cqw, 23px)}
+#number {
+  min-width:0;
+  margin:0;
+  color:var(--text-color);
+  font-size:var(--class-score-size, 76px);
+  font-weight:750;
+  line-height:1;
+  letter-spacing:-.04em;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+#change {font-size:clamp(13px, 5cqw, 23px)}
+.score-progress-group {width:min(100%, 360px);margin:clamp(8px, 2.2dvh, 17px) auto 0}
+.conversion-line {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  gap:3px 8px;
+  margin-top:5px;
+  color:var(--muted-text);
+  font-size:12px;
+  text-align:left;
+  font-variant-numeric:tabular-nums;
+}
+.conversion-line > * {min-width:0;overflow-wrap:anywhere}
+#score-progress {
+  position:relative;
+  overflow:hidden;
+  height:clamp(4px, 5cqw, 10px);
+  border-radius:6px;
+  background:#dce7ed;
+}
+.score-progress-fill {
+  width:100%;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg, #e9a822, var(--score-gold) 76%, #ffdc6a);
+  transform:scaleX(var(--filled, 0));
+  transform-origin:left;
+}
+#score-progress:not([data-continuous])::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:repeating-linear-gradient(to bottom, transparent 0 2px, #fff 2px 4px);
+  mask-image:repeating-linear-gradient(to right, transparent 0 max(0%, calc(var(--division, 33.333%) - 1px)), #000 max(0%, calc(var(--division, 33.333%) - 1px)) var(--division, 33.333%));
+}
+#conversion-rule {margin:0;padding:0;background:none;color:inherit;font:inherit}
+#bottom-row {
+  flex:1;
+  min-height:0;
+  width:100%;
+  align-items:stretch;
+  gap:10px;
+  padding:16px clamp(4px, 3vw, 18px) 18px;
+}
+#selected-team-count {color:var(--muted-text);font-size:12px;text-align:right}
+#team-viewport {
+  flex:1;
+  min-height:0;
+  min-width:0;
+  overflow:auto;
+  scrollbar-width:thin;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable both-edges;
+}
+.scoreboard {
+  width:max-content;
+  max-width:none;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(var(--team-columns, 1), var(--team-card-width, 96px));
+  gap:var(--team-gap, 8px);
+}
+.team-card {
+  container-type:size;
+  display:grid;
+  grid-template-rows:minmax(0, 1fr) auto;
+  min-height:0;
+  position:relative;
+  width:100%;
+  min-width:0;
+  max-width:none;
+  aspect-ratio:var(--score-card-ratio, 4 / 3);
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:12px;
+  background-color:color-mix(in srgb, var(--card-accent, var(--primary-color)) 12%, var(--card-bg));
+  box-shadow:inset 0 3px color-mix(in srgb, var(--card-accent, var(--primary-color)) 65%, var(--card-bg)), inset 0 0 0 1px var(--panel-line);
+  cursor:default;
+}
+.team-card:hover {box-shadow:inset 0 3px var(--card-accent, var(--primary-color)), inset 0 0 0 1px var(--panel-line)}
+.team-card:active {transform:none}
+.team-card.team-selected {
+  background-image:linear-gradient(color-mix(in srgb, var(--score-gold) 28%, transparent), color-mix(in srgb, var(--score-gold) 28%, transparent));
+  box-shadow:inset 0 0 0 3px var(--score-gold-edge);
+}
+.team-select-btn {
+  display:grid;
+  grid-template-rows:auto minmax(0, 1fr);
+  gap:min(4px, 3cqh);
+  min-width:0;
+  padding:min(10px, 7cqh) min(8px, 10cqw) 0;
+  border:0;
+  border-radius:inherit;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+.team-select-btn:focus-visible {outline:2px solid var(--primary-dark);outline-offset:-5px}
+.team-name {
+  min-width:0;
+  max-width:100%;
+  margin:0;
+  padding:0;
+  font-size:clamp(9px, 15cqh, 15px);
+  font-weight:650;
+  line-height:1.2;
+}
+.team-controls {margin:0;min-width:0;min-height:0}
+.team-number {
+  min-width:0;
+  font-size:min(var(--team-score-max, 32px), 41cqh, max(10px, calc(25cqw * var(--score-scale, 1))));
+  font-weight:700;
+  line-height:1.05;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.team-number[data-long-score] {font-size:min(var(--team-score-max, 32px), 41cqh, 24cqw)}
+.team-change {font-size:min(20px, 17cqw)}
+.team-steps {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));padding:0 3px 3px}
+.team-steps button {
+  display:grid;
+  place-items:center;
+  position:static;
+  width:100%;
+  min-width:0;
+  min-height:min(44px, 38cqh);
+  padding:0;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--text-color);
+  font:inherit;
+  font-size:min(23px, 33cqh);
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+}
+.team-steps .team-plus-btn {color:var(--primary-dark)}
+.team-steps button:hover {background:color-mix(in srgb, var(--card-bg) 52%, transparent)}
+[hidden] {display:none !important}
+#batch-score {
+  display:grid;
+  grid-template-columns:60px minmax(0, 1fr) 60px 89px 60px;
+  grid-template-areas:"select . undo amount apply";
+  align-items:center;
+  gap:4px;
+  flex:none;
+  position:relative;
+  z-index:5;
+  margin:0;
+  padding:10px clamp(4px, 3vw, 18px);
+  border-top:1px solid var(--panel-line);
+  background:var(--card-bg);
+}
+#select-all-teams {grid-area:select}
+#undo-score {grid-area:undo}
+.batch-amount {grid-area:amount}
+#apply-batch {grid-area:apply}
+#batch-score button {
+  min-height:42px;
+  padding:0 6px;
+  border:0;
+  border-radius:8px;
+  background:var(--control-bg);
+  color:var(--text-color);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+#batch-score #select-all-teams, #batch-score #undo-score, #batch-score #apply-batch {
+  width:100%;
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+#batch-score #apply-batch {background:var(--primary-color);color:#fff}
+#batch-score button:disabled {opacity:.55;cursor:default}
+.batch-amount {display:flex;min-width:0;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
+#batch-delta {
+  flex:1;
+  width:0;
+  min-width:0;
+  padding:2px;
+  border:0;
+  border-radius:8px;
+  appearance:textfield;
+  text-align:center;
+  font:inherit;
+}
+#batch-delta::-webkit-inner-spin-button, #batch-delta::-webkit-outer-spin-button {appearance:none;margin:0}
+.batch-stepper {display:grid;border-left:1px solid var(--panel-line)}
+#batch-score .batch-stepper button {min-height:21px;width:26px;padding:0;border-radius:0}
+#batch-score .batch-stepper button + button {border-top:1px solid var(--panel-line)}
+#score-link-points, #score-fixed-columns {width:min(76px, 100%);font:inherit}
+.settings-panel {
+  display:grid;
+  position:fixed;
+  top:52px;
+  right:min(8px, 3vw);
+  z-index:10;
+  width:min(290px, calc(100% - 2 * min(8px, 3vw)));
+  max-height:max(0px, calc(100dvh - 60px - var(--toolbar-clearance, 0px)));
+  padding:clamp(5px, 4vw, 12px);
+  gap:9px;
+  overflow:auto;
+  overflow-wrap:anywhere;
+  background:var(--card-bg);
+  border:1px solid var(--panel-line);
+  border-radius:14px;
+  box-shadow:0 8px 22px var(--shadow-color);
+}
+.settings-panel:not(.open) {display:none}
+.settings-panel h3 {margin:0;padding:0;text-align:left;border:0;font-size:16px}
+.score-settings-section {display:grid;min-width:0;gap:8px;padding-top:10px;border-top:1px solid var(--panel-line)}
+.score-settings-section h4 {margin:0;font-size:13px;color:var(--muted-text)}
+.score-setting-row {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;font-size:13px}
+.score-setting-row select {max-width:100%;min-width:0;font:inherit}
+.score-setting-row input[type="checkbox"] {width:18px;height:18px;margin:0;accent-color:var(--score-gold-edge)}
+.score-link-rule {justify-content:flex-start;gap:4px}
+.score-size-controls, .score-settings-actions, .score-management-reset {display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.score-size-controls {text-align:center}
+.score-settings-actions > button {flex:1}
+.score-size-controls output {min-width:4ch;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.settings-panel .score-size-controls > button, .settings-panel .score-settings-actions > button,
+.score-management-reset button {
+  width:auto;
+  max-width:100%;
+  min-height:32px;
+  padding:4px 7px;
+  background:var(--control-bg);
+  color:var(--text-color);
+  border:1px solid var(--panel-line);
+  border-radius:6px;
+  font-size:13px;
+  cursor:pointer;
+}
+.settings-panel .score-size-controls > button:hover, .settings-panel .score-settings-actions > button:hover,
+.score-management-reset button:hover {background:var(--summary-bg)}
+.score-management-reset {margin-top:16px;gap:6px}
+#management-modal .management-content {width:min(600px, 100%);min-height:0;margin:0 auto;padding:12px;overflow:auto}
+.goal-header {gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--summary-bg);border-color:var(--panel-line)}
+.goal-header h2, .management-content h3, .goal-column h3 {margin:0;font-size:16px}
+.goal-header .close-btn, .management-footer button {font:inherit;min-height:36px;padding:5px 9px;border-radius:9px;cursor:pointer}
+.management-footer {margin-top:14px;text-align:right}
+.management-footer button {background:var(--control-bg);color:inherit;border:1px solid var(--panel-line)}
+#manage-main-score, .manage-input, .goal-row input, .score-setting-row select, #score-link-points, #score-fixed-columns {
+  border:1px solid var(--panel-line);
+  border-radius:8px;
+  background:var(--light-bg);
+  color:var(--text-color);
+}
+#team-management-list .team-manage-item {gap:4px;margin:7px 0;flex-wrap:wrap}
+#team-management-list .manage-name {flex:1 1 65px;min-width:0}
+#team-management-list .manage-score {width:min(69px, 100%)}
+#team-management-list .delete-team-btn {width:auto;padding:0 6px;border-radius:8px;font-size:12px}
+.goal-container {grid-template-columns:repeat(auto-fit,minmax(min(100%, 190px),1fr));gap:8px;padding:10px}
+.goal-column {min-width:0;padding:10px;border:1px solid var(--panel-line);box-shadow:none}
+.goal-list-header, .goal-row {grid-template-columns:minmax(34px, .65fr) minmax(0,1.35fr) auto;gap:4px;padding:4px}
+.goal-list-header {font-size:12px;overflow-wrap:anywhere}
+.goal-row input {min-width:0;font-size:12px;padding:5px}
+.add-row-btn {margin-top:8px;background:var(--control-bg);color:var(--text-color)}
+@media (pointer:coarse) {
+  #settings-toggle-btn, #score-maximize, .main-btn, #batch-score button {min-height:44px}
+  #batch-score .batch-stepper button {min-height:22px}
+}
+.modal-box {width:min(500px, calc(100vw - 16px));max-width:100%;max-height:calc(100dvh - var(--toolbar-clearance, 0px) - 8px)}
+.modal-content, .modal-box h3, .modal-buttons {padding:12px}
+.fullscreen-view {max-width:100vw;overflow-x:hidden;padding-bottom:var(--toolbar-clearance, 0px)}
+.management-content, .goal-container {max-width:100%!important}
+#goal-panel {max-width:100%}
+body.goal-active #top-row {flex-direction:column;align-items:stretch;gap:10px}
+body.goal-active #class-area {width:100%;max-width:100%;margin:0}
+body.goal-active #goal-panel {
+  position:relative;inset:auto;width:100%;height:auto;min-height:0;
+  max-height:min(200px, 25dvh);overflow:auto;
+  transform:none;opacity:1;pointer-events:auto;
+}
+.score-setting-hint {margin:0;font-size:12px;line-height:1.4;color:var(--muted-text)}
+
+button, .main-scoreboard, .team-card, #batch-score {
+  -webkit-user-select:none;
+  user-select:none;
+}
+#batch-delta {user-select:text;-webkit-user-select:text}
+.team-card {display:block}
+.team-select-btn {
+  position:absolute;
+  inset:0;
+  display:block;
+  width:100%;
+  height:100%;
+}
+.team-name {position:absolute;top:min(10px, 8cqh);left:min(8px, 10cqw);right:min(30px, 29cqw)}
+.team-controls {position:absolute;inset:0;pointer-events:none}
+.team-number {font-size:min(40px, 34cqh, 25cqw)}
+.team-number[data-long-score] {font-size:min(40px, 34cqh, 24cqw)}
+.team-steps {position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;padding:0;pointer-events:none}
+/* Keep the entire hit target below the centered score, including its pop effect. */
+.team-steps button {
+  width:min(46px, 31cqw);
+  height:min(44px, 25cqh);
+  min-height:0;
+  font-size:min(23px, 22cqh, 25cqw);
+  pointer-events:auto;
+}
+.team-remove {
+  position:absolute;
+  top:0;
+  right:0;
+  width:min(34px, 42cqw);
+  min-height:min(34px, 30cqh);
+  padding:0;
+  border:0;
+  border-radius:0 12px 0 8px;
+  background:transparent;
+  color:#a93327;
+  font-size:min(18px, 25cqh);
+  cursor:pointer;
+}
+.team-remove:hover {background:#a933271f}
+#batch-score #batch-reset {width:18px;min-height:0;padding:0;background:#fff;font-size:15px}
+@media(max-width:304px) {
+  #batch-score {
+    grid-template-columns:minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas:"select undo" "amount apply";
+  }
+  #batch-score #select-all-teams, #batch-score #undo-score {width:min(84px,100%)}
+  #undo-score {justify-self:end}
+}
+@media(max-width:150px) {
+  #batch-score {padding-inline:3px;gap:3px}
+  #batch-score button {font-size:clamp(9px, 10vw, 12px);padding-inline:0}
+  #batch-score #batch-reset {width:min(14px, 15vw)}
+  #batch-score .batch-stepper button {width:min(20px, 17vw)}
+}
+#score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
+
+.fullscreen-view > .dialog-sheet {width:min(700px,100%);padding:14px}
+.dialog-sheet .goal-header {position:static;border:0;background:transparent;padding:0 38px 4px 0}
+.dialog-sheet .goal-header h2 {font-size:1.2rem}
+.dialog-sheet :is(.management-content,.goal-container) {width:100%;overflow:visible;padding:0}
+.dialog-sheet .dialog-footer {margin-top:12px}
+#team-setup-modal .modal-box {padding:14px;width:min(360px,100%)}
+#team-setup-modal .modal-content {padding:6px 0 12px}
+#team-setup-modal .modal-footer {justify-content:flex-end}
+
+.score-conversion-star {
+  position:fixed;z-index:2147483647;pointer-events:none;
+  translate:-50% -50%;
+  color:#fdd835;font-size:clamp(20px, 7vw, 32px);line-height:1;
+  text-shadow:0 1px 2px #68440c, 0 0 5px #68440c80;
+}
+.class-score-delta {
+  position:fixed;z-index:2147483647;pointer-events:none;translate:-50% -50%;
+  font-size:clamp(18px, 7vw, 32px);font-weight:700;white-space:nowrap;
+  text-shadow:0 1px 2px #fff;
+}
+.class-score-delta.gain {color:var(--secondary-color)}
+.class-score-delta.loss {color:var(--accent-color)}
+
+.settings-panel {--dialog-padding:clamp(5px, 4vw, 12px);--dialog-header:#e6f1f4;--dialog-border:#cbdce3;--dialog-text:#123447}
+.settings-panel .dialog-header {margin-bottom:0}
+.settings-panel .dialog-close,.score-delete-dialog .dialog-close {
+  position:absolute;right:var(--dialog-padding);top:50%;transform:translateY(-50%);
+  min-width:34px;min-height:34px;padding:0;line-height:1;font-size:20px;
+  background:white;color:#123447;border:1px solid #cbdce3;border-radius:8px;
+}
+.score-delete-dialog {
+  --dialog-padding:18px;--dialog-header:#e6f1f4;--dialog-border:#cbdce3;--dialog-text:#123447;
+  box-sizing:border-box;width:min(360px,calc(100% - 16px));border:1px solid var(--dialog-border);
+  border-radius:16px;padding:var(--dialog-padding);color:var(--dialog-text);box-shadow:0 16px 48px #12344733;
+}
+.score-delete-dialog::backdrop {background:#112a365c}
+.score-delete-dialog .dialog-action {
+  min-height:36px;padding:6px 10px;border:1px solid #cbdce3;border-radius:8px;
+  background:#edf5f7;color:#123447;
+}
+.score-delete-dialog .dialog-danger {background:#fbece9;color:#922c25;border-color:#ecc5be}
+.dialog-sheet .dialog-header {padding-right:52px}
+
+#team-setup-modal .modal-box, .fullscreen-view > .dialog-sheet {--dialog-padding:14px}
+
+#shared-score-banner { flex:none; padding: .45rem .7rem; background: #fff4d3; color: #533500; overflow-wrap: anywhere; }
+#shared-score-banner button { margin: .2rem 0; }
+#score-conflict-dialog { max-height: 80dvh; overflow: auto; }
+.score-conflict-field {margin:.5rem 0;padding:.6rem;border:1px solid #bfd4dd;border-radius:.55rem}
+.score-conflict-field legend {font-weight:700;color:#123447}
+#score-conflict-dialog .score-conflict-field button {
+  margin:.15rem;padding:.45rem .6rem;background:#edf5f7;color:#123c4b;border:1px solid #b9d1de;border-radius:8px;
+}
+#score-conflicts,#create-teams-btn {min-height:36px}
+
+.class-goal-heading, #class-goal-gifts, .goal-tabs {display:flex;align-items:baseline;gap:.35rem;min-width:0}
+.goal-tabs {flex-wrap:wrap;padding:.5rem}
+.team-goal-gifts {
+  position:absolute;z-index:2;left:50%;bottom:0;transform:translateX(-50%);max-width:36%;
+}
+#class-goal-gifts button {
+  padding:.15em .25em;color:#174866;background:#ecf7ff;border:1px solid #afccdf;
+  border-radius:.35rem;font-size:clamp(.65rem,8cqw,1rem);white-space:nowrap;
+}
+#class-goal-gifts button {background:#fff0c3;border-color:#d8af56}
+#goal-settings {min-height:0;overflow:auto;padding:.5rem}
+#goal-settings > .dialog-footer {position:sticky;bottom:-.5rem;background:#f7fbfd;padding:.45rem 0}
+#goal-edit-error {color:#9d3027}
+#score-volume {width:min(8rem,45%);}
+#score-unlock-audio {align-self:flex-end}
+
+body.score-modal-open {background:transparent}
+body.score-modal-open .container {visibility:hidden}
+#goal-management-view,#management-modal {background:#142a4180;align-items:center;justify-content:center;padding:12px}
+#goal-management-view > .dialog-sheet {display:flex;flex-direction:column;background:#f7fbfd;width:min(1040px,100%);max-height:94dvh;overflow:hidden}
+#goal-management-view .goal-container {grid-template-columns:minmax(0,1fr);gap:1rem}
+#goal-management-view .goal-column {padding:0;border-radius:10px}
+#goal-management-view .goal-column h3 {padding:.65rem .85rem;background:#f2f7fa;border-radius:9px 9px 0 0}
+#goal-management-view .add-row-btn {width:auto;margin:.45rem .7rem .7rem;padding:.4rem .7rem}
+.goal-edit-row {display:block;padding:0;background:white;border-radius:0}
+.goal-fields {
+  display:grid;align-items:center;gap:.45rem;grid-template-columns:6rem minmax(0,1fr) 5.5rem 8.25rem 2.25rem;
+  padding:.4rem .7rem;
+}
+.goal-list-head {background:#f7fbfd;color:#254b60;font-weight:650;font-size:.85rem}
+.goal-field {min-width:0}
+.goal-field span,.goal-auto span {display:none}
+.goal-fields .goal-field input {height:36px;width:100%;min-width:0;padding:0 .45rem;font-size:inherit}
+.goal-auto {display:flex;align-items:center;justify-content:center;gap:.3rem;white-space:nowrap}
+.goal-edit-row input[type=checkbox],#goal-include-existing {
+  appearance:auto;width:1rem;height:1rem;margin:0;flex:none;accent-color:#18536e;
+}
+#goal-management-view .goal-status {
+  display:flex;align-items:center;justify-content:space-between;gap:.3rem;padding:.25rem .5rem;
+  font-size:.86rem;line-height:1.15;text-align:left;
+}
+.goal-status::after {content:'';width:.4rem;height:.4rem;flex:none;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.goal-status[aria-expanded=true]::after {transform:rotate(225deg)}
+#goal-management-view .goal-remove {padding:0;font-size:1.25rem}
+.goal-progress {padding:.5rem .7rem;background:#f8fbfc;border-bottom:1px solid var(--panel-line)}
+.goal-team-list {display:flex;flex-wrap:wrap;gap:.4rem}
+.goal-team-progress {
+  display:inline-flex;align-items:center;gap:.4rem;box-sizing:border-box;max-width:100%;
+  padding:.25rem .45rem;border:1px solid var(--panel-line);border-radius:9px;background:white;
+}
+.goal-team-progress strong {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.875rem}
+.goal-team-progress .goal-status {min-width:4.8rem;white-space:nowrap}
+.goal-team-progress[data-done] {background:#e8f3e4;color:#294c26}
+#goal-management-view .goal-status[data-status=done] {background:#e8f3e4;border-color:#c9dfc3}
+.goal-status[data-status=done]::after {display:none}
+.goal-cancel-text {display:none}
+.goal-status[data-status=done]:is(:focus-visible,[data-confirm-cancel]) .goal-status-text {display:none}
+.goal-status[data-status=done]:is(:focus-visible,[data-confirm-cancel]) .goal-cancel-text {display:inline}
+@media (hover:hover) {
+  .goal-status[data-status=done]:hover .goal-status-text {display:none}
+  .goal-status[data-status=done]:hover .goal-cancel-text {display:inline}
+}
+.goal-status-menu {
+  position:fixed;inset:auto;margin:0;padding:.35rem;border:1px solid var(--panel-line);border-radius:10px;
+  background:#f6fbfd;box-shadow:0 5px 16px #19394d30;color:var(--text-color);max-width:calc(100vw - 16px);
+}
+.goal-status-menu:popover-open {display:grid;gap:.3rem}
+#goal-management-view .goal-status-menu button {text-align:left;font-size:.86rem}
+#management-modal > .dialog-sheet {width:min(740px,100%);max-height:94dvh}
+.score-header-actions {display:flex;flex:none;gap:min(6px,2cqw)}
+#score-maximize {display:grid;place-items:center}
+.score-screen-icon {
+  display:block;width:1em;height:1em;font-size:clamp(11px,7cqw,19px);
+  background:
+    linear-gradient(currentColor,currentColor) left top / .38em 2px,
+    linear-gradient(currentColor,currentColor) left top / 2px .38em,
+    linear-gradient(currentColor,currentColor) right top / .38em 2px,
+    linear-gradient(currentColor,currentColor) right top / 2px .38em,
+    linear-gradient(currentColor,currentColor) left bottom / .38em 2px,
+    linear-gradient(currentColor,currentColor) left bottom / 2px .38em,
+    linear-gradient(currentColor,currentColor) right bottom / .38em 2px,
+    linear-gradient(currentColor,currentColor) right bottom / 2px .38em;
+  background-repeat:no-repeat;
+}
+#score-maximize[aria-pressed=true] .score-screen-icon {
+  background-position:28% 28%,28% 28%,72% 28%,72% 28%,28% 72%,28% 72%,72% 72%,72% 72%;
+  background-size:.28em 2px,2px .28em,.28em 2px,2px .28em,.28em 2px,2px .28em,.28em 2px,2px .28em;
+}
+.score-secondary {
+  padding:.35rem .65rem;border:1px solid var(--panel-line);border-radius:8px;
+  background:#edf5f7;color:var(--text-color);font:inherit;line-height:1.2;cursor:pointer;
+}
+.score-secondary:hover {background:#dcecf1}
+@media (max-width:650px) {
+  .goal-list-head {display:none}
+  .goal-fields {grid-template-columns:4.8rem minmax(0,1fr) 2.25rem}
+  .goal-field span,.goal-auto span {display:inline;font-size:.75rem}
+  .goal-field:first-child {grid-area:1 / 1}
+  .goal-field:nth-child(2) {grid-area:1 / 2 / 2 / 4}
+  .goal-auto {grid-area:2 / 1;justify-content:flex-start}
+  .goal-status {grid-area:2 / 2}
+  .goal-remove {grid-area:2 / 3}
+}
+
+.team-goal-gifts button {
+  display:inline-flex;align-items:center;gap:.15em;min-height:22px;padding:2px;
+  border:0;background:transparent;color:#216a91;font:inherit;
+  font-size:clamp(.65rem,9cqw,1.05rem);line-height:1;white-space:nowrap;cursor:pointer;
+}
+
+#score-sound-targets:not([hidden]){display:grid;gap:4px;max-height:155px;overflow-y:auto;padding:4px 0}
+#score-sound-targets .score-setting-row{gap:8px;justify-content:flex-start}
