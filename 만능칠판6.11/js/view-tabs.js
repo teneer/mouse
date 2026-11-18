@@ -26,7 +26,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   const prefix='whiteboard.view-tab:'+new URL('.',location.href).pathname+':';
   const localKey=prefix+sync.id,namePrefix='whiteboard.tab-name:'+new URL('.',location.href).pathname+':';
   const instance=uid();let members=[],scope=null,unsubscribe=null,present=true,selected=new Set(),channel;
-  let sending=false;
+  let sending=false, nameEditor;
   function savedName(id) {try{return localStorage.getItem(namePrefix+id)||''}catch{return ''}}
   function displayName(row, defaultName) {
     return (cloud.options?cloud.projected().tabNames?.[row.id]:null)||savedName(row.id)||row.tabName||defaultName;
@@ -47,6 +47,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   function position(){if(root.style.display!=='block')return;const edge=toolbar.getBoundingClientRect().top-8,r=opener.getBoundingClientRect();root.style.top='auto';root.style.bottom=(innerHeight-edge)+'px';root.style.maxHeight=Math.max(0,edge-8)+'px';root.style.left=Math.max(8,Math.min(innerWidth-root.offsetWidth-8,r.left+(r.width-root.offsetWidth)/2))+'px';}
   function render(){
     if(root.style.display!=='block')return;
+    if(nameEditor && document.activeElement===nameEditor){position();return;}
     const focus=document.activeElement?.dataset.viewTab;
     const rows=available();
     const names=defaultTabNames(rows);
@@ -58,23 +59,50 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       const label=document.createElement('label'),input=document.createElement('input');
       input.type='checkbox';input.checked=selected.has(row.id);input.dataset.viewTab=row.id;
       input.onchange=()=>{if(input.checked)selected.add(row.id);else selected.delete(row.id);sendButton.disabled=sending||!selected.size;};
-      label.append(input,document.createTextNode((row.label||'이 기기')+' · '+name+(row.id===sync.id?' (이 탭)':'')));
+      const deviceName=row.label||'이 기기';
+      input.setAttribute('aria-label',deviceName+' · '+name);
+      const deviceText=document.createElement('span');
+      deviceText.textContent=deviceName+' ·';
+      label.append(input,deviceText);
+      const details=document.createElement('div');
+      details.className='view-tab-details';
+      const nameText=document.createElement('span');
+      nameText.className='view-tab-name';
+      nameText.textContent=name;
+      details.append(label,nameText);
+      if(row.id===sync.id)details.append(document.createTextNode(' (이 탭)'));
+
       const edit=document.createElement('button');
       edit.type='button';edit.className='view-tab-rename';edit.textContent='✎';
       edit.title='탭 이름 변경';edit.setAttribute('aria-label',name+' 이름 변경');
       edit.onclick=()=>{
+        if(details.querySelector('.view-tab-name-input'))return;
         const field=document.createElement('input');
         field.type='text';field.maxLength=40;field.value=name;
-        field.setAttribute('aria-label','새 탭 이름');field.className='view-tab-name-input';
-        line.replaceChild(field,edit);field.focus();field.select();
-        let cancelled=false;
+        field.setAttribute('aria-label','탭 이름 변경');field.className='view-tab-name-input';
+        nameEditor=field;
+        nameText.replaceWith(field);
+        field.focus();
+        field.select();
         field.onkeydown=event=>{
-          if(event.key==='Enter')field.blur();
-          else if(event.key==='Escape'){cancelled=true;render();}
+          if(event.isComposing || event.keyCode===229)return;
+          if(event.key==='Enter'){event.preventDefault();field.blur();}
+          else if(event.key==='Escape'){
+            event.preventDefault();
+            event.stopPropagation();
+            field.onblur=null;
+            nameEditor=undefined;
+            field.replaceWith(nameText);
+            edit.focus();
+          }
         };
-        field.onblur=()=>{if(cancelled)return;renameTab(row,field.value).catch(fail);};
+        field.onblur=()=>{
+          if(nameEditor===field)nameEditor=undefined;
+          field.replaceWith(nameText);
+          if(field.value.trim()!==name)renameTab(row,field.value).catch(fail);
+        };
       };
-      line.append(label,edit);
+      line.append(details,edit);
       if(focus===row.id)input.focus({preventScroll:true});
       return line;
     }));
