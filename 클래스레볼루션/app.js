@@ -1,9 +1,9 @@
 import { openDatabase, getRecord, putRecord, exportAll, importAll, requestResult, transact } from './core/db.js';
 import { createEventBus } from './core/events.js';
-import { mountGlobalFeedback } from './core/feedback.js?v=reference-20261117';
-import { mountScoreboard } from './modules/scoreboard.js?v=rail-utilities';
-import { mountGrowth } from './modules/growth.js?v=reference-20261117';
-import { mountChecklist } from './modules/checklist.js?v=reference-20261117';
+import { mountGlobalFeedback } from './core/feedback.js?v=golden-eggs';
+import { mountScoreboard } from './modules/scoreboard.js?v=golden-eggs';
+import { mountGrowth } from './modules/growth.js?v=golden-eggs';
+import { mountChecklist } from './modules/checklist.js?v=golden-eggs';
 
 const CLASS_ID = 'class-default';
 const MODE_KEY = 'class-revolution.active-mode.v1';
@@ -163,7 +163,7 @@ async function start() {
       growth.handleEvent(event);
       refreshAll().catch(function (error) { console.error(error); });
     }
-    if (event.type === 'score.changed') {
+    if (event.type === 'score.changed' || event.type === 'eggs.changed') {
       scoreboard.refresh();
       growth.handleEvent(event);
     }

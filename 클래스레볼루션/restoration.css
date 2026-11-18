@@ -158,15 +158,84 @@
 
 /* Named original sprite cutouts for the result stage. */
 .score-feedback-detail { background:#4fc6e7; padding:7vh 20px 0; grid-template-rows:auto minmax(0,1fr) auto; border-radius:12px 0 6px 6px; }
-.score-feedback-detail::before { background-size:100% 100%; opacity:1; }
+.score-feedback-detail.positive {
+  animation:detail-in .22s ease-out, score-sky-brighten 1.8s ease-out both;
+}
+.score-feedback-detail::before {
+  inset:0 0 auto;
+  height:200%;
+  background-size:100% 100%;
+  opacity:1;
+  animation:score-cloud-descent .85s cubic-bezier(.5,.05,.25,1) both;
+}
+@keyframes score-cloud-descent {
+  from { transform:translateY(-30%); }
+  to { transform:translateY(0); }
+}
+@keyframes score-sky-brighten {
+  from { background-color:#40535c; }
+  to { background-color:#4fc6e7; }
+}
 .score-feedback-heading { gap:10px; }
 .score-feedback-heading > strong { font-size:clamp(19px,2.6vw,34px); color:white; font-weight:500; }
 .score-feedback-heading .score-feedback-badge { width:82px; height:82px; border-radius:0; background:url('assets/visuals/sp_effect_wow.png') -137.5px 0 / 310px 237.5px no-repeat; box-shadow:none; font-size:0; }
 .score-feedback-heading .score-feedback-badge::after { content:""; width:36px; height:36px; background:url('assets/visuals/sp_effect_wow.png') -263px -25px / 334.8px 256.5px no-repeat; }
 .score-wings { width:150px; height:73px; top:8px; background:url('assets/visuals/sp_effect_wow.png') 0 0 / 344.4px 263.9px no-repeat; }
-.score-feedback-detail.negative { background:#383a46; }
-.score-feedback-detail.negative::before { background-image:url('assets/visuals/bg-effect-wow-cloud.png'); filter:brightness(.22); opacity:.8; }
-.score-feedback-detail.negative::after { content:""; position:absolute; top:-90px; left:50%; transform:translateX(-50%); width:510px; height:300px; z-index:-1; background:url('assets/visuals/sp_board_images.png') -210px 0 / 1660px 580px no-repeat; filter:brightness(.08); }
+.score-feedback-detail.negative {
+  background:#383a46;
+  animation:detail-in .22s ease-out, score-storm-darken 2.25s ease-out both;
+}
+.score-feedback-detail.negative::before {
+  height:100%;
+  background:url('assets/visuals/bg-effect-wow-cloud.png') center bottom / 100% 330% no-repeat;
+  filter:brightness(.22);
+  opacity:.8;
+  animation:none;
+}
+.score-feedback-detail.negative::after {
+  content:"";
+  position:absolute;
+  z-index:-1;
+  top:0;
+  left:50%;
+  width:min(52%, 960px);
+  aspect-ratio:510 / 240;
+  transform:translate(-50%,-76%);
+  background:url('assets/visuals/sp_board_images.png') 19.13% 0 / 325.49% 241.67% no-repeat;
+  filter:brightness(.08);
+  animation:score-storm-cloud-enter .45s ease-out both;
+}
+.score-rain {
+  position:absolute;
+  z-index:-1;
+  top:3%;
+  left:30%;
+  width:40%;
+  height:30%;
+  pointer-events:none;
+  overflow:hidden;
+  mask-image:radial-gradient(ellipse at 50% 0, #000 5%, transparent 72%);
+}
+.score-rain::before {
+  content:"";
+  position:absolute;
+  inset:-42px 0;
+  background:repeating-linear-gradient(124deg, transparent 0 12px, #d7e7f03d 12px 13px, transparent 13px 22px);
+  mask-image:repeating-linear-gradient(6deg, transparent 0 4px, #000 10px 31px, transparent 38px 42px);
+  animation:score-rain-fall .44s linear infinite;
+}
+@keyframes score-rain-fall {
+  from { transform:translate(10px,-12px); }
+  to { transform:translate(-10px,18px); }
+}
+@keyframes score-storm-cloud-enter {
+  from { transform:translate(-50%,-100%); }
+  to { transform:translate(-50%,-76%); }
+}
+@keyframes score-storm-darken {
+  from { background-color:#aa5053; }
+  to { background-color:#383a46; }
+}
 .score-feedback-heading .score-feedback-badge.negative::after { width:66px; height:66px; background:url('assets/visuals/sp_board_images.png') -1510px -48px / 1660px 580px no-repeat; border-radius:50%; }
 .score-feedback-students { max-width:1000px; align-content:center; gap:14px 3vw; padding-block:20px; }
 .score-feedback-student { width:clamp(75px,11vw,145px); font-weight:500; font-size:18px; gap:8px; }
@@ -252,6 +321,10 @@
 @media (max-width:1100px) { #scoreboard-root { padding-inline:24px; }.roll-surface{padding-inline:24px 85px;}.student-cards{grid-template-columns:repeat(7,minmax(0,1fr));}.student-view-switch button{min-width:100px;}.student-display-options{gap:6px;} }
 @media (max-width:720px) { .classroom-tab{margin:0;padding:0 12px;}.local-indicator{display:none;}#scoreboard-root{padding-inline:12px;}.student-cards,.roster-stage .student-cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 7px;}.student-surface{height:auto;min-height:100%;}.tile-score{font-size:22px;}.tile-name{font-size:11px;}.student-scorebar{flex-wrap:wrap;}.student-selection{margin:0;}.student-scoring{margin-left:auto;}.score-award,.score-penalty{min-width:75px;padding:3px 8px;}.student-display-options{margin:5px 0 10px;}.classroom-stage{min-height:350px;}.classroom-grid{min-width:480px;}.score-composer{padding:14px;}.score-compose-form{grid-template-columns:1fr;gap:10px;overflow:auto;}.score-compose-sidebar{max-height:180px;}.compose-recipients{display:flex;flex-wrap:wrap;flex:none;max-height:65px;}.score-compose-sidebar h2{font-size:18px;}.score-compose-sidebar p{display:none;}.compose-back{padding-bottom:8px;}.score-compose-main{min-height:400px;padding:18px;}.compose-count{margin:4px;}.roll-surface{padding-inline:12px;}.roll-week{gap:2px;}.roll-week button{min-width:35px;padding:6px 2px;}.roll-week small{font-size:9px;}.roll-matrix{gap:15px;}.roll-names{width:135px;}.roll-column{width:160px;}.roll-student-preview{display:none;}.growth-tree-title{width:125px;font-size:11px;}.growth-class-label{left:40%;}.growth-sky{padding-inline:10px;}.score-feedback-students{gap:12px;}.score-feedback-student{font-size:13px;}.score-feedback-detail{padding-top:20px;}.score-feedback-heading .score-feedback-badge{transform:scale(.7);margin:-10px;}.score-wings{transform:translateX(-50%) scale(.7);top:0;} }
 @media (prefers-reduced-motion:reduce) { .score-feedback-detail .score-feedback-heading,.score-feedback-detail .score-feedback-student {animation:none;} }
+@media (prefers-reduced-motion:reduce) {
+  .score-feedback-detail.positive, .score-feedback-detail.negative,
+  .score-feedback-detail::before, .score-feedback-detail.negative::after, .score-rain::before { animation:none; }
+}
 
 .growth-scene-host {height:100%;}
 .growth-goals {display:grid;gap:7px;}

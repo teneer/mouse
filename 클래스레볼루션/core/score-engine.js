@@ -1,5 +1,26 @@
 import { requestResult, transact } from './db.js';
-import { applyPath, sumDeductions } from './growth-path.js';
+import { applyPath, sumDeductions } from './growth-path.js?v=golden-eggs';
+
+export function adjustGoldenEggs(classId, delta) {
+  if (!Number.isSafeInteger(delta) || delta === 0) throw new Error('변경할 황금알 개수를 확인해 주세요.');
+  return transact(['growthStates'], 'readwrite', async function (transaction) {
+    const store = transaction.objectStore('growthStates');
+    const state = await requestResult(store.get(classId)) ||
+      { classId, classScore: 0, pending: [], totalContributions: 0 };
+    const total = Number(state.classScore || 0) + delta;
+    const specialEggs = Number(state.specialEggs || 0) + delta;
+    if (total < 0) throw new Error('현재 보유한 황금알보다 많이 차감할 수 없습니다.');
+    if (!Number.isSafeInteger(total) || !Number.isSafeInteger(specialEggs)) {
+      throw new Error('황금알 개수가 저장 가능한 범위를 벗어났습니다.');
+    }
+    state.classScore = total;
+    state.specialEggs = specialEggs;
+    state.pathRevision = (state.pathRevision || 0) + 1;
+    state.updatedAt = new Date().toISOString();
+    store.put(state);
+    return state;
+  });
+}
 
 export function applyScoreBatch(options) {
   const { classId } = options;

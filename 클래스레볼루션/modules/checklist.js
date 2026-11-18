@@ -1,7 +1,7 @@
 import { getAll, transact, requestResult } from '../core/db.js';
 import { stillAvatar } from '../core/avatar.js';
 import { escapeHtml as esc } from '../core/text.js';
-import { mountScoreComposer } from '../core/score-composer.js';
+import { mountScoreComposer } from '../core/score-composer.js?v=golden-eggs';
 
 const TYPES = {
   symbol: { label: '◎○△×', color: '#efa34a', values: ['◎', '○', '△', '×'] },

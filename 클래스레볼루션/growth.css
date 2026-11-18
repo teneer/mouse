@@ -63,6 +63,27 @@
   font-weight: 900;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  width: 13.2%;
+  aspect-ratio: 198 / 239;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.egg-open-mark {
+  position: absolute;
+  right: -3%;
+  bottom: 3%;
+  display: grid;
+  place-items: center;
+  width: clamp(23px, 3.6cqw, 43px);
+  aspect-ratio: 1;
+  border: 2px solid #ff9a00;
+  border-radius: 50%;
+  background: #ffc62d;
+  color: #874908;
+  font: 800 clamp(18px, 2.9cqw, 34px)/1 system-ui, sans-serif;
 }
 
 .growth-actor {
@@ -142,19 +163,80 @@
   font-weight: 850;
   text-align: center;
 }
-.growth-tree-egg {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 4px 6px;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  padding: 5px 8px;
-  border-radius: 8px;
-  background: #624323;
+.growth-world .growth-tree-strip { background-size: 100% 100%; }
+.growth-tree-meter {
+  position: absolute;
+  top: max(19%, 115px);
+  bottom: 0;
+  left: 70%;
+  width: 16%;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
-.growth-tree-egg strong { font-size: clamp(13px, 1.7vw, 22px); text-align: center; }
-.growth-tree-egg small { grid-column: 1 / -1; text-align: center; font-size: 10px; }
+.growth-tree-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: var(--egg-height, 0%);
+  background: #8cca19;
+  transition: height .65s ease-in-out;
+}
+.growth-tree-marker {
+  position: absolute;
+  z-index: 1;
+  bottom: var(--egg-height, 0%);
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: clamp(32px, 4.2vw, 70px);
+  aspect-ratio: 90 / 85;
+  transform: translateX(-50%);
+  background: url('assets/visuals/sp_board_tree.png') 9.09% 0 / 711.11% 658.82% no-repeat;
+  color: #704007;
+  font-size: clamp(11px, 1.3vw, 21px);
+  font-variant-numeric: tabular-nums;
+  transition: bottom .65s ease-in-out;
+}
+.growth-tree-marker strong { margin-bottom: 14%; }
+.growth-counts i.art-positive, .growth-counts i.art-negative {
+  width: 26px;
+  height: 26px;
+  background: url('assets/visuals/sp_board_images.png') -560px -28px / 664px 232px no-repeat;
+}
+.growth-counts i.art-negative { background-position: -604px -20px; }
+.growth-adjustment {
+  position: fixed;
+  inset: auto clamp(10px, 6vw, 120px) 12px auto;
+  width: min(290px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  color: #794909;
+  background: #fff;
+  box-shadow: 0 10px 42px #16211d38;
+  font-variant-numeric: tabular-nums;
+}
+.growth-adjustment::backdrop { background: #071c20bd; }
+.growth-adjustment-form {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  padding: 20px 22px;
+}
+.growth-adjustment-form h2 { margin: 0 0 5px; font-size: 16px; }
+.egg-close { position: absolute; top: 4px; right: 6px; padding: 6px 9px; border: 0; background: transparent; color: #706a5d; font-size: 21px; }
+.egg-step { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: #eff4fb; color: #1575d3; font: bold 28px/1 system-ui, sans-serif; }
+.egg-step[data-growth="egg-minus"] { color: #c9394c; background: #fff0f2; }
+.egg-step:disabled { opacity: .43; }
+.egg-quantity { display: flex; align-items: center; gap: 12px; font-weight: 650; }
+.egg-delta { min-width: 2ch; font-size: 34px; font-weight: 850; text-align: center; }
+.egg-balances { margin-top: 10px; text-align: center; }
+.egg-balances small { display: block; margin-top: 4px; color: #89663c; }
+.egg-apply { min-width: 105px; padding: 8px 16px; border: 0; border-radius: 5px; background: #1675cb; color: #fff; font-weight: 750; }
+.egg-apply.is-deduction { background: #bb354a; }
+.egg-apply:disabled { background: #dedbd3; color: #625c51; }
 .growth-egg-art {
   display: block;
   width: 22px;
@@ -192,11 +274,11 @@
   .growth-world { --tree-width: clamp(45px, 16vw, 88px); }
   .growth-sky { padding-inline: 5px; }
   .growth-tree-strip { padding-inline: 2px; }
-  .growth-tree-egg { padding-inline: 3px; }
   .growth-counts { padding-right: 2%; }
   .growth-actor { width: 12%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .growth-actor, .growth-actor .avatar-fx, .growth-egg-celebration { animation: none; }
+  .growth-tree-marker, .growth-tree-fill { transition: none; }
 }

@@ -1,5 +1,5 @@
 import { getAll, getRecord, putRecord } from './db.js';
-import { applyScoreBatch } from './score-engine.js?v=growth-path';
+import { applyScoreBatch } from './score-engine.js?v=golden-eggs';
 import { stillAvatar } from './avatar.js';
 import { escapeHtml as esc } from './text.js';
 

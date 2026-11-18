@@ -17,25 +17,25 @@ const OTHER_FEEDBACK = {
   'goal.achieved': { kind: 'success', icon: '🏆' }
 };
 
-function scoreContent(payload, mode) {
+function scoreContent(payload, detailed) {
   const students = Array.isArray(payload.students) && payload.students.length
     ? payload.students : [{ name: payload.studentName || '학생', avatarId: payload.avatarId }];
   const delta = Number(payload.delta);
   const penalty = delta < 0;
-  const detail = mode === 'scoreboard' || mode === 'growth';
   const kind = penalty ? 'negative' : 'positive';
   const amount = (students.length > 1 ? '각 ' : '') + (penalty ? '−' : '+') + Math.abs(delta) + '점';
   const label = penalty ? '감점' : '점수';
   const reason = String(payload.reason || '').trim();
   const icon = '<span class="score-feedback-badge ' + kind + '" aria-hidden="true">' + (penalty ? '☁' : '★') + '</span>';
 
-  if (!detail) {
+  if (!detailed) {
     return '<div class="score-feedback-body"><div class="score-feedback-line">' + icon + '<strong>' +
       escapeHtml((reason || label) + ' · ' + amount) +
       '</strong></div><p>' + escapeHtml(students.map(function (student) { return student.name; }).join(', ')) + '</p></div>';
   }
 
-  return '<div class="score-feedback-heading">' +
+  return (penalty ? '<span class="score-rain" aria-hidden="true"></span>' : '') +
+    '<div class="score-feedback-heading">' +
     (penalty ? '' : '<span class="score-wings" aria-hidden="true"></span>') + icon +
     '<strong>' + label + ' <span>' + amount + '</span></strong></div>' +
     '<div class="score-feedback-students">' + students.map(function (student, index) {
@@ -88,11 +88,11 @@ export function mountGlobalFeedback(bus) {
   function render() {
     if (!active) return;
     const mode = document.body.dataset.classroomMode || 'whiteboard';
-    const detailed = mode === 'scoreboard' || mode === 'growth';
+    const detailed = mode === 'scoreboard' || mode === 'seats' || mode === 'growth';
     if (active.type === 'score.changed') {
       const kind = Number(active.payload.delta) < 0 ? 'negative' : 'positive';
       card.className = 'score-feedback ' + (detailed ? 'score-feedback-detail' : 'score-feedback-bottom') + ' ' + kind;
-      card.innerHTML = scoreContent(active.payload, mode);
+      card.innerHTML = scoreContent(active.payload, detailed);
     } else {
       card.className = 'feedback-card';
       card.innerHTML = messageContent(active);

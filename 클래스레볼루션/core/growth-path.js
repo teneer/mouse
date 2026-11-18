@@ -10,6 +10,7 @@ export function sumDeductions(events) {
 export function pathSnapshot(state) {
   return {
     classScore: state.classScore,
+    specialEggs: state.specialEggs || 0,
     pending: state.pending.slice(),
     totalContributions: state.totalContributions,
     totalDeductions: state.totalDeductions
@@ -25,6 +26,7 @@ function historicalPath(conversion, level) {
 
 export function applyPath(state, events, students, pastConversions, legacyDeductions, now, makeId) {
   state.classScore = Math.max(0, Math.trunc(Number(state.classScore) || 0));
+  const specialEggs = state.specialEggs || 0;
   state.pending = Array.isArray(state.pending) ? state.pending.slice(0, PATH_LENGTH - 1) : [];
   state.totalContributions = Number(state.totalContributions) || 0;
   state.totalDeductions = Number.isFinite(state.totalDeductions) ? state.totalDeductions : legacyDeductions;
@@ -34,9 +36,11 @@ export function applyPath(state, events, students, pastConversions, legacyDeduct
   const reopened = [];
   const activeEggs = new Map();
   pastConversions.forEach(function (record) {
-    const existing = activeEggs.get(record.classScoreAfter);
+    // Older conversions preceded special eggs, so their displayed total was their path level.
+    const level = record.pathLevel ?? record.classScoreAfter;
+    const existing = activeEggs.get(level);
     if (!record.reversedAt && (!existing || record.createdAt >= existing.createdAt)) {
-      activeEggs.set(record.classScoreAfter, record);
+      activeEggs.set(level, record);
     }
   });
 
@@ -61,6 +65,7 @@ export function applyPath(state, events, students, pastConversions, legacyDeduct
           state.classScore += 1;
           earned.push({
             id: makeId(), classId: state.classId, classScoreAfter: state.classScore,
+            pathLevel: state.classScore - specialEggs,
             contributions: state.pending, createdAt: now
           });
           state.pending = [];
@@ -71,9 +76,10 @@ export function applyPath(state, events, students, pastConversions, legacyDeduct
     }
 
     state.totalDeductions += -event.delta;
-    for (let point = 0; point > event.delta && (state.pending.length || state.classScore); point -= 1) {
+    const eggFloor = Math.max(0, specialEggs);
+    for (let point = 0; point > event.delta && (state.pending.length || state.classScore > eggFloor); point -= 1) {
       if (!state.pending.length) {
-        const level = state.classScore;
+        const level = state.classScore - specialEggs;
         const previous = activeEggs.get(level);
         if (previous) reopened.push({ ...previous, reversedAt: now, reversedBy: event.id });
         activeEggs.delete(level);

@@ -4,7 +4,7 @@ import {
   saveGroup, saveStudent, studentSeats, trashStudent
 } from '../core/roster.js';
 import { getRecord, getAll } from '../core/db.js';
-import { mountScoreComposer } from '../core/score-composer.js';
+import { mountScoreComposer } from '../core/score-composer.js?v=golden-eggs';
 import { escapeHtml } from '../core/text.js';
 
 const DIRECTION_KEY = 'class-revolution.room-reversed';

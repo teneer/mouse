@@ -2,15 +2,14 @@ import { animatedAvatar, stillAvatar } from '../core/avatar.js';
 import { getRecord, putRecord, requestResult, transact } from '../core/db.js';
 import { PATH_LENGTH, sumDeductions } from '../core/growth-path.js';
 import { escapeHtml } from '../core/text.js';
-import { mountScoreComposer } from '../core/score-composer.js';
-import { loadRoster } from '../core/roster.js';
+import { adjustGoldenEggs } from '../core/score-engine.js?v=golden-eggs';
 
 const POSITIONS = [
   [79.6, 26.0], [61.1, 19.4], [42.6, 26.0], [24.0, 19.4], [7.4, 41.3],
   [19.0, 70.4], [37.5, 77.1], [56.0, 70.4], [74.6, 77.1], [91.9, 75.2]
 ];
 const ENTRY_POSITION = [94, 25];
-const EMPTY_STATE = { classScore: 0, pending: [], totalContributions: 0, totalDeductions: 0 };
+const EMPTY_STATE = { classScore: 0, pending: [], totalContributions: 0, totalDeductions: 0, specialEggs: 0 };
 
 async function readBoard(classId) {
   return transact(['growthStates', 'classes', 'scoreEvents'], 'readonly', async function (transaction) {
@@ -48,10 +47,40 @@ function actor(contribution, index, effect) {
 }
 
 export function mountGrowth(root, { classId, bus }) {
-  root.innerHTML = '<div class="growth-scene-host"></div><dialog class="student-dialog growth-settings"></dialog>';
-  const scene = root.querySelector('.growth-scene-host');
+  root.innerHTML = `
+    <div class="growth-scene-host"><section class="growth-world" aria-label="학급점수판">
+      <div class="growth-sky"></div>
+      <aside class="growth-tree-strip" aria-label="황금알 누적">
+        <button type="button" class="growth-tree-title" data-growth="settings"><strong></strong><span></span></button>
+        <div class="growth-tree-meter">
+          <div class="growth-tree-fill"></div>
+          <div class="growth-tree-marker"><strong></strong></div>
+        </div>
+      </aside>
+    </section></div>
+    <dialog class="student-dialog growth-settings"></dialog>
+    <dialog class="growth-adjustment" aria-labelledby="egg-adjustment-title">
+      <form class="growth-adjustment-form">
+        <button type="button" data-growth="close-adjustment" class="egg-close" aria-label="닫기">×</button>
+        <h2 id="egg-adjustment-title">황금알 조정</h2>
+        <button type="button" class="egg-step" data-growth="egg-plus" aria-label="황금알 한 개 추가">+</button>
+        <div class="egg-quantity">황금알 <output class="egg-delta" aria-live="polite">0</output> 개</div>
+        <button type="button" class="egg-step" data-growth="egg-minus" aria-label="황금알 한 개 차감">−</button>
+        <div class="egg-balances">총 황금알 <strong class="egg-total"></strong> 개
+          <small>누적 특별 황금알 <b class="egg-special"></b> 개</small>
+        </div>
+        <p class="student-form-error" role="alert"></p>
+        <button type="submit" class="egg-apply" disabled>부여하기</button>
+      </form>
+    </dialog>`;
+  const sky = root.querySelector('.growth-sky');
   const settings = root.querySelector('.growth-settings');
-  const composer = mountScoreComposer(root, { classId, bus });
+  const adjustment = root.querySelector('.growth-adjustment');
+  const treeTitle = root.querySelector('.growth-tree-title');
+  const treeMeter = root.querySelector('.growth-tree-meter');
+  let storedState = EMPTY_STATE;
+  let eggDelta = 0;
+  let savingEggs = false;
   let goals = [];
   let className = '우리 반';
   let requested = 0;
@@ -70,17 +99,20 @@ export function mountGrowth(root, { classId, bus }) {
       ? '<div class="growth-egg-celebration"><span class="score-wings" aria-hidden="true"></span><span class="growth-egg-art" aria-hidden="true"></span>' +
         '<strong>황금알 ' + (effect.eggs || 1) + '개를 얻었어요!</strong></div>' : '';
     const nextGoal = goals.filter(g => Number(g.points) > eggs).sort((a,b) => a.points - b.points)[0];
-    scene.innerHTML = '<section class="growth-world" aria-label="학급점수판"><div class="growth-sky">' +
-      '<button type="button" data-growth="settings" class="growth-class-label" aria-label="학급 이름과 목표 설정">' + escapeHtml(className) + ' ✎</button><div class="growth-board">' +
+    sky.innerHTML = '<button type="button" data-growth="settings" class="growth-class-label" aria-label="학급 이름과 목표 설정">' + escapeHtml(className) + ' ✎</button><div class="growth-board">' +
       '<div class="growth-path-art" aria-label="별길 ' + marker + ' / ' + PATH_LENGTH + '">' +
-      '<span class="growth-egg-count" aria-label="황금알 ' + eggs + '개">' + eggs + '</span>' +
+      '<button type="button" class="growth-egg-count" data-growth="adjust-eggs" aria-label="황금알 ' + eggs + '개, 수량 조정">' + eggs +
+      '<span class="egg-open-mark" aria-hidden="true">+</span></button>' +
       frame.pending.map(function (contribution, index) { return actor(contribution, index, effect); }).join('') +
-      '</div><div class="growth-counts"><span><i aria-hidden="true">★</i> 상점 ' + (Number(frame.totalContributions) || 0) +
-      '</span><span><i aria-hidden="true">☁</i> 감점 ' + (Number(frame.totalDeductions) || 0) + '</span></div></div>' +
-      '<div class="growth-score-actions"><button data-growth="award">으쓱 주기</button><button data-growth="penalty">머쓱 주기</button></div>' + reward +
-      '</div><aside class="growth-tree-strip" aria-label="황금알 누적"><button class="growth-tree-title" data-growth="settings"><strong>' + (nextGoal ? '황금알 ' + Number(nextGoal.points) + '개' : '우리 반 목표') + '</strong>' + escapeHtml(nextGoal?.reward || '목표와 보상 정하기') + '</button>' +
-      '<div class="growth-tree-egg"><span class="growth-egg-art" aria-hidden="true"></span><strong>' + eggs +
-      '</strong><small>황금알</small></div></aside></section>';
+      '</div><div class="growth-counts"><span aria-label="누적 상점 ' + frame.totalContributions + '점"><i class="art-positive" aria-hidden="true"></i>' + (Number(frame.totalContributions) || 0) +
+      '</span><span aria-label="누적 감점 ' + frame.totalDeductions + '점"><i class="art-negative" aria-hidden="true"></i>' + (Number(frame.totalDeductions) || 0) + '</span></div></div>' + reward;
+    treeTitle.querySelector('strong').textContent = nextGoal ? '다음 목표 · 황금알 ' + nextGoal.points + '개' : '우리 반 목표';
+    treeTitle.querySelector('span').textContent = nextGoal?.reward || '목표와 보상 정하기';
+    // Each group of ten eggs climbs the ten stars painted on the trunk.
+    const treeStep = eggs > 0 ? (eggs - 1) % 10 + 1 : 0;
+    treeMeter.style.setProperty('--egg-height', treeStep * 10 + '%');
+    treeMeter.querySelector('strong').textContent = eggs;
+    treeMeter.setAttribute('aria-label', '누적 황금알 ' + eggs + '개');
   }
 
   async function refresh() {
@@ -88,6 +120,8 @@ export function mountGrowth(root, { classId, bus }) {
     const result = await readBoard(classId);
     if (request !== requested) return;
     const current = result.state;
+    storedState = current;
+    if (adjustment.open) renderAdjustment();
     className = result.className;
     goals = result.goals;
     if (!playing && !queue.length) {
@@ -97,6 +131,7 @@ export function mountGrowth(root, { classId, bus }) {
   }
 
   function sound(earned) {
+    if (document.getElementById('sound-toggle')?.getAttribute('aria-pressed') === 'false') return;
     const file = earned ? 'Egg up.MP3' : 'Egg down.MP3';
     const audio = new Audio('assets/audio/' + file);
     audio.volume = .55;
@@ -182,6 +217,11 @@ export function mountGrowth(root, { classId, bus }) {
   }
 
   function handleEvent(event) {
+    if (event.type === 'eggs.changed') {
+      clearPlayback();
+      void refresh().catch(report);
+      return;
+    }
     if (event.type === 'data.restored') {
       clearPlayback();
       newestRevision = 0;
@@ -208,13 +248,62 @@ export function mountGrowth(root, { classId, bus }) {
     }
   });
 
+  function renderAdjustment() {
+    const total = Number(storedState.classScore) || 0;
+    const special = Number(storedState.specialEggs) || 0;
+    const proposed = total + eggDelta;
+    const valid = Number.isSafeInteger(proposed) && proposed >= 0;
+    adjustment.querySelector('.egg-delta').value = eggDelta > 0 ? '+' + eggDelta : String(eggDelta);
+    adjustment.querySelector('.egg-total').textContent = total;
+    adjustment.querySelector('.egg-special').textContent = special > 0 ? '+' + special : special;
+    adjustment.querySelector('[data-growth="egg-plus"]').disabled = savingEggs || proposed >= Number.MAX_SAFE_INTEGER;
+    adjustment.querySelector('[data-growth="egg-minus"]').disabled = savingEggs || proposed <= 0;
+    adjustment.querySelector('[data-growth="close-adjustment"]').disabled = savingEggs;
+    const apply = adjustment.querySelector('.egg-apply');
+    apply.disabled = savingEggs || !eggDelta || !valid;
+    apply.classList.toggle('is-deduction', eggDelta < 0);
+    apply.textContent = eggDelta < 0 ? '차감하기' : '부여하기';
+  }
+
+  adjustment.addEventListener('cancel', event => { if (savingEggs) event.preventDefault(); });
+  adjustment.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (savingEggs || adjustment.querySelector('.egg-apply').disabled) return;
+    const delta = eggDelta;
+    savingEggs = true;
+    renderAdjustment();
+    try {
+      storedState = await adjustGoldenEggs(classId, delta);
+      adjustment.close();
+      sound(delta > 0);
+      bus.publish('eggs.changed', { classId });
+    } catch (error) {
+      adjustment.querySelector('[role="alert"]').textContent = error.message;
+      await refresh().catch(report);
+    } finally {
+      savingEggs = false;
+      renderAdjustment();
+    }
+  });
+
   root.addEventListener('click', async function (event) {
     const action = event.target.closest('[data-growth]')?.dataset.growth;
     if (!action) return;
     if (action === 'close') { settings.close(); return; }
-    if (action === 'award' || action === 'penalty') {
-      const roster = await loadRoster(classId);
-      await composer.open({students:roster.students,selectAll:false,sign:action==='penalty'?-1:1,source:'growth'});
+    if (action === 'adjust-eggs') {
+      eggDelta = 0;
+      adjustment.querySelector('[role="alert"]').textContent = '';
+      renderAdjustment();
+      adjustment.showModal();
+      await refresh().catch(report);
+      return;
+    }
+    if (action === 'close-adjustment') { if (!savingEggs) adjustment.close(); return; }
+    if (action === 'egg-plus' || action === 'egg-minus') {
+      if (savingEggs) return;
+      eggDelta += action === 'egg-plus' ? 1 : -1;
+      adjustment.querySelector('[role="alert"]').textContent = '';
+      renderAdjustment();
       return;
     }
     if (action === 'settings') {
