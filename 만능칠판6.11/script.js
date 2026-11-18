@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=screen-transfer-611';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=screen-transfer-selection-611';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js';

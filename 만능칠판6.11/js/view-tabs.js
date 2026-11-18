@@ -26,6 +26,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   const prefix='whiteboard.view-tab:'+new URL('.',location.href).pathname+':';
   const localKey=prefix+sync.id,namePrefix='whiteboard.tab-name:'+new URL('.',location.href).pathname+':';
   const instance=uid();let members=[],scope=null,unsubscribe=null,present=true,selected=new Set(),channel;
+  let sending=false;
   function savedName(id) {try{return localStorage.getItem(namePrefix+id)||''}catch{return ''}}
   function displayName(row, defaultName) {
     return (cloud.options?cloud.projected().tabNames?.[row.id]:null)||savedName(row.id)||row.tabName||defaultName;
@@ -56,7 +57,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       line.className='view-tab-row';
       const label=document.createElement('label'),input=document.createElement('input');
       input.type='checkbox';input.checked=selected.has(row.id);input.dataset.viewTab=row.id;
-      input.onchange=()=>{if(input.checked)selected.add(row.id);else selected.delete(row.id);sendButton.disabled=!selected.size;};
+      input.onchange=()=>{if(input.checked)selected.add(row.id);else selected.delete(row.id);sendButton.disabled=sending||!selected.size;};
       label.append(input,document.createTextNode((row.label||'이 기기')+' · '+name+(row.id===sync.id?' (이 탭)':'')));
       const edit=document.createElement('button');
       edit.type='button';edit.className='view-tab-rename';edit.textContent='✎';
@@ -77,13 +78,13 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       if(focus===row.id)input.focus({preventScroll:true});
       return line;
     }));
-    sendButton.disabled=!selected.size;position();
+    sendButton.disabled=sending||!selected.size;position();
   }
-  function announce(){if(!present)return;const next=cloud.options?.boardId||null;if(scope!==next){unsubscribe?.();unsubscribe=null;members=[];scope=next;}
+  function announce(){if(!present)return;const next=cloud.options?.boardId||null;if(scope!==next){unsubscribe?.();unsubscribe=null;members=[];selected.clear();scope=next;}
     if(!scope){try{localStorage.setItem(localKey,JSON.stringify(presence()));channel?.postMessage('presence');}catch{}}
     else if(cloud.online&&cloud.fs){cloud.fs.setDoc(cloud.ref('viewTabs',sync.id),{...presence(),owner:cloud.deviceId}).catch(fail);if(!unsubscribe)unsubscribe=cloud.fs.onSnapshot(cloud.collection('viewTabs'),snap=>{members=snap.docs.map(d=>d.data());render();},fail);}
     render();}
-  function show(){selected.clear();sendButton.disabled=true;togglePopup('viewSyncMenu',opener);announce();render();}
+  function show(){togglePopup('viewSyncMenu',opener);announce();}
   opener.onclick=e=>{e.preventDefault();show();};opener.oncontextmenu=e=>{e.preventDefault();show();};
   root.querySelector('[data-view-all]').onclick=()=>{
     selected=new Set(available().map(row=>row.id));
@@ -93,7 +94,28 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     selected.clear();
     render();
   };
-  sendButton.onclick=async()=>{const targets=screenTransferTargets(selected,available());if(!targets.length){render();return;}sendButton.disabled=true;try{const state={...currentView(),epoch:uid(),sourceTab:sync.id,enabled:true,targets,sentAt:Date.now()};if(cloud.options)await cloud.sendView(state);else sync.sendView(state);root.style.display='none';opener.setAttribute('aria-expanded','false');const toast=document.getElementById('toast');toast.textContent=targets.length+'개 탭에 현재 상태를 전송했습니다.';toast.hidden=false;}catch(e){fail(e);}finally{selected.clear();render();}};
+  sendButton.onclick=async()=>{
+    if(sending)return;
+    const targets=screenTransferTargets(selected,available());
+    if(!targets.length){render();return;}
+    sending=true;
+    sendButton.disabled=true;
+    try {
+      const state={...currentView(),epoch:uid(),sourceTab:sync.id,enabled:true,targets,sentAt:Date.now()};
+      if(cloud.options)await cloud.sendView(state);
+      else sync.sendView(state);
+      root.style.display='none';
+      opener.setAttribute('aria-expanded','false');
+      const toast=document.getElementById('toast');
+      toast.textContent=targets.length+'개 탭에 현재 상태를 전송했습니다.';
+      toast.hidden=false;
+    } catch(error) {
+      fail(error);
+    } finally {
+      sending=false;
+      render();
+    }
+  };
   if(channel)channel.onmessage=()=>render();window.addEventListener('storage',e=>{if(e.key?.startsWith(prefix))render();});window.addEventListener('resize',position);
   window.addEventListener('pagehide',()=>{present=false;unsubscribe?.();unsubscribe=null;try{if(JSON.parse(localStorage.getItem(localKey))?.instance===instance)localStorage.removeItem(localKey);channel?.postMessage('closed');}catch{}closePopups();});
   window.addEventListener('pageshow',()=>{present=true;announce();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')announce();});setInterval(announce,heartbeat);announce();return{render,refresh:announce};
