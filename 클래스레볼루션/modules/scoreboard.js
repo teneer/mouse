@@ -199,7 +199,7 @@ export function mountScoreboard(root, { classId, bus }) {
     return '<div class="student-scorebar"><button type="button" class="class-progress" data-action="growth" aria-label="학급점수 보기">' +
       '<span class="art-egg" aria-hidden="true"></span><strong>' + Number(growth.classScore || 0) + '</strong>' +
       '<span class="mini-path">' +
-      Array.from({length:10}, (_,i) => '<i class="' + (i < count ? 'filled' : '') + '">?</i>').join('') +
+      Array.from({length:10}, (_,i) => '<i class="' + (i < count ? 'filled' : '') + '">★</i>').join('') +
       '<span class="path-count">' + count + '/10</span></span></button>' +
       '<div class="student-selection"><button type="button" data-action="all">전체선택</button></div>' +
       '<div class="student-scoring"><button type="button" class="roster-control" data-action="history">이력관리</button>' +

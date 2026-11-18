@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="stage1.css">
   <link rel="stylesheet" href="growth.css">
-  <link rel="stylesheet" href="restoration.css?v=classroom-controls">
+  <link rel="stylesheet" href="restoration.css?v=rail-sprites">
 </head>
 <body>
   <div class="app-shell">
@@ -35,8 +35,12 @@
         <button class="mode-tab is-pending" type="button" aria-label="점수 일괄 관리 · 추후 제공" title="점수 일괄 관리 · 추후 제공" popovertarget="bulk-notice"><i class="art-sprout" aria-hidden="true"></i><span class="mode-label">점수 일괄 관리</span></button>
       </nav>
       <div class="rail-utilities" aria-label="수업 화면 보조 도구">
-        <button class="shell-button" type="button" id="sound-toggle" aria-label="소리" title="소리" aria-pressed="true"><i class="art-sound" aria-hidden="true"></i></button>
-        <button class="shell-button" type="button" id="curtain-toggle" aria-label="깜깜이 · 화면 가리기" title="깜깜이 · 화면 가리기"><i class="art-eye" aria-hidden="true"></i></button>
+        <button class="shell-button" type="button" id="sound-toggle" aria-label="소리" title="소리" aria-pressed="true">
+          <i class="art-speaker" aria-hidden="true"></i>
+        </button>
+        <button class="shell-button" type="button" id="curtain-toggle" aria-label="화면 가리기" title="화면 가리기" aria-pressed="false">
+          <i class="art-curtain" aria-hidden="true"></i>
+        </button>
         <button class="shell-button" type="button" id="rail-settings" aria-label="설정" title="설정"><i class="art-settings" aria-hidden="true"></i></button>
       </div>
       </aside>
@@ -70,10 +74,8 @@
       <button class="student-form-save" type="submit">학반 이름 저장</button>
     </form>
   </dialog>
-  <dialog id="screen-curtain" aria-label="깜깜이">
-    <form method="dialog"><button autofocus>화면 다시 보기</button></form>
-  </dialog>
+  <div id="screen-curtain" aria-hidden="true" hidden></div>
   <div id="global-feedback" class="global-feedback" aria-live="polite" aria-atomic="true"></div>
-  <script type="module" src="app.js?v=classroom-controls"></script>
+  <script type="module" src="app.js?v=rail-utilities"></script>
 </body>
 </html>

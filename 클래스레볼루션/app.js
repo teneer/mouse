@@ -1,7 +1,7 @@
 import { openDatabase, getRecord, putRecord, exportAll, importAll, requestResult, transact } from './core/db.js';
 import { createEventBus } from './core/events.js';
 import { mountGlobalFeedback } from './core/feedback.js?v=reference-20261117';
-import { mountScoreboard } from './modules/scoreboard.js?v=classroom-controls';
+import { mountScoreboard } from './modules/scoreboard.js?v=rail-utilities';
 import { mountGrowth } from './modules/growth.js?v=reference-20261117';
 import { mountChecklist } from './modules/checklist.js?v=reference-20261117';
 
@@ -138,8 +138,20 @@ async function start() {
     updateSound();
   });
   const curtain = document.getElementById('screen-curtain');
-  document.getElementById('curtain-toggle').addEventListener('click', () => curtain.showModal());
-  curtain.addEventListener('click', event => { if (event.target === curtain) curtain.close(); });
+  const curtainToggle = document.getElementById('curtain-toggle');
+  const coveredControls = document.querySelectorAll('.app-header, .mode-nav, .workspace, #sound-toggle, #rail-settings, #global-feedback');
+  function setCurtain(covered) {
+    curtain.hidden = !covered;
+    curtainToggle.setAttribute('aria-pressed', String(covered));
+    curtainToggle.title = covered ? '화면 보이기' : '화면 가리기';
+    curtainToggle.setAttribute('aria-label', curtainToggle.title);
+    coveredControls.forEach(element => { element.inert = covered; });
+    curtainToggle.focus();
+  }
+  curtainToggle.addEventListener('click', () => setCurtain(curtain.hidden));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !curtain.hidden) setCurtain(false);
+  });
 
   function refreshAll() {
     return Promise.all([scoreboard.refresh(), growth.refresh(), checklist.refresh()]);
