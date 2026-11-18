@@ -22,7 +22,7 @@ export function mountScoreComposer(host, { classId, bus, onApplied = () => {} })
     sign = options.sign < 0 ? -1 : 1;
     source = options.source || 'scoreboard';
     reason = options.reason || '';
-    points = '1';
+    points = String(options.points || 1);
     const [settings, history] = await Promise.all([getRecord('settings', settingsKey()), getAll('scoreEvents')]);
     favorites = Array.isArray(settings?.values) ? settings.values.filter(r => typeof r === 'string').slice(0, 10) : [];
     recent = [...new Set(history.filter(e => e.classId === classId && Math.sign(e.delta) === sign && e.reason)

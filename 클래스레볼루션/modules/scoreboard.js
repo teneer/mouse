@@ -33,8 +33,9 @@ function attributes(info) {
 }
 
 export function mountScoreboard(root, { classId, bus }) {
-  const savedView = readPreference(VIEW_KEY);
-  let view = VIEWS.some(function ([key]) { return key === savedView; }) ? savedView : 'list';
+  let view = 'list';
+  let previousView = 'list';
+  let rotation = null;
   let reversed = readPreference(DIRECTION_KEY) === 'true';
   let editing = false;
   let source = null;
@@ -42,11 +43,11 @@ export function mountScoreboard(root, { classId, bus }) {
   let students = [];
   let deletedStudents = [];
   let groups = [];
-  let reason = '';
+  let recentCard = null;
   let growth = { classScore: 0, pending: [] };
   let sort = 'number';
   let showNumbers = true;
-  let showAvatars = false;
+  let showAvatars = true;
   let notice = '';
   let busy = false;
   let revision = 0;
@@ -54,14 +55,20 @@ export function mountScoreboard(root, { classId, bus }) {
 
   root.innerHTML = '<div class="student-surface"></div><dialog class="student-dialog" aria-labelledby="student-dialog-title"></dialog>';
   const surface = root.querySelector('.student-surface');
+  const displayOptions = document.getElementById('display-options');
+  const portraitOption = displayOptions.querySelector('[data-option="portraits"]');
   const dialog = root.querySelector('.student-dialog');
   const composer = mountScoreComposer(root, { classId, bus, onApplied: () => { selected.clear(); void refresh(); } });
   dialog.addEventListener('cancel', function (event) { if (busy) event.preventDefault(); });
 
   async function refresh() {
     const current = ++revision;
-    const [roster, progress] = await Promise.all([loadRoster(classId), getRecord('growthStates', classId)]);
+    const [roster, progress, events] = await Promise.all([
+      loadRoster(classId), getRecord('growthStates', classId), getAll('scoreEvents')
+    ]);
     if (current !== revision) return;
+    recentCard = events.filter(event => event.classId === classId && event.reason && event.delta)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     growth = progress || { classScore: 0, pending: [] };
     students = roster.students.sort((a, b) => sort === 'score' ? Number(b.score || 0) - Number(a.score || 0) : sort === 'name' ? a.name.localeCompare(b.name, 'ko') : Number(a.number) - Number(b.number));
     deletedStudents = roster.deletedStudents;
@@ -73,17 +80,19 @@ export function mountScoreboard(root, { classId, bus }) {
   }
 
   function render() {
-    const controls = '<nav class="student-view-switch" aria-label="학생 화면">' + VIEWS.map(function ([key, label]) {
-      return '<button type="button" data-action="view" data-view="' + key + '" aria-pressed="' +
-        (view === key) + '">' + label + '</button>';
-    }).join('') + '</nav><div class="student-display-options"><label><input type="checkbox" data-option="numbers"' + (showNumbers ? ' checked' : '') + '> 번호 표시</label>' +
-      (view === 'seats' ? '<label><input type="checkbox" data-option="portraits"' + (showAvatars ? ' checked' : '') + '> 아바타 보기</label>' : '<label>정렬 <select data-option="sort"><option value="number"' + (sort === 'number' ? ' selected' : '') + '>번호순</option><option value="name"' + (sort === 'name' ? ' selected' : '') + '>이름순</option><option value="score"' + (sort === 'score' ? ' selected' : '') + '>점수순</option></select></label>') + '</div>';
+    if (rotation) return;
+    portraitOption.checked = showAvatars;
+    const sortControl = '<label class="student-sort">정렬 <select data-option="sort">' +
+      [['number', '번호순'], ['name', '이름순'], ['score', '점수순']].map(([value, label]) =>
+        '<option value="' + value + '"' + (sort === value ? ' selected' : '') + '>' + label + '</option>'
+      ).join('') + '</select></label>';
     const content = view === 'manage' ? renderManagement() :
       view === 'seats' ? renderSeating() : '<div class="student-cards">' +
         students.map(function (student) { return studentCard(student, false); }).join('') +
         '<button class="student-add-card" type="button" data-action="add-student"><b>＋</b>학생 추가</button></div>';
     surface.classList.toggle('hide-numbers', !showNumbers);
-    surface.innerHTML = '<header class="student-view-header">' + controls + '</header>' + content +
+    surface.classList.toggle('hide-portraits', !showAvatars);
+    surface.innerHTML = (view === 'list' ? sortControl : '') + content +
       '<p class="student-notice" role="status">' + escapeHtml(notice) + '</p>' +
       (view !== 'manage' && !editing ? renderScoreBar() : '');
   }
@@ -103,6 +112,7 @@ export function mountScoreboard(root, { classId, bus }) {
         escapeHtml(group.id) + '">' + escapeHtml(group.name) + '</button>';
     }).join('');
     return '<section class="roster-stage" aria-label="학생관리"><div class="roster-tools">' +
+      '<button type="button" class="roster-control" data-action="close-management">수업 화면으로 돌아가기</button>' +
       '<button type="button" class="roster-control" data-action="paste-roster">명단 붙여넣기</button>' +
       '<button type="button" class="roster-control" data-action="add-group">모둠 추가</button>' +
       '<button type="button" class="roster-control" data-action="show-trash">학생 휴지통</button></div>' +
@@ -116,18 +126,18 @@ export function mountScoreboard(root, { classId, bus }) {
     const groupIds = new Set(groups.map(function (group) { return group.id; }));
     const ungrouped = students.filter(function (student) { return !groupIds.has(student.groupId); });
     return '<div class="classroom-stage"><div class="classroom-edge">' + (reversed ? '교실 뒤' : '교실 앞') + '</div>' +
-      '<div class="classroom-scroll"><div class="classroom-grid">' +
+      '<div class="classroom-scroll"><div class="classroom-layout' + (reversed ? ' is-reversed' : '') + '"><div class="classroom-grid">' +
       slots(arrangement, 3, 6, reversed, editing ? 1 : 0).map(function (position) {
         const group = arrangement.get(position);
         return group ? renderGroup(group, students.filter(function (student) { return student.groupId === group.id; }), position) :
           renderEmptyGroup(position);
       }).join('') + '</div>' +
       (ungrouped.length || editing ? '<div class="ungrouped-seats">' + renderGroup({ id: '', name: '미배정' }, ungrouped, null) + '</div>' : '') +
-      '</div><div class="classroom-edge">' + (reversed ? '교실 앞' : '교실 뒤') + '</div></div>' +
+      '</div></div><div class="classroom-edge">' + (reversed ? '교실 앞' : '교실 뒤') + '</div></div>' +
       '<div class="classroom-controls"><button type="button" class="seat-edit-toggle" data-action="edit-seats" aria-pressed="' +
-      editing + '">' + (editing ? '자리배치 완료' : '자리배치 수정') + '</button>' +
+      editing + '"><i class="art-seating" aria-hidden="true"></i> ' + (editing ? '자리배치 완료' : '자리배치 수정') + '</button>' +
       '<button type="button" class="roster-control" data-action="flip" aria-pressed="' + reversed +
-      '">↻ 180도 방향 전환</button>' +
+      '"' + (selected.size ? ' disabled' : '') + '>↻ 180도 방향 전환</button>' +
       (editing ? '<button type="button" class="roster-control" data-action="add-group">모둠 추가</button>' : '') + '</div>';
   }
 
@@ -135,12 +145,15 @@ export function mountScoreboard(root, { classId, bus }) {
     const arrangement = studentSeats(members);
     const total = members.reduce(function (sum, student) { return sum + Number(student.score || 0); }, 0);
     const moving = source?.kind === 'group' && source.id === group.id;
+    const fullySelected = !editing && members.length > 0 && members.every(student => selected.has(student.id));
     const handle = editing && position != null
       ? '<button type="button" class="group-handle" draggable="true" aria-pressed="' + moving +
         '" aria-label="' + escapeHtml(group.name) + ' 위치 이동"' +
         attributes({ action: 'group-position', position, id: group.id }) + '>✥ ' + escapeHtml(group.name) + '</button>'
-      : '<button type="button" class="group-select" data-action="select-group" data-id="' + escapeHtml(group.id) + '" aria-label="' + escapeHtml(group.name) + ' 학생 선택">' + escapeHtml(group.name) + '</button>';
-    return '<section class="classroom-group"' +
+      : '<button type="button" class="group-select" data-action="select-group" data-id="' + escapeHtml(group.id) +
+        '" aria-pressed="' + fullySelected + '" aria-label="' + escapeHtml(group.name) + ' 학생 선택">' + escapeHtml(group.name) + '</button>';
+    return '<section class="classroom-group' + (fullySelected ? ' is-group-selected' : '') + '"' +
+      (!editing && members.length ? attributes({ 'select-group': group.id }) : '') +
       (position == null ? '' : attributes({ 'room-position': position, 'room-group': group.id })) + ' aria-label="' +
       escapeHtml(group.name) + '"><div class="seat-grid">' +
       slots(arrangement, 2, 4, reversed, editing ? 1 : 0).map(function (seat) {
@@ -170,16 +183,68 @@ export function mountScoreboard(root, { classId, bus }) {
   }
 
   function renderScoreBar() {
-    const disabled = selected.size && !busy ? '' : ' disabled';
+    if (selected.size) {
+      const recent = recentCard
+        ? '<button type="button" class="recent-card' + (recentCard.delta < 0 ? ' is-penalty' : '') +
+          '" data-action="recent"><small>최근 부여한 카드</small><span>' +
+          escapeHtml(recentCard.reason) + ' ? ' + (recentCard.delta > 0 ? '+' : '') + Number(recentCard.delta) + '</span></button>'
+        : '';
+      return '<div class="student-scorebar has-selection"><div class="student-selection">' +
+        '<button type="button" data-action="all">' + selected.size + '명 선택취소</button>' +
+        '<button type="button" data-action="invert">선택반전</button></div><div class="student-scoring">' + recent +
+        '<button type="button" class="score-award" data-action="award"><i class="art-positive" aria-hidden="true"></i> 으쓱</button>' +
+        '<button type="button" class="score-penalty" data-action="penalty"><i class="art-negative" aria-hidden="true"></i> 머쓱</button></div></div>';
+    }
+    const count = growth.pending.length;
     return '<div class="student-scorebar"><button type="button" class="class-progress" data-action="growth" aria-label="학급점수 보기">' +
       '<span class="art-egg" aria-hidden="true"></span><strong>' + Number(growth.classScore || 0) + '</strong>' +
-      '<span class="mini-path" aria-label="별길 ' + growth.pending.length + ' / 10">' +
-      Array.from({length:10}, (_,i) => '<i class="' + (i < growth.pending.length ? 'filled' : '') + '">★</i>').join('') + '</span></button>' +
-      '<div class="student-selection"><button type="button" data-action="all">' + (selected.size ? selected.size + '명 선택취소' : '전체선택') +
-      '</button><button type="button" data-action="invert">선택반전</button></div><div class="student-scoring">' +
-      '<button type="button" class="roster-control" data-action="history">이력관리</button>' +
-      '<button type="button" class="score-award" data-action="award"' + disabled + '><i class="art-positive" aria-hidden="true"></i> 으쓱</button>' +
-      '<button type="button" class="score-penalty" data-action="penalty"' + disabled + '><i class="art-negative" aria-hidden="true"></i> 머쓱</button></div></div>';
+      '<span class="mini-path">' +
+      Array.from({length:10}, (_,i) => '<i class="' + (i < count ? 'filled' : '') + '">?</i>').join('') +
+      '<span class="path-count">' + count + '/10</span></span></button>' +
+      '<div class="student-selection"><button type="button" data-action="all">전체선택</button></div>' +
+      '<div class="student-scoring"><button type="button" class="roster-control" data-action="history">이력관리</button>' +
+      '<button type="button" class="roster-control" data-action="manage"><i class="art-settings" aria-hidden="true"></i> 학생설정</button></div></div>';
+  }
+
+  function setView(next) {
+    rotation?.cancel();
+    view = next;
+    editing = false;
+    source = null;
+    notice = '';
+    render();
+  }
+
+  function selectGroup(id) {
+    const members = students.filter(student => id
+      ? student.groupId === id
+      : !groups.some(group => group.id === student.groupId));
+    const allSelected = members.every(student => selected.has(student.id));
+    members.forEach(student => allSelected ? selected.delete(student.id) : selected.add(student.id));
+  }
+
+  async function flipRoom() {
+    if (selected.size || rotation) return;
+    reversed = !reversed;
+    savePreference(DIRECTION_KEY, String(reversed));
+    const stage = surface.querySelector('.classroom-stage');
+    const grid = stage.querySelector('.classroom-layout');
+    const button = surface.querySelector('[data-action="flip"]');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && grid.animate) {
+      const options = { duration: 680, easing: 'ease-in-out', fill: 'forwards' };
+      button.disabled = true;
+      stage.classList.add('is-rotating');
+      rotation = grid.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(180deg)' }], options);
+      const labels = [...grid.querySelectorAll('.seat-tile:not(.seat-empty), .classroom-group-footer')];
+      const labelAnimations = labels.map(label => label.animate([
+        { transform: 'rotate(0deg)' }, { transform: 'rotate(-180deg)' }
+      ], options));
+      try { await rotation.finished; } catch (error) { /* Navigation can cancel the rotation. */ }
+      labelAnimations.forEach(animation => animation.cancel());
+      rotation = null;
+    }
+    render();
+    surface.querySelector('[data-action="flip"]')?.focus();
   }
 
   async function showHistory() {
@@ -327,22 +392,33 @@ export function mountScoreboard(root, { classId, bus }) {
     if (!busy) { source = null; render(); }
   });
 
+  displayOptions.addEventListener('change', function (event) {
+    if (event.target.dataset.option === 'numbers') showNumbers = event.target.checked;
+    if (event.target.dataset.option === 'portraits') showAvatars = event.target.checked;
+    render();
+  });
   root.addEventListener('change', function (event) {
-    const option = event.target.dataset.option;
-    if (option === 'numbers') showNumbers = event.target.checked;
-    if (option === 'portraits') showAvatars = event.target.checked;
-    if (option === 'sort') { sort = event.target.value; void refresh(); return; }
-    if (option) render();
+    if (event.target.dataset.option === 'sort') { sort = event.target.value; void refresh(); }
   });
 
   root.addEventListener('click', function (event) {
+    if (busy || rotation) return;
     const button = event.target.closest('[data-action]');
-    if (!button || busy) return;
+    if (!button) {
+      const group = event.target.closest('[data-select-group]');
+      if (group) { selectGroup(group.dataset.selectGroup); render(); }
+      return;
+    }
     const { action, id } = button.dataset;
     if (action === 'growth') { document.querySelector('[data-mode="growth"]').click(); return; }
     if (action === 'history') { void showHistory().catch(error => { notice = error.message; render(); }); return; }
-    if (action === 'award' || action === 'penalty') {
-      void composer.open({ students: students.filter(s => selected.has(s.id)), sign: action === 'penalty' ? -1 : 1, reason }).catch(error => { notice = error.message; render(); });
+    if (action === 'award' || action === 'penalty' || action === 'recent') {
+      const card = action === 'recent' ? recentCard : null;
+      void composer.open({
+        students: students.filter(student => selected.has(student.id)),
+        sign: action === 'penalty' || card?.delta < 0 ? -1 : 1,
+        reason: card?.reason, points: card ? Math.abs(card.delta) : 1
+      }).catch(error => { notice = error.message; render(); });
       return;
     }
     if (action === 'close-dialog') { dialog.close(); return; }
@@ -352,25 +428,25 @@ export function mountScoreboard(root, { classId, bus }) {
       return;
     }
     notice = '';
-    if (action === 'view') {
-      view = button.dataset.view;
-      savePreference(VIEW_KEY, view);
-      editing = false;
-      source = null;
+    if (action === 'manage') {
+      previousView = view;
+      setView('manage');
+      return;
+    } else if (action === 'close-management') {
+      setView(previousView);
+      return;
     } else if (action === 'edit-seats') {
       editing = !editing;
       source = null;
       if (editing) notice = '학생이나 모둠을 끌어서 옮기거나, 옮길 대상과 위치를 차례로 선택하세요.';
     } else if (action === 'flip') {
-      reversed = !reversed;
-      savePreference(DIRECTION_KEY, String(reversed));
+      void flipRoom();
+      return;
     } else if (action === 'select-student') {
       if (selected.has(id)) selected.delete(id);
       else selected.add(id);
     } else if (action === 'select-group') {
-      const members = students.filter(s => (s.groupId || '') === id);
-      const allSelected = members.every(s => selected.has(s.id));
-      members.forEach(s => allSelected ? selected.delete(s.id) : selected.add(s.id));
+      selectGroup(id);
     } else if (action === 'all') {
       if (selected.size) selected.clear();
       else students.forEach(function (student) { selected.add(student.id); });
@@ -434,5 +510,5 @@ export function mountScoreboard(root, { classId, bus }) {
     }
   });
 
-  return { refresh };
+  return { refresh, setView };
 }

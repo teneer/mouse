@@ -1,7 +1,7 @@
-import { openDatabase, getRecord, putRecord, exportAll, importAll } from './core/db.js';
+import { openDatabase, getRecord, putRecord, exportAll, importAll, requestResult, transact } from './core/db.js';
 import { createEventBus } from './core/events.js';
 import { mountGlobalFeedback } from './core/feedback.js?v=reference-20261117';
-import { mountScoreboard } from './modules/scoreboard.js?v=reference-20261117';
+import { mountScoreboard } from './modules/scoreboard.js?v=classroom-controls';
 import { mountGrowth } from './modules/growth.js?v=reference-20261117';
 import { mountChecklist } from './modules/checklist.js?v=reference-20261117';
 
@@ -25,15 +25,17 @@ function downloadJson(data, filename) {
 }
 
 function switchMode(mode) {
-  const allowed = ['scoreboard', 'growth', 'checklist'];
+  const allowed = ['scoreboard', 'seats', 'growth', 'checklist'];
   if (!allowed.includes(mode)) mode = 'scoreboard';
+  const panelMode = mode === 'seats' ? 'scoreboard' : mode;
   document.querySelectorAll('[data-mode]').forEach(function (button) {
     button.classList.toggle('is-active', button.dataset.mode === mode);
     button.setAttribute('aria-current', button.dataset.mode === mode ? 'page' : 'false');
   });
   document.querySelectorAll('.mode-panel').forEach(function (panel) {
-    panel.classList.toggle('is-active', panel.id === 'mode-' + mode);
+    panel.classList.toggle('is-active', panel.id === 'mode-' + panelMode);
   });
+  document.getElementById('display-options').hidden = panelMode !== 'scoreboard';
   if (document.body.dataset.classroomMode !== mode) {
     document.body.dataset.classroomMode = mode;
     document.dispatchEvent(new Event('classroom-mode-changed'));
@@ -63,7 +65,7 @@ async function start() {
   }
 
   const bus = createEventBus();
-  mountGlobalFeedback(bus);
+  const feedback = mountGlobalFeedback(bus);
 
   const scoreboard = mountScoreboard(document.getElementById('scoreboard-root'), {
     classId: CLASS_ID,
@@ -78,12 +80,74 @@ async function start() {
     bus: bus
   });
 
+  const settings = document.getElementById('app-settings');
+  const nameInput = settings.querySelector('[name="className"]');
+  const nameLabel = document.getElementById('class-name');
+  const settingsError = document.getElementById('settings-error');
+  async function refreshClassName() {
+    const classroom = await getRecord('classes', CLASS_ID);
+    nameLabel.textContent = classroom?.name || '우리 반';
+  }
+  for (const id of ['header-settings', 'rail-settings']) {
+    document.getElementById(id).addEventListener('click', function () {
+      nameInput.value = nameLabel.textContent;
+      settingsError.textContent = '';
+      settings.showModal();
+    });
+  }
+  document.getElementById('settings-close').addEventListener('click', () => settings.close());
+  settings.querySelector('form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    if (!name) {
+      settingsError.textContent = '학반 이름을 입력해 주세요.';
+      return;
+    }
+    const submit = event.submitter;
+    if (submit?.disabled) return;
+    if (submit) submit.disabled = true;
+    try {
+      await transact(['classes'], 'readwrite', async function (transaction) {
+        const classes = transaction.objectStore('classes');
+        const classroom = await requestResult(classes.get(CLASS_ID));
+        classes.put({ ...classroom, id: CLASS_ID, name });
+      });
+      settings.close();
+      bus.publish('class.changed', { classId: CLASS_ID });
+    } catch (error) {
+      settingsError.textContent = error.message;
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+
+  const sound = document.getElementById('sound-toggle');
+  const soundKey = 'class-revolution.sound';
+  let soundEnabled = true;
+  try { soundEnabled = localStorage.getItem(soundKey) !== 'off'; } catch (error) {}
+  function updateSound() {
+    feedback.setSoundEnabled(soundEnabled);
+    sound.setAttribute('aria-pressed', String(soundEnabled));
+    sound.title = soundEnabled ? '소리 끄기' : '소리 켜기';
+    sound.setAttribute('aria-label', sound.title);
+  }
+  updateSound();
+  sound.addEventListener('click', function () {
+    soundEnabled = !soundEnabled;
+    try { localStorage.setItem(soundKey, soundEnabled ? 'on' : 'off'); } catch (error) {}
+    updateSound();
+  });
+  const curtain = document.getElementById('screen-curtain');
+  document.getElementById('curtain-toggle').addEventListener('click', () => curtain.showModal());
+  curtain.addEventListener('click', event => { if (event.target === curtain) curtain.close(); });
+
   function refreshAll() {
     return Promise.all([scoreboard.refresh(), growth.refresh(), checklist.refresh()]);
   }
 
   bus.subscribe(function (event) {
     if (event.type === 'data.restored') {
+      void refreshClassName();
       growth.handleEvent(event);
       refreshAll().catch(function (error) { console.error(error); });
     }
@@ -96,13 +160,21 @@ async function start() {
       growth.refresh();
       checklist.refresh();
     }
-    if (event.type === 'class.changed') growth.refresh();
+    if (event.type === 'class.changed') {
+      void refreshClassName();
+      growth.refresh();
+    }
     if (event.type === 'checklist.updated') checklist.refresh();
   });
 
+  function openMode(mode) {
+    if (mode === 'scoreboard' || mode === 'seats') scoreboard.setView(mode === 'seats' ? 'seats' : 'list');
+    switchMode(mode);
+  }
   document.querySelectorAll('[data-mode]').forEach(function (button) {
-    button.addEventListener('click', function () { switchMode(button.dataset.mode); });
+    button.addEventListener('click', function () { openMode(button.dataset.mode); });
   });
+  document.getElementById('home-button').addEventListener('click', () => openMode('scoreboard'));
 
   document.getElementById('backup-button').addEventListener('click', async function () {
     const data = await exportAll();
@@ -134,10 +206,10 @@ async function start() {
 
   let savedMode = 'scoreboard';
   try { savedMode = localStorage.getItem(MODE_KEY) || 'scoreboard'; } catch (error) {}
-  switchMode(savedMode);
-  await refreshAll();
+  openMode(savedMode);
+  await Promise.all([refreshAll(), refreshClassName()]);
   setStatus('로컬 데이터베이스 연결됨', false);
-  window.classRevolution = { db: db, bus: bus, switchMode: switchMode };
+  window.classRevolution = { db: db, bus: bus, switchMode: openMode };
 }
 
 start().catch(function (error) {
