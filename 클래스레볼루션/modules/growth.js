@@ -1,9 +1,9 @@
-import { mountEggTree } from './egg-tree.js?v=tree-branches';
+import { mountEggTree } from './egg-tree.js?v=landscapes';
 import { animatedAvatar, stillAvatar } from '../core/avatar.js';
 import { getRecord, putRecord, requestResult, transact } from '../core/db.js';
 import { PATH_LENGTH, sumDeductions } from '../core/growth-path.js';
 import { escapeHtml } from '../core/text.js';
-import { adjustGoldenEggs } from '../core/score-engine.js?v=golden-eggs';
+import { adjustGoldenEggs } from '../core/score-engine.js?v=signed-eggs';
 
 const POSITIONS = [
   [79.6, 26.0], [61.1, 19.4], [42.6, 26.0], [24.0, 19.4], [7.4, 41.3],
@@ -50,6 +50,11 @@ function actor(contribution, index, effect) {
 export function mountGrowth(root, { classId, bus }) {
   root.innerHTML = `
     <div class="growth-scene-host"><section class="growth-world" aria-label="학급점수판">
+      <div class="growth-landscape" aria-hidden="true">
+        ${Array.from({ length: 2 }, () => `<div class="growth-landscape-page">
+          <div class="growth-fossil"><i></i><b></b><span></span></div>
+        </div>`).join('')}
+      </div>
       <div class="growth-sky"></div>
       <aside class="growth-tree-strip" aria-label="황금알 누적">
         <button type="button" class="growth-tree-title" data-growth="settings"><strong></strong><span></span></button>
@@ -250,12 +255,14 @@ export function mountGrowth(root, { classId, bus }) {
     const total = Number(storedState.classScore) || 0;
     const special = Number(storedState.specialEggs) || 0;
     const proposed = total + eggDelta;
-    const valid = Number.isSafeInteger(proposed) && proposed >= 0;
+    const valid = Number.isSafeInteger(proposed) && Number.isSafeInteger(special + eggDelta);
     adjustment.querySelector('.egg-delta').value = eggDelta > 0 ? '+' + eggDelta : String(eggDelta);
     adjustment.querySelector('.egg-total').textContent = total;
     adjustment.querySelector('.egg-special').textContent = special > 0 ? '+' + special : special;
-    adjustment.querySelector('[data-growth="egg-plus"]').disabled = savingEggs || proposed >= Number.MAX_SAFE_INTEGER;
-    adjustment.querySelector('[data-growth="egg-minus"]').disabled = savingEggs || proposed <= 0;
+    adjustment.querySelector('[data-growth="egg-plus"]').disabled =
+      savingEggs || !Number.isSafeInteger(proposed + 1) || !Number.isSafeInteger(special + eggDelta + 1);
+    adjustment.querySelector('[data-growth="egg-minus"]').disabled =
+      savingEggs || !Number.isSafeInteger(proposed - 1) || !Number.isSafeInteger(special + eggDelta - 1);
     adjustment.querySelector('[data-growth="close-adjustment"]').disabled = savingEggs;
     const apply = adjustment.querySelector('.egg-apply');
     apply.disabled = savingEggs || !eggDelta || !valid;

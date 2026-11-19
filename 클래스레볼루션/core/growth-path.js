@@ -25,7 +25,7 @@ function historicalPath(conversion, level) {
 }
 
 export function applyPath(state, events, students, pastConversions, legacyDeductions, now, makeId) {
-  state.classScore = Math.max(0, Math.trunc(Number(state.classScore) || 0));
+  state.classScore = Math.trunc(Number(state.classScore) || 0);
   const specialEggs = state.specialEggs || 0;
   state.pending = Array.isArray(state.pending) ? state.pending.slice(0, PATH_LENGTH - 1) : [];
   state.totalContributions = Number(state.totalContributions) || 0;
@@ -76,7 +76,7 @@ export function applyPath(state, events, students, pastConversions, legacyDeduct
     }
 
     state.totalDeductions += -event.delta;
-    const eggFloor = Math.max(0, specialEggs);
+    const eggFloor = specialEggs;
     for (let point = 0; point > event.delta && (state.pending.length || state.classScore > eggFloor); point -= 1) {
       if (!state.pending.length) {
         const level = state.classScore - specialEggs;

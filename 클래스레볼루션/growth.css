@@ -6,11 +6,148 @@
 
 .growth-world {
   --tree-width: clamp(85px, 13vw, 205px);
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--tree-width);
   min-height: 100%;
   background: #44d6ed;
   color: #124a59;
+}
+
+.growth-landscape {
+  position: absolute;
+  inset: 0 var(--tree-width) 0 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.growth-landscape-page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #44d6ed;
+}
+
+.growth-landscape-page[data-zone="village"] {
+  background: url('assets/visuals/sp_board_sky_village.png') center bottom / 100% auto no-repeat #44d6ed;
+}
+.growth-landscape-page[data-zone="sky"] {
+  background: url('assets/visuals/bg-effect-wow-cloud.png') center var(--sheet-position) / 100% 300% no-repeat #44d6ed;
+}
+
+.growth-landscape-page:is([data-zone="birds"], [data-zone="airships"], [data-zone="planes"], [data-zone="space"]) {
+  background-image: var(--sky-sheet), var(--sky-stars, none);
+  background-position: center var(--sheet-position);
+  background-size: 100% 300%;
+  background-repeat: no-repeat;
+}
+.growth-landscape-page[data-zone="birds"] { --sky-sheet: url('assets/visuals/sp_board_sky_object2.png'); }
+.growth-landscape-page[data-zone="airships"] { --sky-sheet: url('assets/visuals/sp_board_sky_object3.png'); background-color: #36badf; }
+.growth-landscape-page[data-zone="planes"] { --sky-sheet: url('assets/visuals/sp_board_sky_object4.png'); background-color: #308dc8; }
+.growth-landscape-page[data-zone="space"] {
+  --sky-sheet: url('assets/visuals/sp_board_sky_object5.png');
+  --sky-stars: url('assets/visuals/sp_board_sky_stars.png');
+  background-color: #171f49;
+}
+
+.growth-landscape-page[data-zone="soil"] {
+  background:
+    radial-gradient(ellipse at 24% 36%, #b98c62 0 5px, transparent 6px) 0 0 / 197px 147px,
+    radial-gradient(ellipse at 75% 74%, #684735 0 4px, transparent 5px) 0 0 / 157px 103px,
+    linear-gradient(114deg, transparent 46%, #674531 48% 50%, transparent 53%) 0 0 / 170px 140px,
+    #8e6248;
+}
+.growth-landscape-page.has-roots::before,
+.growth-landscape-page.has-roots::after {
+  content: "";
+  position: absolute;
+  inset: -6% 8% auto auto;
+  width: 27%;
+  height: 40%;
+  border-left: clamp(6px, 1.5vw, 24px) solid #4f3024;
+  border-radius: 35% 0 0 88%;
+  transform: rotate(-26deg);
+  box-shadow: -3px 0 #b5855a;
+}
+.growth-landscape-page.has-roots::after {
+  right: 15%;
+  width: 14%;
+  height: 26%;
+  transform: rotate(31deg);
+}
+.growth-landscape-page[data-zone="fossil"] {
+  background: repeating-linear-gradient(172deg, #887264 0 36px, #6a544d 37px 64px, #9f8370 65px 82px);
+}
+.growth-fossil {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 9%;
+  width: 48%;
+  height: 200%;
+  color: #e1c49b;
+  opacity: .85;
+}
+.growth-landscape-page:is([data-fossil="upper"], [data-fossil="lower"]) .growth-fossil { display: block; }
+.growth-landscape-page[data-fossil="lower"] .growth-fossil { transform: translateY(-50%); }
+.growth-fossil i {
+  position: absolute;
+  top: 28%;
+  left: 2%;
+  width: 31%;
+  aspect-ratio: 1.5;
+  transform: rotate(-16deg);
+  border-radius: 65% 52% 36% 22%;
+  background: radial-gradient(circle at 66% 34%, #67554e 0 13%, transparent 14%), currentColor;
+}
+.growth-fossil i::after {
+  content: "";
+  position: absolute;
+  inset: 83% 16% -22% 3%;
+  border-bottom: 6px solid currentColor;
+  background: repeating-linear-gradient(91deg, currentColor 0 5%, transparent 6% 11%) top / 100% 45% no-repeat;
+  transform: rotate(8deg);
+}
+.growth-fossil b {
+  position: absolute;
+  top: 37%;
+  left: 26%;
+  width: 61%;
+  height: 21%;
+  border: 9px dashed currentColor;
+  border-left: 0;
+  border-top-right-radius: 85%;
+  border-bottom-right-radius: 80%;
+  transform: rotate(17deg);
+}
+.growth-fossil span {
+  position: absolute;
+  top: 43%;
+  left: 32%;
+  width: 44%;
+  height: 23%;
+  transform: rotate(25deg);
+  border-radius: 60% 65% 45% 90%;
+  background: repeating-linear-gradient(103deg, transparent 0 14%, currentColor 15% 19%, transparent 20% 25%);
+}
+.growth-landscape-page[data-zone="rock"] {
+  background:
+    conic-gradient(from 12deg at 23% 61%, transparent 0 45deg, #718ad0 47deg 58deg, transparent 60deg 360deg) 0 0 / 333px 271px,
+    repeating-linear-gradient(29deg, #353542 0 34px, #51505a 35px 79px, #292b34 80px 85px);
+}
+.growth-landscape-page[data-zone="magma"] {
+  background:
+    repeating-linear-gradient(158deg, #241c29 0 55px, #4e2526 64px, #ff6b28 71px, #ffc76b 74px, #7e2c28 79px, #241c29 92px);
+}
+.growth-landscape-page[data-zone="dark"] { background: #080a13; }
+.growth-world.is-underground .growth-class-label { background: #151018b8; color: #fff6dd; }
+.growth-world.is-underground .growth-tree-strip::before { visibility: hidden; }
+.growth-world.is-in-darkness .growth-tree-strip { background: #11111b; }
+.growth-world.is-in-darkness .tree-level::before { background: #352b30; }
+.growth-world.is-in-darkness .growth-path-art {
+  background-image: linear-gradient(90deg, #080a13ce 75%, transparent 85%), url('assets/visuals/bg-class-clouds-way.png');
 }
 
 .growth-sky {
@@ -174,14 +311,6 @@
   top:max(19%,115px); bottom:clamp(24px,5%,48px);
   left:-80%; width:180%;
   background:var(--branches) left var(--camera-offset,0px) / 100% 100% repeat-y;
-}
-.growth-sky::before {
-  content:""; position:absolute; inset:0; pointer-events:none;
-  background-image:radial-gradient(ellipse 36px 9px at 14% 42%,#fff3 95%,transparent),
-    radial-gradient(ellipse 23px 13px at 16% 40%,#fff3 95%,transparent),
-    radial-gradient(ellipse 44px 10px at 83% 75%,#fff2 95%,transparent);
-  background-size:100% var(--sky-repeat,180px);
-  background-position:center calc(var(--camera-offset,0px) / 3);
 }
 .growth-world .growth-tree-title { z-index:3; isolation:isolate; background:transparent; }
 .growth-tree-title::before { content:""; position:absolute; inset:0; z-index:-1; background:url('assets/visuals/sp_board_tree.png') 52.38% 0 / 174.4% 255.7% no-repeat; }

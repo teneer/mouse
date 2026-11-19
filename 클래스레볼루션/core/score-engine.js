@@ -1,5 +1,5 @@
 import { requestResult, transact } from './db.js';
-import { applyPath, sumDeductions } from './growth-path.js?v=golden-eggs';
+import { applyPath, sumDeductions } from './growth-path.js?v=signed-eggs';
 
 export function adjustGoldenEggs(classId, delta) {
   if (!Number.isSafeInteger(delta) || delta === 0) throw new Error('변경할 황금알 개수를 확인해 주세요.');
@@ -9,7 +9,6 @@ export function adjustGoldenEggs(classId, delta) {
       { classId, classScore: 0, pending: [], totalContributions: 0 };
     const total = Number(state.classScore || 0) + delta;
     const specialEggs = Number(state.specialEggs || 0) + delta;
-    if (total < 0) throw new Error('현재 보유한 황금알보다 많이 차감할 수 없습니다.');
     if (!Number.isSafeInteger(total) || !Number.isSafeInteger(specialEggs)) {
       throw new Error('황금알 개수가 저장 가능한 범위를 벗어났습니다.');
     }
@@ -48,7 +47,8 @@ export function applyScoreBatch(options) {
     const now = new Date().toISOString();
     const growthState = savedGrowth || { classId, classScore: 0, pending: [], totalContributions: 0 };
     const [pastConversions, historicalScores] = await Promise.all([
-      delta < 0 && growthState.classScore ? requestResult(conversionStore.index('classId').getAll(classId)) : [],
+      delta < 0 && (growthState.classScore || 0) > (growthState.specialEggs || 0)
+        ? requestResult(conversionStore.index('classId').getAll(classId)) : [],
       Number.isFinite(growthState.totalDeductions) ? [] : requestResult(eventStore.index('classId').getAll(classId))
     ]);
     const batchId = crypto.randomUUID();
