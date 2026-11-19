@@ -2,7 +2,7 @@ import { openDatabase, getRecord, putRecord, exportAll, importAll, requestResult
 import { createEventBus } from './core/events.js';
 import { mountGlobalFeedback } from './core/feedback.js?v=golden-eggs';
 import { mountScoreboard } from './modules/scoreboard.js?v=app-motion';
-import { mountGrowth } from './modules/growth.js?v=app-motion';
+import { mountGrowth } from './modules/growth.js?v=tree-climb';
 import { mountChecklist } from './modules/checklist.js?v=golden-eggs';
 
 const CLASS_ID = 'class-default';

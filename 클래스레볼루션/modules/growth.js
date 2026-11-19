@@ -1,3 +1,4 @@
+import { mountEggTree } from './egg-tree.js';
 import { animatedAvatar, stillAvatar } from '../core/avatar.js';
 import { getRecord, putRecord, requestResult, transact } from '../core/db.js';
 import { PATH_LENGTH, sumDeductions } from '../core/growth-path.js';
@@ -53,6 +54,7 @@ export function mountGrowth(root, { classId, bus }) {
       <aside class="growth-tree-strip" aria-label="황금알 누적">
         <button type="button" class="growth-tree-title" data-growth="settings"><strong></strong><span></span></button>
         <div class="growth-tree-meter">
+          <div class="tree-level" aria-hidden="true"></div>
           <div class="growth-tree-fill"></div>
           <div class="growth-tree-marker"><strong></strong></div>
         </div>
@@ -78,6 +80,7 @@ export function mountGrowth(root, { classId, bus }) {
   const adjustment = root.querySelector('.growth-adjustment');
   const treeTitle = root.querySelector('.growth-tree-title');
   const treeMeter = root.querySelector('.growth-tree-meter');
+  const updateTree = mountEggTree(treeMeter);
   let storedState = EMPTY_STATE;
   let eggDelta = 0;
   let savingEggs = false;
@@ -107,10 +110,7 @@ export function mountGrowth(root, { classId, bus }) {
       '</span><span aria-label="누적 감점 ' + frame.totalDeductions + '점"><i class="art-negative" aria-hidden="true"></i>' + (Number(frame.totalDeductions) || 0) + '</span></div></div>' + reward;
     treeTitle.querySelector('strong').textContent = nextGoal ? '다음 목표 · 황금알 ' + nextGoal.points + '개' : '우리 반 목표';
     treeTitle.querySelector('span').textContent = nextGoal?.reward || '목표와 보상 정하기';
-    // Each group of ten eggs climbs the ten stars painted on the trunk.
-    const treeStep = eggs > 0 ? (eggs - 1) % 10 + 1 : 0;
-    treeMeter.style.setProperty('--egg-height', treeStep * 10 + '%');
-    treeMeter.querySelector('strong').textContent = eggs;
+    updateTree(eggs, visible());
     treeMeter.setAttribute('aria-label', '누적 황금알 ' + eggs + '개');
   }
 
