@@ -1,8 +1,8 @@
 import { openDatabase, getRecord, putRecord, exportAll, importAll, requestResult, transact } from './core/db.js';
 import { createEventBus } from './core/events.js';
 import { mountGlobalFeedback } from './core/feedback.js?v=golden-eggs';
-import { mountScoreboard } from './modules/scoreboard.js?v=golden-eggs';
-import { mountGrowth } from './modules/growth.js?v=golden-eggs';
+import { mountScoreboard } from './modules/scoreboard.js?v=app-motion';
+import { mountGrowth } from './modules/growth.js?v=app-motion';
 import { mountChecklist } from './modules/checklist.js?v=golden-eggs';
 
 const CLASS_ID = 'class-default';

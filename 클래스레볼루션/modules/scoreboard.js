@@ -230,7 +230,7 @@ export function mountScoreboard(root, { classId, bus }) {
     const stage = surface.querySelector('.classroom-stage');
     const grid = stage.querySelector('.classroom-layout');
     const button = surface.querySelector('[data-action="flip"]');
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && grid.animate) {
+    if (grid.animate) {
       const options = { duration: 680, easing: 'ease-in-out', fill: 'forwards' };
       button.disabled = true;
       stage.classList.add('is-rotating');

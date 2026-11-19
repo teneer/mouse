@@ -277,8 +277,3 @@
   .growth-counts { padding-right: 2%; }
   .growth-actor { width: 12%; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .growth-actor, .growth-actor .avatar-fx, .growth-egg-celebration { animation: none; }
-  .growth-tree-marker, .growth-tree-fill { transition: none; }
-}

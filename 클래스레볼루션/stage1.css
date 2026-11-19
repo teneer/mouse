@@ -496,7 +496,3 @@ button.empty-room-position {
   .score-feedback-students { gap: 7px; }
   .score-feedback-bottom { padding-inline: 29px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .score-feedback, .score-feedback-student, .score-feedback-student .avatar-fx,
-  .score-feedback-detail.negative .score-feedback-student .avatar-still { animation: none; }
-}

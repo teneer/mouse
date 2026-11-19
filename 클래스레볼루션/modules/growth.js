@@ -90,7 +90,6 @@ export function mountGrowth(root, { classId, bus }) {
   const queue = [];
   const visible = () => document.body.dataset.classroomMode === 'growth';
   const popupOpen = () => Boolean(document.querySelector('#global-feedback .score-feedback-detail'));
-  const smallMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function render(frame, effect = {}) {
     const marker = frame.pending.length;
@@ -162,17 +161,16 @@ export function mountGrowth(root, { classId, bus }) {
       while (queue.length && session === generation && !popupOpen()) {
         const trail = queue.shift();
         const frame = { ...trail.before, pending: trail.before.pending.slice() };
-        const reduced = smallMotion();
         const pace = Math.min(1, Math.max(.45, 20 / trail.steps.length));
         const change = trail.after.classScore - trail.before.classScore;
-        if (trail.condensed || reduced) {
+        if (trail.condensed) {
           if (change) sound(change > 0);
-          if (change > 0 && !reduced) {
+          if (change > 0) {
             render(trail.after, { step: 'earn', eggs: change });
             await wait(900);
           }
         }
-        for (const step of reduced ? [] : trail.steps) {
+        for (const step of trail.steps) {
           while (session === generation && popupOpen()) await waitForPopup();
           if (session !== generation) return;
           if (step.kind === 'arrive') {
