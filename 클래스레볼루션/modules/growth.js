@@ -1,4 +1,4 @@
-import { mountEggTree } from './egg-tree.js';
+import { mountEggTree } from './egg-tree.js?v=tree-branches';
 import { animatedAvatar, stillAvatar } from '../core/avatar.js';
 import { getRecord, putRecord, requestResult, transact } from '../core/db.js';
 import { PATH_LENGTH, sumDeductions } from '../core/growth-path.js';

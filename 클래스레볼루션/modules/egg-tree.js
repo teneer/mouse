@@ -4,6 +4,8 @@ export function mountEggTree(meter) {
   const marker = meter.querySelector('.growth-tree-marker');
   const label = marker.querySelector('strong');
   const scene = meter.closest('.growth-world');
+  // The sprite sheets put blossoms (2) before leafy shoots (3).
+  const branchSheets = [1, 3, 2, 4, 5];
   const stars = Array.from({ length: 10 }, () => {
     const star = document.createElement('i');
     star.className = 'tree-star';
@@ -16,6 +18,8 @@ export function mountEggTree(meter) {
   let phase;
 
   function draw(height, camera, count) {
+    const sheet = branchSheets[Math.min(4, Math.floor(count / 100))];
+    if (scene.dataset.branchSheet !== String(sheet)) scene.dataset.branchSheet = String(sheet);
     const level = Math.floor(camera / 10) * 10;
     const offset = camera - level;
     stars.forEach((star, index) => {

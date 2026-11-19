@@ -164,6 +164,17 @@
   text-align: center;
 }
 .growth-world .growth-tree-strip { background:linear-gradient(90deg,#a3744c,#90613d 45%,#815535); }
+.growth-world { --branches:url('assets/visuals/sp_board_tree_branch1.png'); }
+.growth-world[data-branch-sheet="3"] { --branches:url('assets/visuals/sp_board_tree_branch3.png'); }
+.growth-world[data-branch-sheet="2"] { --branches:url('assets/visuals/sp_board_tree_branch2.png'); }
+.growth-world[data-branch-sheet="4"] { --branches:url('assets/visuals/sp_board_tree_branch4.png'); }
+.growth-world[data-branch-sheet="5"] { --branches:url('assets/visuals/sp_board_tree_branch5.png'); }
+.growth-tree-strip::before {
+  content:""; position:absolute; pointer-events:none;
+  top:max(19%,115px); bottom:clamp(24px,5%,48px);
+  left:-80%; width:180%;
+  background:var(--branches) left var(--camera-offset,0px) / 100% 100% repeat-y;
+}
 .growth-sky::before {
   content:""; position:absolute; inset:0; pointer-events:none;
   background-image:radial-gradient(ellipse 36px 9px at 14% 42%,#fff3 95%,transparent),
