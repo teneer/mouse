@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function authenticated() { return request.auth != null; }
+    function boardPath(board) {
+      return /databases/$(database)/documents/wbBoards/$(board);
+    }
+    function devicePath(board, uid) {
+      return /databases/$(database)/documents/wbBoards/$(board)/devices/$(uid);
+    }
+    function member(board) {
+      return authenticated() && exists(devicePath(board, request.auth.uid));
+    }
+    function payloadSize() {
+      return request.resource.data.payload is string && request.resource.data.payload.size() <= 200000;
+    }
+
+    match /wbBoards/{board} {
+      allow get: if member(board);
+      allow create: if authenticated() && request.resource.data.owner == request.auth.uid
+        && request.resource.data.head == 0 && request.resource.data.created == request.time
+        && existsAfter(devicePath(board, request.auth.uid));
+      allow update: if member(board)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['head', 'last'])
+        && request.resource.data.head == resource.data.head + 1
+        && getAfter(/databases/$(database)/documents/wbBoards/$(board)/operations/$(request.resource.data.last)).data.revision
+          == request.resource.data.head;
+
+      match /devices/{uid} {
+        allow read: if member(board) || (authenticated() && request.auth.uid == uid);
+        allow create: if request.resource.data.keys().hasOnly(['label', 'joined', 'requestCode', 'inviteToken'])
+          && request.resource.data.label is string && request.resource.data.label.size() <= 50
+          && request.resource.data.joined == request.time
+          && ((authenticated() && request.auth.uid == uid
+              && !('requestCode' in request.resource.data) && !('inviteToken' in request.resource.data)
+              && !exists(boardPath(board))
+              && getAfter(boardPath(board)).data.owner == uid)
+            || (authenticated() && request.auth.uid == uid && exists(boardPath(board))
+              && !('requestCode' in request.resource.data)
+              && 'inviteToken' in request.resource.data && request.resource.data.inviteToken is string
+              && request.resource.data.inviteToken.matches('[0-9a-f]{48}')
+              && getAfter(/databases/$(database)/documents/wbBoards/$(board)/control/deviceInvite).data.token
+                == request.resource.data.inviteToken)
+            || (member(board) && !('inviteToken' in request.resource.data)
+              && 'requestCode' in request.resource.data && request.resource.data.requestCode is string
+              && getAfter(/databases/$(database)/documents/wbBoards/$(board)/requests/$(request.resource.data.requestCode)).data.approved == true
+              && getAfter(/databases/$(database)/documents/wbBoards/$(board)/requests/$(request.resource.data.requestCode)).data.deviceId == uid));
+        allow update: if member(board)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label'])
+          && request.resource.data.label is string
+          && request.resource.data.label.size() >= 1 && request.resource.data.label.size() <= 50;
+        allow delete: if member(board) && request.auth.uid != uid;
+      }
+
+      match /requests/{code} {
+        allow get: if member(board) || (authenticated() && resource.data.deviceId == request.auth.uid);
+        allow create: if authenticated() && exists(boardPath(board))
+          && code.matches('[A-Z0-9]{20}')
+          && request.resource.data.keys().hasOnly(['deviceId','label','created'])
+          && request.resource.data.deviceId == request.auth.uid
+          && request.resource.data.label is string && request.resource.data.label.size() <= 50
+          && request.resource.data.created == request.time;
+        allow update: if member(board) && !('approved' in resource.data)
+          && request.time < resource.data.created + duration.value(10, 'm')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved'])
+          && request.resource.data.approved == true
+          && existsAfter(devicePath(board, resource.data.deviceId));
+      }
+
+      match /operations/{operation} {
+        allow read: if member(board);
+        allow create: if member(board) && request.resource.data.author == request.auth.uid
+          && getAfter(boardPath(board)).data.last == operation
+          && getAfter(boardPath(board)).data.head == request.resource.data.revision
+          && (('payload' in request.resource.data && payloadSize())
+            || (request.resource.data.parts is int && request.resource.data.parts > 0));
+        match /parts/{part} {
+          allow read: if member(board);
+          allow create: if member(board) && getAfter(boardPath(board)).data.last == operation
+            && payloadSize();
+        }
+      }
+      match /receipts/{receipt} {
+        allow get: if member(board);
+        allow create: if member(board) && request.resource.data.revision == getAfter(boardPath(board)).data.head;
+      }
+      match /control/deviceInvite {
+        allow get, delete: if member(board);
+        allow create: if member(board)
+          && request.resource.data.keys().hasOnly(['token'])
+          && request.resource.data.token is string
+          && request.resource.data.token.matches('[0-9a-f]{48}');
+      }
+      match /viewTabs/{tab} {
+        allow read: if member(board);
+        allow create: if member(board) && request.resource.data.owner == request.auth.uid
+          && request.resource.data.id == tab;
+        allow update: if member(board) && resource.data.owner == request.auth.uid
+          && request.resource.data.owner == request.auth.uid && request.resource.data.id == tab;
+        allow delete: if member(board) && resource.data.owner == request.auth.uid;
+      }
+      match /control/view {
+        allow read: if member(board);
+        allow write: if member(board) && request.resource.data.device == request.auth.uid;
+      }
+      match /availability/{uid}/files/{file} {
+        allow read: if member(board);
+        allow write: if member(board) && uid == request.auth.uid;
+      }
+      match /transfers/{id} {
+        allow get, list: if member(board) && request.auth.uid in resource.data.participants;
+        allow create: if member(board) && request.resource.data.sender == request.auth.uid
+          && request.resource.data.participants == [request.auth.uid, request.resource.data.receiver]
+          && exists(devicePath(board, request.resource.data.receiver));
+        allow update: if member(board) && request.auth.uid in resource.data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answer', 'status']);
+        allow delete: if member(board) && request.auth.uid in resource.data.participants;
+      }
+    }
+  }
+}

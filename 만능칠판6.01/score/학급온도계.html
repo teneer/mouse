@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학급 점수판 v.7 · 통합 패널</title>
+    <link rel="stylesheet" href="style.css?v=conflict-fields-1">
+    <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
+    <link rel="stylesheet" href="celebration.css?v=1">
+</head>
+
+<body>
+    <div id="shared-score-banner" hidden>
+        <span id="shared-score-message" role="status"></span>
+        <button id="score-conflicts" type="button" hidden>점수 충돌 확인</button>
+    </div>
+    <button id="score-unlock-audio" type="button" hidden>소리 켜기</button>
+    <div class="container">
+        <div id="display-area">
+            <div id="top-row">
+                <section id="class-area" aria-labelledby="class-score-title">
+                    <div class="main-scoreboard">
+                        <header class="class-heading">
+                            <div class="class-goal-heading"><h1 id="class-score-title">학급 점수</h1><div id="class-goal-gifts" hidden></div></div>
+                            <div class="score-header-actions">
+                                <button type="button" id="score-maximize" aria-label="전체 화면" title="전체 화면" aria-pressed="false"><span class="score-screen-icon" aria-hidden="true"></span></button>
+                                <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
+                            </div>
+                        </header>
+                        <div class="main-controls">
+                            <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
+                            <span id="number">0</span>
+                            <button id="main-increase-btn" class="main-btn" aria-label="학급 점수 1점 추가">+</button>
+                        </div>
+                        <div id="change"></div>
+                        <div class="score-progress-group">
+                            <div id="score-progress" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+                                <div class="score-progress-fill"></div>
+                            </div>
+                            <div class="conversion-line">
+                                <span id="conversion-rule">모둠 3점 = 학급 1점</span>
+                                <span id="conversion-progress" aria-hidden="true"></span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <section id="bottom-row" aria-labelledby="scoreboard-title">
+                <header class="team-heading">
+                    <h2 id="scoreboard-title">모둠 점수</h2>
+                    <span id="selected-team-count" role="status"></span>
+                </header>
+                <div id="team-viewport" role="region" aria-label="모둠 카드 목록" tabindex="0">
+                    <div id="scoreboard" class="scoreboard"></div>
+                </div>
+                
+                <div id="create-teams-btn-wrap">
+                    <button id="create-teams-btn" type="button" class="score-secondary">＋ 모둠 추가</button>
+                </div>
+            </section>
+        </div>
+
+        <form id="batch-score" hidden>
+            <button type="button" id="select-all-teams">전체선택</button>
+            <button type="button" id="undo-score" disabled>되돌리기</button>
+            <div class="batch-amount">
+                <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
+                <button type="button" id="batch-reset" aria-label="입력한 점수 지우기" hidden>×</button>
+                <div class="batch-stepper">
+                    <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
+                    <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
+                </div>
+            </div>
+            <button type="submit" id="apply-batch" disabled>반영</button>
+        </form>
+
+        <div id="settings-panel" class="settings-panel" aria-labelledby="score-settings-title" inert>
+            <header class="dialog-header"><h3 id="score-settings-title">점수판 설정</h3><button id="close-score-settings" class="dialog-close" type="button" aria-label="닫기">×</button></header>
+            <section class="score-settings-section" aria-labelledby="display-settings-title">
+                <h4 id="display-settings-title">화면 표시</h4>
+                <label class="score-setting-row" id="score-panel-side-row" hidden>점수판 위치
+                    <select id="score-panel-side">
+                        <option value="left">왼쪽</option>
+                        <option value="right" selected>오른쪽</option>
+                    </select>
+                </label>
+                <label class="score-setting-row">모둠카드 배치
+                    <select id="score-layout-mode">
+                        <option value="auto">자동 배치</option>
+                        <option value="fixed">열 수 고정</option>
+                    </select>
+                </label>
+                <label class="score-setting-row" id="score-fixed-columns-row" hidden>고정 열 수
+                    <input id="score-fixed-columns" type="number" min="1" max="6" step="1" value="3" inputmode="numeric">
+                </label>
+                <p class="score-setting-hint" id="score-layout-hint">사용 가능한 가로·세로 공간에서 모둠카드가 가장 크게 보이도록 배치합니다.</p>
+                <label class="score-setting-row">모둠 카드 비율
+                    <select id="score-card-ratio">
+                        <option value="4:3">4:3</option>
+                        <option value="16:9">16:9</option>
+                    </select>
+                </label>
+                <div class="score-setting-row">
+                    <span id="scale-label">표시 배율</span>
+                    <div class="score-size-controls" role="group" aria-labelledby="scale-label">
+                        <button type="button" id="scoreSizeDown" aria-label="점수판 축소">−</button>
+                        <output id="scoreSizeValue">100%</output>
+                        <button type="button" id="scoreSizeUp" aria-label="점수판 확대">+</button>
+                        <button type="button" id="scoreSizeReset" aria-label="배율을 100%로 초기화">초기화</button>
+                    </div>
+                </div>
+            </section>
+            <section class="score-settings-section" aria-labelledby="link-settings-title">
+                <h4 id="link-settings-title">점수 연동</h4>
+                <label class="score-setting-row">모둠 점수 연동
+                    <input type="checkbox" id="score-link-mode" checked>
+                </label>
+                <label class="score-setting-row score-link-rule" id="score-link-rule">
+                    <span>모둠</span>
+                    <input id="score-link-points" type="number" min="1" step="1" value="3" aria-label="학급 1점에 필요한 모둠 점수">
+                    <span>점 = 학급 1점</span>
+                </label>
+            </section>
+            <section class="score-settings-section">
+                <h4>효과음</h4>
+                <label class="score-setting-row">음량 <input id="score-volume" type="range" min="0" max="120" step="1" value="100"><output id="score-volume-level">100%</output></label>
+                <label class="score-setting-row">음소거 <input id="score-mute" type="checkbox"></label>
+            </section>
+            <section class="score-settings-section" aria-labelledby="manage-settings-title">
+                <h4 id="manage-settings-title">관리</h4>
+                <div class="score-settings-actions">
+                    <button type="button" id="open-goal-modal-btn">목표·달성 기록</button>
+                    <button type="button" id="open-management-modal-btn">점수판 관리</button>
+                </div>
+            </section>
+        </div>
+
+    </div>
+
+    <div id="team-setup-modal" class="modal-background" role="dialog" aria-modal="true" aria-labelledby="team-setup-title">
+        <div class="modal-box">
+            <header class="dialog-header"><h3 id="team-setup-title">모둠 생성</h3><button type="button" class="dialog-close" id="close-team-setup" aria-label="닫기">×</button></header>
+            <div class="modal-content">
+                <label for="team-count">모둠 수:</label>
+                <input type="number" id="team-count" min="1" max="12" value="6">
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-team-setup" class="dialog-action">취소</button>
+                <button id="confirm-team-setup" class="dialog-action dialog-primary">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="management-modal" class="fullscreen-view" role="dialog" aria-modal="true" aria-labelledby="manage-title">
+      <div class="dialog-sheet">
+        <header class="dialog-header">
+            <h2 id="manage-title">점수판 관리</h2>
+            <button id="close-management-dialog" class="dialog-close" aria-label="닫기">×</button>
+        </header>
+        <div class="management-content">
+             <div class="setting-item" style="margin-bottom:20px;">
+                <label for="manage-main-score">학급 점수</label>
+                <input type="number" id="manage-main-score">
+            </div>
+             
+             <div class="setting-item">
+                <h3>모둠 점수</h3>
+                <div id="team-management-list"></div>
+                <button id="add-team-btn" class="add-row-btn">+ 모둠 추가</button>
+            </div>
+
+            <section class="score-management-reset" aria-label="점수 초기화">
+                <button type="button" id="reset-main-btn">학급 점수 초기화</button>
+                <button type="button" id="reset-teams-btn">모둠 점수 초기화</button>
+            </section>
+
+            <div class="management-footer">
+                <button id="close-management-btn" class="dialog-action">취소</button>
+                <button id="save-management-btn" class="dialog-action dialog-primary">저장</button>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="goal-management-view" class="fullscreen-view" role="dialog" aria-labelledby="goal-manage-title">
+      <div class="dialog-sheet">
+        <header class="dialog-header"><h2 id="goal-manage-title">목표 설정</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
+        <div id="goal-settings">
+          <div class="goal-container">
+            <section class="goal-column"><h3>학급 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="class-goals-list"></div><button class="add-row-btn" data-type="class">+ 학급 목표 추가</button></section>
+            <section class="goal-column"><h3>모둠 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="team-goals-list"></div><button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button></section>
+          </div>
+          <label><input type="checkbox" id="goal-include-existing"> 새 목표를 이미 달성한 대상의 기록도 만들기</label>
+          <p id="goal-edit-error" role="status"></p>
+          <div class="dialog-footer"><button class="dialog-action" id="cancel-goal-edit">취소</button><button class="dialog-action dialog-primary" id="close-goal-view-btn">저장</button></div>
+        </div>
+      </div>
+    </div>
+
+    <aside id="goal-celebration" hidden aria-label="축하 메시지"></aside>
+
+    <dialog class="score-delete-dialog" id="team-delete-dialog" aria-labelledby="team-delete-title">
+        <form method="dialog">
+            <header class="dialog-header"><h2 id="team-delete-title">모둠 삭제</h2><button class="dialog-close" value="cancel" aria-label="닫기">×</button></header>
+            <p id="team-delete-message"></p>
+            <div class="dialog-footer"><button class="dialog-action" value="cancel" autofocus>취소</button><button class="dialog-action dialog-danger" value="delete">삭제</button></div>
+        </form>
+    </dialog>
+    <dialog class="score-delete-dialog" id="score-conflict-dialog" aria-labelledby="score-conflict-title">
+        <form method="dialog">
+            <header class="dialog-header"><h2 id="score-conflict-title">점수 충돌 확인</h2><button class="dialog-close" aria-label="닫기">×</button></header>
+            <p>서버 값과 기기에서 마지막으로 입력한 값 중 적용할 점수를 고르세요.</p>
+            <div id="score-conflict-fields"></div>
+        </form>
+    </dialog>
+
+    <script type="module" src="script.js?v=score-tab-preview-1"></script><script type="module" src="panel-ui.js?v=panel-side-1"></script>
+</body>
+</html>
