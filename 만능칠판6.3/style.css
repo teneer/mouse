@@ -754,8 +754,11 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 
 :is(.quick-colors,.quick-sizes) button.favorite {border-style:dashed}
 
-#cloudSyncStatus { font-size: .78rem; color: #324d60; white-space: nowrap; }
-#cloudSyncStatus[data-offline="true"] { color: #754100; background: #fff1d0; padding: .3rem .5rem; border-radius: .4rem; }
+#cloudSyncStatus {
+  box-sizing: border-box; inline-size: 5.25rem; padding: .3rem .25rem; border-radius: .4rem;
+  font-size: .78rem; color: #324d60; text-align: center; white-space: nowrap;
+}
+#cloudSyncStatus[data-offline="true"] { color: #754100; background: #fff1d0; }
 
 body.score-full #scorePanel {left:0;right:0;width:100%}
 body.score-full :is(#scoreSplitter,#toolbarScaleWrap) {display:none}

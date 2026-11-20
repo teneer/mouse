@@ -14,7 +14,7 @@ import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files
 import {CloudBoard} from './js/cloud.js?v=conflict-fields-1';
 import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=conflict-fields-1';
-import {wireCloudUI} from './js/cloud-ui.js?v=device-guide-1';
+import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
 import {validateContent} from './js/validation.js';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';

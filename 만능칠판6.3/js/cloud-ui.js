@@ -134,15 +134,17 @@ export function wireCloudUI({cloud,files,openModal,notify,flush,pages,current,us
   function status() {
     const linked = !!cloud.options;
     const waiting = cloud.pending.size;
-    const label = linked
-      ? cloud.revoked ? '이 기기의 연결이 해제되었습니다'
-      : cloud.online ? waiting ? `동기화 중 · 전송 대기 ${waiting}건` : '연결됨'
-      : `오프라인 · 전송 대기 ${waiting}건`
-      : '로컬 모드';
-    text('deviceStatus',label);
+    const [toolbarLabel, detail = toolbarLabel] = linked
+      ? cloud.revoked ? ['연결 해제', '이 기기의 연결이 해제되었습니다']
+      : cloud.online ? waiting ? ['동기화 중', `동기화 중 · 전송 대기 ${waiting}건`] : ['연결됨']
+      : ['오프라인', `오프라인 · 전송 대기 ${waiting}건`]
+      : ['로컬 모드'];
+    text('deviceStatus',detail);
     $('deviceStatus').dataset.online=String(linked && cloud.online);
-    if ($('cloudSyncStatus').textContent !== label) text('cloudSyncStatus',label);
-    $('cloudSyncStatus').dataset.offline = String(linked && !cloud.online);
+    const toolbarStatus = $('cloudSyncStatus');
+    if (toolbarStatus.textContent !== toolbarLabel) toolbarStatus.textContent = toolbarLabel;
+    toolbarStatus.title = detail;
+    toolbarStatus.dataset.offline = String(linked && !cloud.online);
     $('deviceSeedScore').hidden = !linked || !cloud.boardReady || !cloud.online ||
       cloud.state.revision < cloud.head || !!cloud.projectedScore();
     $('deviceResume').hidden = linked || !reconnectOptions;
