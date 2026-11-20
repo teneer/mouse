@@ -12,7 +12,7 @@ export function validateContent(input) {
       f.width < 1 || f.height < 1 || f.width > 20000 || f.height > 20000 ||
       Math.abs(f.cx) > 1e8 || Math.abs(f.cy) > 1e8) throw Error('뷰포트 크기가 올바르지 않습니다.');
   let count = 0, segments = 0;
-  const KEYS = new Set(('type version originX originY left top width height fill stroke strokeWidth strokeDashArray strokeLineCap strokeDashOffset strokeLineJoin strokeUniform strokeMiterLimit scaleX scaleY angle flipX flipY opacity shadow visible backgroundColor fillRule paintFirst globalCompositeOperation skewX skewY rx ry radius startAngle endAngle path pathOffset points x1 y1 x2 y2 text fontSize fontWeight fontFamily fontStyle lineHeight underline overline linethrough textAlign textBackgroundColor charSpacing styles direction minWidth splitByGrapheme deltaY src crossOrigin filters resizeFilter cropX cropY objects clipPath inverted absolutePositioned id isHighlighter selectable evented wbAsset wbPage wbPinned wbTextBorder').split(' '));
+  const KEYS = new Set(('type version originX originY left top width height fill stroke strokeWidth strokeDashArray strokeLineCap strokeDashOffset strokeLineJoin strokeUniform strokeMiterLimit scaleX scaleY angle flipX flipY opacity shadow visible backgroundColor fillRule paintFirst globalCompositeOperation skewX skewY rx ry radius startAngle endAngle path pathOffset points x1 y1 x2 y2 text fontSize fontWeight fontFamily fontStyle lineHeight underline overline linethrough textAlign textBackgroundColor charSpacing styles direction minWidth splitByGrapheme deltaY src crossOrigin filters resizeFilter cropX cropY objects clipPath inverted absolutePositioned id isHighlighter selectable evented wbAsset wbPage wbPinned wbTextBorder wbInkGroup').split(' '));
   function visit(obj, depth = 0) {
     if (++count > 15000 || depth > 32 || !obj || !TYPES.has(obj.type)) throw Error('지원하지 않거나 너무 복잡한 객체입니다.');
     for (const key of Object.keys(obj)) if(!KEYS.has(key)) delete obj[key];
@@ -41,6 +41,7 @@ export function validateContent(input) {
     if (obj.filters?.length) throw Error('이미지 필터가 있는 가져오기 데이터는 지원하지 않습니다.');
     if(['text','i-text','textbox'].includes(obj.type) && obj.wbTextBorder) obj.wbTextBorder=normalizeTextBoxBorder(obj.wbTextBorder);
     else delete obj.wbTextBorder;
+    if(obj.type!=='path' || typeof obj.wbInkGroup!=='string' || !/^[0-9a-f-]{36}$/i.test(obj.wbInkGroup)) delete obj.wbInkGroup;
     if(obj.wbPinned!==true)delete obj.wbPinned;
     delete obj.customLayer;
     obj.visible = true; obj.selectable = true; obj.evented = true;

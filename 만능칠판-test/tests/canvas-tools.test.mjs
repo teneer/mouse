@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CanvasTools} from '../js/canvas-tools.js';
+import {PageHistory} from '../history.js';
 class Rect {
  constructor(options){Object.assign(this,options);}
  set(options){Object.assign(this,options);return this;}
@@ -10,6 +11,7 @@ class Rect {
 }
 globalThis.fabric={
  Point:class{constructor(x,y){this.x=x;this.y=y;}},Rect,
+ ActiveSelection:class{constructor(objects){this.objects=objects;}},
  util:{
   createCanvasElement(){
    const ctx={
@@ -41,7 +43,7 @@ globalThis.fabric={
 function fixture() {
  let changes=0,views=0,textPoint=null,editable=true;
  const c={width:1280,height:720,viewportTransform:[1,0,0,1,0,0],objects:[],events:{},
- on(name,fn){this.events[name]=fn;},getObjects(){return this.objects;},discardActiveObject(){},
+ on(name,fn){this.events[name]=fn;},getObjects(){return this.objects;},discardActiveObject(){this.active=null;},setActiveObject(o){this.active=o;},
  requestRenderAll(){},setCursor(s){this.cursor=s;},getZoom(){return this.viewportTransform[0];},
  zoomToPoint(p,z){this.zoomPoint=p;this.viewportTransform[0]=this.viewportTransform[3]=z;},
  bringToFront(o){this.objects=this.objects.filter(x=>x!==o);this.objects.push(o);},
@@ -106,4 +108,35 @@ test('locked editor ignores pointer input',()=>{
 });
 test('text mode passes world pointer position to the editor',()=>{
  const f=fixture();f.t.setMode('text');f.t.down({e:{clientX:12,clientY:34,button:0}});assert.deepEqual(f.text(),{x:12,y:34});
+});
+
+test('strokes across word spaces and a line break select together but keep per-stroke undo and erasing',()=>{
+ const {c,t,changes}=fixture();
+ t.setMode('pen');
+ const a=new Rect({type:'path',left:10,top:10,width:20,height:25,strokeWidth:3,stroke:'#000'});
+ const b=new Rect({type:'path',left:85,top:10,width:20,height:25,strokeWidth:3,stroke:'#000'});
+ const nextLine=new Rect({type:'path',left:10,top:65,width:20,height:25,strokeWidth:3,stroke:'#000'});
+ const history=new PageHistory();
+ history.reset('page',[]);
+ for(const path of [a,b,nextLine]){
+  c.events['mouse:down:before']({e:{button:0}});
+  c.add(path);
+  c.events['path:created']({path});
+  history.push('page',c.objects.map(({id,wbInkGroup})=>({id,wbInkGroup})));
+ }
+ assert.notEqual(a.id,b.id);
+ assert.equal(a.wbInkGroup,b.wbInkGroup);
+ assert.equal(a.wbInkGroup,nextLine.wbInkGroup);
+ assert.equal(changes(),3);
+ assert.deepEqual(history.step('page',-1).map(stroke=>stroke.id),[a.id,b.id]);
+ t.setMode('select');
+ c.events['mouse:down:before']({e:{button:0},target:b});
+ assert.deepEqual(c.active.objects,[a,b,nextLine]);
+ assert.equal(c._target,c.active);
+ assert.deepEqual(c.objects,[a,b,nextLine]);
+ t.setMode('eraser');
+ t.down({e:{clientX:13,clientY:16,button:0}});
+ t.up();
+ assert.deepEqual(c.objects,[b,nextLine]);
+ assert.equal(changes(),4);
 });

@@ -1,16 +1,26 @@
-import {SERIAL_PROPS,uid} from './js/constants.js';
-import {validateContent} from './js/validation.js';
+import {SERIAL_PROPS,uid} from './js/constants.js?v=whiteboard-7';
+import {validateContent} from './js/validation.js?v=whiteboard-7';
+import {isInkSelection} from './js/ink-group.js';
 const utf8To64=s=>{const bytes=new TextEncoder().encode(s);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(raw);};
 const from64=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 const escapeHTML=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function freshIds(obj) {obj.id=uid();obj.objects?.forEach(freshIds);}
+function freshIds(obj, inkGroups=new Map()) {
+  obj.id=uid();
+  if(obj.wbInkGroup){
+    if(!inkGroups.has(obj.wbInkGroup))inkGroups.set(obj.wbInkGroup,uid());
+    obj.wbInkGroup=inkGroups.get(obj.wbInkGroup);
+  }
+  obj.objects?.forEach(child=>freshIds(child,inkGroups));
+}
 function dataURLBlob(url) {const [header,body]=url.split(',');const bytes=Uint8Array.from(atob(body),c=>c.charCodeAt(0));return new Blob([bytes],{type:header.match(/:(.*?);/)[1]});}
 export function parseBoardHTML(html) {
   if(!html || html.length>20*1024*1024) return null;
   const node=new DOMParser().parseFromString(html,'text/html').querySelector('[data-whiteboard-v2]');
   if(!node) return null;
   const payload=JSON.parse(from64(node.getAttribute('data-whiteboard-v2')));
-  return validateContent({canvas:{objects:[payload.object],background:'#fff'},frame:{width:1280,height:720,cx:0,cy:0}}).canvas.objects[0];
+  const object=validateContent({canvas:{objects:[payload.object],background:'#fff'},frame:{width:1280,height:720,cx:0,cy:0}}).canvas.objects[0];
+  if(payload.inkSelection===true && object.type==='group' && isInkSelection(object.objects??[]))object.inkSelection=true;
+  return object;
 }
 export class SystemClipboard {
   constructor({canvas,allowed,run,onChange,onFiles,onText,notify,isTextEditing}) {
@@ -23,7 +33,8 @@ export class SystemClipboard {
     const object=this.canvas.getActiveObject();if(!object) throw Error('먼저 복사할 객체를 선택해주세요.');
     const json=object.toObject(SERIAL_PROPS);
     if(json.type==='activeSelection') json.type='group';
-    const encoded=utf8To64(JSON.stringify({object:json}));
+    const inkSelection=object.type==='activeSelection' && isInkSelection(json.objects);
+    const encoded=utf8To64(JSON.stringify({object:json,inkSelection}));
     if(encoded.length>20*1024*1024) throw Error('선택한 내용이 너무 큽니다. 나누어 복사해주세요.');
     const plain=object.text || object.getObjects?.().map(o=>o.text || '').filter(Boolean).join('\n') || '만능칠판 객체';
     
@@ -98,11 +109,14 @@ export class SystemClipboard {
       if(image) await this.onFiles([image]);else if(text) this.onText(text);else this.notify('붙여넣을 이미지나 텍스트가 없습니다.');
     });
   }
-  async pasteObject(json) {
+  async pasteObject(source) {
+    const {inkSelection,...json}=source;
     freshIds(json);
     const objects=await new Promise(resolve=>fabric.util.enlivenObjects([json],resolve));
     const object=objects[0];if(!object)throw Error('클립보드 객체를 복원하지 못했습니다.');
     const c=this.canvas,center=fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
-    object.setPositionByOrigin(center,'center','center');object.setCoords();c.add(object);c.setActiveObject(object);c.requestRenderAll();this.onChange();
+    object.setPositionByOrigin(center,'center','center');object.setCoords();c.add(object);c.setActiveObject(object);
+    if(inkSelection && object.type==='group')object.toActiveSelection();
+    c.requestRenderAll();this.onChange();
   }
 }

@@ -1,13 +1,29 @@
 import {MIN_ZOOM,MAX_ZOOM,uid} from './constants.js';
+import {canJoinInk,inkSelectionMembers} from './ink-group.js?v=ink-session-1';
 export class CanvasTools {
   constructor({canvas,canEdit,onChange,onViewport,onMode,onText}) {
     Object.assign(this,{canvas,canEdit,onChange,onViewport,onMode,onText});
     this.mode='select';this.pen={color:'#000000',width:5};this.marker={color:'#000000',width:30};
     this.text={color:'#000000',size:48};this.gesture=false;this.pan=null;this.erased=false;this.erasePoint=null;this.eraseCanvas=null;
+    this.ink=null;this.inkStart=null;
     const c=canvas;
     c.on('mouse:down:before',opt=>{
       if(!canEdit())return;
       if(opt.e.button===1 || this.mode==='move') {c.selection=false;c.skipTargetFind=true;}
+      if((opt.e.button && opt.e.button!==0) || opt.e.isPrimary===false)return;
+      if(c.isDrawingMode)this.inkStart=performance.now();
+      if(this.mode==='select' && !opt.e.shiftKey && !opt.e.altKey && !opt.e.ctrlKey && !opt.e.metaKey){
+        const members=inkSelectionMembers(c.getObjects(),opt.target);
+        if(members.length>1){
+          c.discardActiveObject(opt.e);
+          const selection=new fabric.ActiveSelection(members,{canvas:c});
+          c.setActiveObject(selection,opt.e);
+          // Fabric 5.3.1 reads the cached target after down:before. Use the
+          // selection for the same pointer gesture's drag as well as clicks.
+          c._target=selection;
+          c.requestRenderAll();
+        }
+      }
     });
     c.on('mouse:down',opt=>this.down(opt));
     c.on('mouse:move',opt=>this.move(opt));
@@ -18,13 +34,23 @@ export class CanvasTools {
     });
     c.on('path:created',({path})=>{
       path.id=uid();if(this.mode==='marker')path.set({stroke:this.marker.color,opacity:0.32,isHighlighter:true});
-      path.setCoords();c.requestRenderAll();onChange();
+      path.setCoords();
+      const endedAt=performance.now();
+      const stroke={mode:this.mode,color:path.stroke,
+        strokeWidth:path.strokeWidth,startedAt:this.inkStart??endedAt,endedAt};
+      const previous=this.ink && c.getObjects().includes(this.ink.lastPath) && canJoinInk(this.ink,stroke)
+        ? this.ink : null;
+      path.wbInkGroup=previous?.id??path.id;
+      this.ink={...stroke,id:path.wbInkGroup,lastPath:path};
+      this.inkStart=null;
+      c.requestRenderAll();onChange();
     });
     c.on('object:modified',()=>onChange());
     this.setMode('select');
   }
   pointer(e) {const p=e.touches?.[0] || e.changedTouches?.[0] || e;return {x:p.clientX,y:p.clientY};}
   setMode(mode) {
+    this.ink=null;this.inkStart=null;
     this.mode=mode;const c=this.canvas;
     c.discardActiveObject();c.isDrawingMode=mode==='pen'||mode==='marker';c.selection=mode==='select';c.skipTargetFind=mode==='move';
     c.getObjects().forEach(o=>o.set({selectable:mode==='select' && !o.wbPinned && !o.wbAssetMissing,evented:!o.wbPinned && !o.wbAssetMissing}));
