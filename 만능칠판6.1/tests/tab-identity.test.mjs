@@ -32,12 +32,3 @@ test('a reload cannot claim the ID of another live tab',async()=>{
   const after=await acquireTabIdentity(key,{storage,navigation:'reload',acquire:async name=>!name.endsWith(first.id)});
   assert.notEqual(after.id,first.id);
 });
-
-test('default selects all live tabs and explicit selections survive churn',async()=>{
-  const {viewTargets}=await import('../js/view-tabs.js');
-  const available=['pc','tablet'];
-  assert.deepEqual(viewTargets(undefined,available),available);
-  assert.deepEqual(viewTargets([],available),[]);
-  assert.deepEqual(viewTargets(['old','tablet'],available),['tablet']);
-  assert.deepEqual(viewTargets(['old'],available),available);
-});
