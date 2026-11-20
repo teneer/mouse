@@ -7,7 +7,7 @@ import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES}
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=conflict-fields-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js';
-import {CanvasTools} from './js/canvas-tools.js?v=board-ux-1';
+import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';

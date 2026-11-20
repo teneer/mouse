@@ -1,5 +1,5 @@
 import {MIN_ZOOM,MAX_ZOOM,uid} from './constants.js';
-import {canJoinInk,extendInk,inkSelectionMembers} from './ink-group.js';
+import {canJoinInk,inkSelectionMembers} from './ink-group.js?v=ink-session-1';
 export class CanvasTools {
   constructor({canvas,canEdit,onChange,onViewport,onMode,onText}) {
     Object.assign(this,{canvas,canEdit,onChange,onViewport,onMode,onText});
@@ -36,12 +36,12 @@ export class CanvasTools {
       path.id=uid();if(this.mode==='marker')path.set({stroke:this.marker.color,opacity:0.32,isHighlighter:true});
       path.setCoords();
       const endedAt=performance.now();
-      const stroke={bounds:path.getBoundingRect(true,true),mode:this.mode,color:path.stroke,
+      const stroke={mode:this.mode,color:path.stroke,
         strokeWidth:path.strokeWidth,startedAt:this.inkStart??endedAt,endedAt};
       const previous=this.ink && c.getObjects().includes(this.ink.lastPath) && canJoinInk(this.ink,stroke)
         ? this.ink : null;
       path.wbInkGroup=previous?.id??path.id;
-      this.ink={...extendInk(previous,stroke,path.wbInkGroup),lastPath:path};
+      this.ink={...stroke,id:path.wbInkGroup,lastPath:path};
       this.inkStart=null;
       c.requestRenderAll();onChange();
     });

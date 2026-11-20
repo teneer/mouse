@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CanvasTools} from '../js/canvas-tools.js';
+import {PageHistory} from '../history.js';
 class Rect {
  constructor(options){Object.assign(this,options);}
  set(options){Object.assign(this,options);return this;}
@@ -109,27 +110,33 @@ test('text mode passes world pointer position to the editor',()=>{
  const f=fixture();f.t.setMode('text');f.t.down({e:{clientX:12,clientY:34,button:0}});assert.deepEqual(f.text(),{x:12,y:34});
 });
 
-test('two nearby ink strokes select together but the eraser only removes the touched stroke',()=>{
+test('strokes across word spaces and a line break select together but keep per-stroke undo and erasing',()=>{
  const {c,t,changes}=fixture();
  t.setMode('pen');
  const a=new Rect({type:'path',left:10,top:10,width:20,height:25,strokeWidth:3,stroke:'#000'});
- const b=new Rect({type:'path',left:33,top:10,width:20,height:25,strokeWidth:3,stroke:'#000'});
- for(const path of [a,b]){
+ const b=new Rect({type:'path',left:85,top:10,width:20,height:25,strokeWidth:3,stroke:'#000'});
+ const nextLine=new Rect({type:'path',left:10,top:65,width:20,height:25,strokeWidth:3,stroke:'#000'});
+ const history=new PageHistory();
+ history.reset('page',[]);
+ for(const path of [a,b,nextLine]){
   c.events['mouse:down:before']({e:{button:0}});
   c.add(path);
   c.events['path:created']({path});
+  history.push('page',c.objects.map(({id,wbInkGroup})=>({id,wbInkGroup})));
  }
  assert.notEqual(a.id,b.id);
  assert.equal(a.wbInkGroup,b.wbInkGroup);
- assert.equal(changes(),2);
+ assert.equal(a.wbInkGroup,nextLine.wbInkGroup);
+ assert.equal(changes(),3);
+ assert.deepEqual(history.step('page',-1).map(stroke=>stroke.id),[a.id,b.id]);
  t.setMode('select');
  c.events['mouse:down:before']({e:{button:0},target:b});
- assert.deepEqual(c.active.objects,[a,b]);
+ assert.deepEqual(c.active.objects,[a,b,nextLine]);
  assert.equal(c._target,c.active);
- assert.deepEqual(c.objects,[a,b]);
+ assert.deepEqual(c.objects,[a,b,nextLine]);
  t.setMode('eraser');
  t.down({e:{clientX:13,clientY:16,button:0}});
  t.up();
- assert.deepEqual(c.objects,[b]);
- assert.equal(changes(),3);
+ assert.deepEqual(c.objects,[b,nextLine]);
+ assert.equal(changes(),4);
 });
