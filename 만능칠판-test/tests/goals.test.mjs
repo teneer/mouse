@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyScoreOperation} from '../js/shared-score.js';
-import {nextClassGoalScore} from '../score/goal-model.js';
+import {nextClassGoal} from '../score/goal-model.js';
 
 function scenario() {
   const board={}, send=(kind, key, fields)=>applyScoreOperation(board,{kind,key,authoredAt:1,...fields});
@@ -122,10 +122,54 @@ test('next class goal picks the closest upcoming class score and skips completed
       {id:'next',type:'class',score:30},
       {id:'done',type:'class',score:25}
     ],
-    records:[{goalId:'done',teamId:null,status:'done'}]
+    records:[{id:'["done",null]',goalId:'done',teamId:null,status:'done'}]
   };
-  assert.equal(nextClassGoalScore(system,20),30);
-  assert.equal(nextClassGoalScore(system,30),60);
-  assert.equal(nextClassGoalScore(system,60),null);
-  assert.equal(nextClassGoalScore({goals:[],records:[]},0),null);
+  assert.equal(nextClassGoal(system,20)?.score,30);
+  assert.equal(nextClassGoal(system,30)?.score,60);
+  assert.equal(nextClassGoal(system,60),null);
+  assert.equal(nextClassGoal({goals:[],records:[]},0),null);
+});
+
+test('recurring class goals keep independent rounds at overlapping scores',()=>{
+  const {score,send}=scenario();
+  send('score-goals','goals',{base:null,goals:[
+    {id:'movie',type:'class',score:50,interval:50,message:'영화데이'},
+    {id:'free',type:'class',score:100,interval:100,message:'자유시간'},
+    {id:'once',type:'class',score:125,message:'스티커'},
+  ]});
+  assert.equal(nextClassGoal(score(),9)?.message,'영화데이');
+  send('score-delta','jump',{group:'jump',amount:91});
+  const records=()=>score().records.map(({goalId,score,status})=>[goalId,score,status]);
+  assert.deepEqual(records(),[['movie',50,'pending'],['movie',100,'pending'],['free',100,'pending']]);
+  assert.equal(nextClassGoal(score(),100)?.score,125);
+  const movie=score().records[1];
+  send('score-records','complete',{records:[{id:movie.id,reached:movie.reached}],complete:true});
+  assert.deepEqual(records(),[['movie',50,'pending'],['movie',100,'done'],['free',100,'pending']]);
+  send('score-delta','drop',{group:'drop',amount:-60});
+  assert.deepEqual(records(),[['movie',50,'withdrawn'],['movie',100,'done'],['free',100,'withdrawn']]);
+  send('score-delta','again',{group:'again',amount:60});
+  assert.deepEqual(records(),[['movie',50,'pending'],['movie',100,'done'],['free',100,'pending']]);
+  send('score-records','cancel',{records:[{id:movie.id,reached:movie.reached}],complete:false});
+  assert.deepEqual(records(),[['movie',50,'pending'],['movie',100,'pending'],['free',100,'pending']]);
+});
+
+test('each group earns its own repeated milestones and automatic completion',()=>{
+  const {score,send}=scenario();
+  send('score-goals','goals',{base:null,goals:[
+    {id:'team',type:'team',score:5,interval:5,message:'모둠 보상',automatic:true}
+  ]});
+  send('score-delta','team-a',{group:'team-a',amount:10,targets:['a']});
+  send('score-delta','team-b',{group:'team-b',amount:5,targets:['b']});
+  assert.deepEqual(score().records.map(({teamId,score,status})=>[teamId,score,status]),[
+    ['a',5,'done'],['a',10,'done'],['b',5,'done']
+  ]);
+});
+
+test('recurring goals optionally add previously reached milestones as silent records',()=>{
+  const {score,send}=scenario();
+  send('score-goals','goals',{base:null,includeExisting:true,goals:[
+    {id:'class',type:'class',score:3,interval:3,message:'반복'}
+  ]});
+  assert.deepEqual(score().records.map(({score,silent})=>[score,silent]),[[3,true],[6,true],[9,true]]);
+  assert.equal(nextClassGoal(score(),9)?.score,12);
 });

@@ -1,4 +1,4 @@
-import {goalStatus,parseGoalScore} from './goal-model.js?v=conflict-fields-1';
+import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=recurring-goals-1';
 import {mountGoalCelebration} from './goal-celebration.js';
 
 const $ = id => document.getElementById(id);
@@ -63,7 +63,7 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       if (accepted && active===record) close();
       return accepted;
     }:null;
-    const score=String(record.achievedScore??record.score)+'점';
+    const score=String(record.milestone??record.achievedScore??record.score)+'점';
     const detail={
       type:record.type,
       title:record.type==='class'?'학급 목표 달성':'모둠 목표 달성',
@@ -100,9 +100,16 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     }
     if (announce && previous) {
       const seen=new Map(previous.records.map(row=>[row.id,row.reached]));
+      const recurring = new Map();
       for (const row of system.records) {
-        if (!row.silent && row.status!=='withdrawn' && row.reached!==seen.get(row.id)) queue.push(row);
+        if (row.silent || row.status==='withdrawn' || row.reached===seen.get(row.id)) continue;
+        if (row.milestone === undefined) queue.push(row);
+        else {
+          const batch = JSON.stringify([row.reached,row.goalId,row.teamId]);
+          if (!recurring.has(batch) || recurring.get(batch).milestone < row.milestone) recurring.set(batch,row);
+        }
       }
+      queue.push(...recurring.values());
     }
     previous=structuredClone(system);
     advance();
@@ -141,15 +148,33 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     row.dataset.type=type;
     row.innerHTML=`
       <div class="goal-fields">
-        <label class="goal-field"><span>목표 점수</span><input type="text" class="goal-score" autocomplete="off" spellcheck="false" aria-label="목표 점수"></label>
-        <label class="goal-field"><span>축하 메시지</span><input class="goal-message" maxlength="240" aria-label="축하 메시지"></label>
+        <label class="goal-field goal-type-field"><span>유형</span><select class="goal-frequency" aria-label="목표 유형"><option value="once">한 번</option><option value="repeat">반복</option></select></label>
+        <div class="goal-thresholds">
+          <label class="goal-field goal-start-field"><span>목표 점수</span><input type="text" class="goal-score" autocomplete="off" spellcheck="false" aria-label="목표 점수"></label>
+          <label class="goal-field goal-interval-field" hidden><span>점마다</span><input type="text" inputmode="numeric" class="goal-interval" autocomplete="off" aria-label="반복 간격"></label>
+        </div>
+        <label class="goal-field goal-message-field"><span>축하 메시지</span><input class="goal-message" maxlength="240" aria-label="축하 메시지"></label>
         <label class="goal-auto"><input class="goal-completion" type="checkbox" aria-label="자동 완료"><span>자동 완료</span></label>
         <button type="button" class="dialog-action goal-status" aria-expanded="false"><span class="goal-status-text">새 목표</span></button>
       </div>
       <div class="goal-progress" hidden>
         <div class="goal-progress-body"></div>
       </div>`;
-    row.querySelector('.goal-score').value=goal.score??'';
+    const frequency = row.querySelector('.goal-frequency');
+    const intervalField = row.querySelector('.goal-interval-field');
+    const scoreInput = row.querySelector('.goal-score');
+    frequency.value = goal.interval ? 'repeat' : 'once';
+    scoreInput.value = goal.score??'';
+    row.querySelector('.goal-interval').value = goal.interval??'';
+    frequency.onchange = () => {
+      const repeating = frequency.value === 'repeat';
+      intervalField.hidden = !repeating;
+      row.toggleAttribute('data-repeating',repeating);
+      scoreInput.placeholder = repeating ? '첫 점수' : '';
+      scoreInput.setAttribute('aria-label',repeating ? '첫 목표 점수' : '목표 점수');
+      scoreInput.previousElementSibling.textContent = repeating ? '점부터' : '목표 점수';
+    };
+    frequency.onchange();
     row.querySelector('.goal-message').value=goal.message??'';
     row.querySelector('.goal-completion').checked=!!goal.automatic;
     const remove=button('×',()=>row.remove(),'dialog-action dialog-danger goal-remove');
@@ -185,7 +210,7 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     const row=[...view.querySelectorAll('.goal-edit-row')].find(item=>item.dataset.goal===record.goalId);
     if (row) {
       row.scrollIntoView({block:'nearest'});
-      if (row.dataset.type==='team') setExpanded(row,true);
+      if (row.dataset.type==='team' && record.milestone===undefined) setExpanded(row,true);
       else row.querySelector('.goal-status').click();
     } else show(record,true);
   }
@@ -201,11 +226,18 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     for (const type of ['class','team']) for (const row of $(type+'-goals-list').children) {
       const input=row.querySelector('.goal-score'), score=parseGoalScore(input.value);
       const message=row.querySelector('.goal-message').value.trim();
-      if (!input.value.trim() && !message) continue;
-      if (score===null || !message) {
-        $('goal-edit-error').textContent='목표 점수는 -10000~10000 사이의 정수로 입력하고 축하 메시지를 작성해 주세요.';return;
+      const repeating = row.querySelector('.goal-frequency').value === 'repeat';
+      const intervalValue = row.querySelector('.goal-interval').value;
+      if (!input.value.trim() && !message && (!repeating || !intervalValue.trim())) continue;
+      const interval = repeating ? parseGoalInterval(intervalValue) : null;
+      if (score===null || repeating && interval===null) {
+        $('goal-edit-error').textContent = score===null
+          ? '목표 점수를 -10000~10000 사이의 정수로 입력해 주세요.'
+          : '반복 간격을 1~10000 사이의 정수로 입력해 주세요.';
+        return;
       }
-      goals.push({id:row.dataset.goal,type,score,message,automatic:row.querySelector('.goal-completion').checked});
+      goals.push({id:row.dataset.goal,type,score,message,automatic:row.querySelector('.goal-completion').checked,
+        ...(repeating ? {interval} : {})});
     }
     $('goal-edit-error').textContent='';
     saveButton.disabled=true;
@@ -252,6 +284,63 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     return {team,state,target};
   }
 
+  function renderRecurringRows(row,goal,status) {
+    const records = system.records.filter(record => record.goalId === goal.id);
+    const waiting = records.filter(record => record.status === 'pending').length;
+    const finished = records.filter(record => record.status === 'done').length;
+    const progress = row.querySelector('.goal-progress');
+    status.removeAttribute('data-status');
+    status.removeAttribute('data-confirm-cancel');
+    status.removeAttribute('aria-label');
+    status.classList.remove('goal-dropdown-trigger');
+    status.querySelector('.goal-status-text').textContent = waiting ? `대기 ${waiting}건`
+      : finished ? `✓ 완료 ${finished}건` : '미도달';
+    status.setAttribute('aria-controls',progress.id);
+    status.onclick = () => {
+      const expand = progress.hidden;
+      setExpanded(row,expand);
+      if (expand) renderRecurringRows(row,goal,status);
+    };
+    if (progress.hidden) return;
+
+    const body = row.querySelector('.goal-progress-body');
+    const sorted = records.sort((a,b) => {
+      const order = {pending:0,done:1,withdrawn:2};
+      return order[a.status]-order[b.status] || b.score-a.score ||
+        (a.teamName||'').localeCompare(b.teamName||'','ko');
+    });
+    body.replaceChildren();
+    if (!sorted.length) {
+      body.append('아직 달성한 회차가 없습니다.');
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'goal-round-list';
+    body.append(list);
+    let shown = 0;
+    const more = button('더 보기',showMore);
+    function showMore() {
+      for (const record of sorted.slice(shown,shown+30)) {
+        const item = document.createElement('div');
+        item.className = 'goal-round';
+        const heading = document.createElement('strong');
+        heading.textContent = (record.teamName ? record.teamName+' · ' : '')+record.score+'점';
+        const pending = record.status === 'pending';
+        const done = record.status === 'done';
+        const state = document.createElement('span');
+        state.textContent = pending ? '완료 대기' : done ? '✓ 완료' : '미도달';
+        state.dataset.status = record.status;
+        item.append(heading,state);
+        if (pending || done) item.append(button(pending ? '완료 처리' : '완료 취소',()=>change([record],pending)));
+        list.append(item);
+      }
+      shown = list.childElementCount;
+      if (shown < sorted.length) list.after(more);
+      else more.remove();
+    }
+    showMore();
+  }
+
   function refreshRows() {
     closeDropdown();
     for (const row of view.querySelectorAll('.goal-edit-row')) {
@@ -259,6 +348,10 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       if (!goal) continue;
       const found=new Map(system.records.filter(rec=>rec.goalId===goal.id).map(rec=>[rec.teamId,rec]));
       const status=row.querySelector('.goal-status');
+      if (goal.interval || system.records.some(record=>record.goalId===goal.id && record.milestone!==undefined)) {
+        renderRecurringRows(row,goal,status);
+        continue;
+      }
       if (goal.type==='class') {
         const info=describeTarget(goal,{id:null,name:'학급',score:classScore()},found.get(null));
         row.querySelector('.goal-progress').hidden=true;

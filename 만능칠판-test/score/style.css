@@ -331,11 +331,9 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   max-width:100%;
   margin:clamp(4px, 1dvh, 10px) auto 0;
   padding:.2rem clamp(.3rem, 3cqw, .65rem);
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-  align-items:baseline;
-  gap:0 .45rem;
+  display:grid;
+  justify-items:center;
+  gap:.12rem;
   border:1px solid #d8af56;
   border-radius:999px;
   background:#fff0c3;
@@ -348,6 +346,13 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 #next-class-goal strong {
   font-size:clamp(.9rem, 5cqw, 1.15rem);
   font-variant-numeric:tabular-nums;
+}
+#next-class-goal-message {
+  color:#523309;
+  font-size:clamp(.8rem, 4cqw, 1rem);
+  font-weight:750;
+  overflow-wrap:anywhere;
+  max-width:min(100%,28rem);
 }
 .main-controls {gap:min(12px, 3cqw);margin:clamp(4px, 1dvh, 10px) 0 0;min-width:0}
 .main-btn {flex:0 0 auto;font-size:clamp(13px, 8cqw, 23px)}
@@ -785,13 +790,20 @@ body.score-modal-open .container {visibility:hidden}
 #goal-management-view .add-row-btn {width:auto;margin:.45rem .7rem .7rem;padding:.4rem .7rem}
 .goal-edit-row {display:block;padding:0;background:white;border-radius:0}
 .goal-fields {
-  display:grid;align-items:center;gap:.45rem;grid-template-columns:6rem minmax(0,1fr) 5.5rem 8.25rem 2.25rem;
+  display:grid;align-items:center;gap:.45rem;grid-template-columns:4.5rem minmax(10rem,1.25fr) minmax(0,2fr) 5.5rem 8.25rem 2.25rem;
   padding:.4rem .7rem;
 }
 .goal-list-head {background:#f7fbfd;color:#254b60;font-weight:650;font-size:.85rem}
 .goal-field {min-width:0}
 .goal-field span,.goal-auto span {display:none}
-.goal-fields .goal-field input {height:36px;width:100%;min-width:0;padding:0 .45rem;font-size:inherit}
+.goal-thresholds {display:flex;gap:.35rem;min-width:0}
+.goal-thresholds .goal-field {flex:1}
+.goal-fields .goal-field :is(input,select) {height:36px;width:100%;min-width:0;padding:0 .45rem;font-size:inherit}
+.goal-frequency {color:var(--text-color);background:#edf5f7;border:1px solid var(--panel-line);border-radius:8px}
+.goal-thresholds .goal-interval-field, [data-repeating] .goal-start-field {
+  display:flex;flex-direction:row-reverse;align-items:center;gap:.2rem;white-space:nowrap;
+}
+.goal-thresholds .goal-interval-field span, [data-repeating] .goal-start-field span {display:inline;font-size:.75rem}
 .goal-auto {display:flex;align-items:center;justify-content:center;gap:.3rem;white-space:nowrap}
 .goal-edit-row input[type=checkbox],#goal-include-existing {
   appearance:auto;width:1rem;height:1rem;margin:0;flex:none;accent-color:#18536e;
@@ -805,6 +817,16 @@ body.score-modal-open .container {visibility:hidden}
 #goal-management-view .goal-remove {padding:0;font-size:1.25rem}
 .goal-progress {padding:.5rem .7rem;background:#f8fbfc;border-bottom:1px solid var(--panel-line)}
 .goal-team-list {display:flex;flex-wrap:wrap;gap:.4rem}
+.goal-round-list {display:grid;gap:.35rem}
+.goal-round {
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(4.5rem,auto) auto;
+  align-items:center;gap:.45rem;padding:.3rem .55rem;border:1px solid var(--panel-line);
+  border-radius:9px;background:white;font-size:.875rem;
+}
+.goal-round strong {overflow-wrap:anywhere}
+.goal-round span[data-status=done] {color:#294c26;background:#e8f3e4;border-radius:8px;padding:.25rem .45rem}
+.goal-round span[data-status=withdrawn] {color:var(--muted-text)}
+.goal-round-list + .dialog-action {margin-top:.4rem}
 .goal-team-progress {
   display:inline-flex;align-items:center;gap:.4rem;box-sizing:border-box;max-width:100%;
   padding:.25rem .45rem;border:1px solid var(--panel-line);border-radius:9px;background:white;
@@ -856,11 +878,13 @@ body.score-modal-open .container {visibility:hidden}
   .goal-list-head {display:none}
   .goal-fields {grid-template-columns:4.8rem minmax(0,1fr) 2.25rem}
   .goal-field span,.goal-auto span {display:inline;font-size:.75rem}
-  .goal-field:first-child {grid-area:1 / 1}
-  .goal-field:nth-child(2) {grid-area:1 / 2 / 2 / 4}
-  .goal-auto {grid-area:2 / 1;justify-content:flex-start}
-  .goal-status {grid-area:2 / 2}
-  .goal-remove {grid-area:2 / 3}
+  .goal-type-field {grid-area:1 / 1}
+  .goal-thresholds {grid-area:1 / 2;flex-wrap:wrap}
+  .goal-thresholds .goal-field {flex:1 0 100%}
+  .goal-message-field {grid-area:2 / 1 / 3 / 4}
+  .goal-auto {grid-area:3 / 1;justify-content:flex-start}
+  .goal-status {grid-area:3 / 2}
+  .goal-remove {grid-area:1 / 3;align-self:start}
 }
 
 .team-goal-gifts button {

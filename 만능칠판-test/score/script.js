@@ -1,6 +1,6 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
-import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoalScore} from './goal-model.js?v=next-class-goal-1';
-import {wireGoals} from './goals-ui.js?v=conflict-fields-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal} from './goal-model.js?v=recurring-goals-1';
+import {wireGoals} from './goals-ui.js?v=recurring-goals-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
@@ -40,7 +40,8 @@ const managementModal = document.getElementById('management-modal');
 const settingsPanel = document.getElementById('settings-panel');
 const settingsToggleBtn = document.getElementById('settings-toggle-btn');
 const goalManagementView = document.getElementById('goal-management-view');
-const nextClassGoal = document.getElementById('next-class-goal');
+const nextClassGoalBadge = document.getElementById('next-class-goal');
+const nextClassGoalMessage = document.getElementById('next-class-goal-message');
 const nextClassGoalValue = document.getElementById('next-class-goal-score');
 const goalScoreFormat = new Intl.NumberFormat('ko-KR');
 const progress = document.getElementById('score-progress');
@@ -322,10 +323,13 @@ function snapshot(version) {
 function renderClassGoalFeedback(announce) {
   goalUI.update(goalSystem,announce);
   goalUI.giftGroup(document.getElementById('class-goal-gifts'));
-  const next = nextClassGoalScore(goalSystem,count);
-  nextClassGoal.hidden = next === null;
-  const label = next === null ? '' : `${goalScoreFormat.format(next)}점`;
+  const next = nextClassGoal(goalSystem,count);
+  nextClassGoalBadge.hidden = next === null;
+  const label = next === null ? '' : `${goalScoreFormat.format(next.score)}점`;
+  const message = next?.message ?? '';
   if (nextClassGoalValue.textContent !== label) nextClassGoalValue.textContent = label;
+  if (nextClassGoalMessage.textContent !== message) nextClassGoalMessage.textContent = message;
+  nextClassGoalMessage.hidden = !message;
 }
 function renderGoalFeedback(announce) {
   renderClassGoalFeedback(announce);

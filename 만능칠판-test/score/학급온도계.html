@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=next-class-goal-1">
+    <link rel="stylesheet" href="style.css?v=recurring-goals-1">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=1">
 </head>
@@ -29,8 +29,8 @@
                             </div>
                         </header>
                         <div id="next-class-goal" role="status" hidden>
-                            <span>다음 학급 목표</span>
-                            <strong id="next-class-goal-score"></strong>
+                            <div>다음 목표 <strong id="next-class-goal-score"></strong></div>
+                            <div id="next-class-goal-message" hidden></div>
                         </div>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
@@ -194,8 +194,8 @@
         <header class="dialog-header"><h2 id="goal-manage-title">목표 설정</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
         <div id="goal-settings">
           <div class="goal-container">
-            <section class="goal-column"><h3>학급 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="class-goals-list"></div><button class="add-row-btn" data-type="class">+ 학급 목표 추가</button></section>
-            <section class="goal-column"><h3>모둠 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="team-goals-list"></div><button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button></section>
+            <section class="goal-column"><h3>학급 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>유형</span><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="class-goals-list"></div><button class="add-row-btn" data-type="class">+ 학급 목표 추가</button></section>
+            <section class="goal-column"><h3>모둠 목표</h3><div class="goal-list-head goal-fields" aria-hidden="true"><span>유형</span><span>목표 점수</span><span>축하 메시지</span><span>자동 완료</span><span>현재 상태</span></div><div id="team-goals-list"></div><button class="add-row-btn" data-type="team">+ 모둠 목표 추가</button></section>
           </div>
           <label><input type="checkbox" id="goal-include-existing"> 새 목표를 이미 달성한 대상의 기록도 만들기</label>
           <p id="goal-edit-error" role="status"></p>
@@ -221,6 +221,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=next-class-goal-1"></script><script type="module" src="panel-ui.js?v=panel-side-1"></script>
+    <script type="module" src="script.js?v=recurring-goals-1"></script><script type="module" src="panel-ui.js?v=panel-side-1"></script>
 </body>
 </html>
