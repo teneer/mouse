@@ -19,6 +19,8 @@ import { measureTeamLayout } from './team-layout.js?v=3';
   const hint = document.getElementById('score-layout-hint');
   const frame = window.frameElement;
   const scaleOutput = document.getElementById('scoreSizeValue');
+  const sideRow = document.getElementById('score-panel-side-row');
+  const sideSelect = document.getElementById('score-panel-side');
 
   function readSetting(key) {
     try { return localStorage.getItem(key); } catch { return null; }
@@ -138,12 +140,23 @@ import { measureTeamLayout } from './team-layout.js?v=3';
   document.getElementById('scoreSizeUp').addEventListener('click', () => setScale(scale + 10, true));
   document.getElementById('scoreSizeReset').addEventListener('click', () => setScale(100, true));
   if (frame) {
+    const applySide = () => {
+      const side = frame.dataset.scoreSide;
+      sideRow.hidden = side !== 'left' && side !== 'right';
+      if (!sideRow.hidden) sideSelect.value = side;
+    };
+    applySide();
+    sideSelect.addEventListener('change', () => {
+      frame.dispatchEvent(new CustomEvent('score-panel-side', { detail: sideSelect.value }));
+      applySide();
+    });
     new MutationObserver(() => {
+      applySide();
       const incoming = Number(frame.dataset.syncedScoreScale);
       if (incoming>=60 && incoming<=150 && incoming!==scale) setScale(incoming);
       scheduleLayout();
     }).observe(frame, {
-      attributeFilter: ['data-panel-percent', 'data-toolbar-height', 'data-synced-score-scale'],
+      attributeFilter: ['data-panel-percent', 'data-toolbar-height', 'data-synced-score-scale', 'data-score-side'],
     });
   }
   const resizeObserver = new ResizeObserver(scheduleLayout);

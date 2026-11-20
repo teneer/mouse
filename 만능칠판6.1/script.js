@@ -1249,9 +1249,17 @@ function setupIntegratedScorePanel(){
   if(!$('scorePanelToggle'))return;
   const toggle=$('scorePanelToggle'),splitter=$('scoreSplitter'),panel=$('scorePanel'),frame=$('scoreFrame');
   const clamp=n=>Math.max(MIN_BOARD_SHARE,Math.min(MAX_BOARD_SHARE,n));
-  try{const saved=JSON.parse(localStorage.getItem(PANEL_STORAGE_KEY)||'{}');scoreOpen=saved.open===true;scoreShare=Number.isFinite(saved.share)?clamp(saved.share):70;}catch{}
-  const save=()=>{try{localStorage.setItem(PANEL_STORAGE_KEY,JSON.stringify({open:scoreOpen,share:scoreShare}));}catch{}};
+  let scoreSide='right';
+  try{
+    const saved=JSON.parse(localStorage.getItem(PANEL_STORAGE_KEY)||'{}');
+    scoreOpen=saved.open===true;
+    scoreShare=Number.isFinite(saved.share)?clamp(saved.share):70;
+    if(saved.side==='left')scoreSide='left';
+  }catch{}
+  const save=()=>{try{localStorage.setItem(PANEL_STORAGE_KEY,JSON.stringify({open:scoreOpen,share:scoreShare,side:scoreSide}));}catch{}};
   const update=()=>{
+    document.body.dataset.scoreSide=scoreSide;
+    frame.dataset.scoreSide=scoreSide;
     document.body.classList.toggle('score-open',scoreOpen);
     document.body.classList.toggle('score-full',scoreFull && scoreOpen);
     frame.dataset.scoreFull=String(scoreFull && scoreOpen);
@@ -1274,6 +1282,13 @@ function setupIntegratedScorePanel(){
     }
     if(Number.isFinite(view.scoreScale))frame.dataset.syncedScoreScale=String(view.scoreScale);
   };
+  frame.addEventListener('score-panel-side',event=>{
+    const side=event.detail;
+    if(scoreDragging || (side!=='left' && side!=='right') || side===scoreSide)return;
+    scoreSide=side;
+    update();
+    save();
+  });
   frame.addEventListener('score-display-scale',()=>rememberView(true));
   const toolbar=$('toolbar');
   const updateToolbarHeight=()=>{
@@ -1303,11 +1318,14 @@ function setupIntegratedScorePanel(){
   let dragOffset=0;
   const changeShare=clientX=>{
     const width=document.documentElement.clientWidth||innerWidth;
-    scoreShare=clamp((clientX+dragOffset)/width*100);update();
+    const boundary=clientX+dragOffset;
+    const boardWidth=scoreSide==='left'?width-boundary:boundary;
+    scoreShare=clamp(boardWidth/width*100);update();
   };
   splitter.addEventListener('pointerdown',e=>{
     if(!scoreOpen||e.button!==0)return;
-    dragOffset=splitter.getBoundingClientRect().right-e.clientX;
+    const rect=splitter.getBoundingClientRect();
+    dragOffset=(scoreSide==='left'?rect.left:rect.right)-e.clientX;
     scoreDragging=true;document.body.classList.add('score-resizing');splitter.classList.add('dragging');
     splitter.setPointerCapture(e.pointerId);e.preventDefault();
   });
@@ -1317,8 +1335,9 @@ function setupIntegratedScorePanel(){
   splitter.addEventListener('keydown',e=>{
     if(!scoreOpen)return;
     const step=e.shiftKey?10:2;
-    if(e.key==='ArrowLeft')scoreShare=clamp(scoreShare-step);
-    else if(e.key==='ArrowRight')scoreShare=clamp(scoreShare+step);
+    const rightStep=scoreSide==='left'?-step:step;
+    if(e.key==='ArrowLeft')scoreShare=clamp(scoreShare-rightStep);
+    else if(e.key==='ArrowRight')scoreShare=clamp(scoreShare+rightStep);
     else if(e.key==='Home')scoreShare=MIN_BOARD_SHARE;
     else if(e.key==='End')scoreShare=MAX_BOARD_SHARE;
     else return;
