@@ -1,5 +1,5 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
-import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals} from './goal-model.js?v=conflict-fields-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoalScore} from './goal-model.js?v=next-class-goal-1';
 import {wireGoals} from './goals-ui.js?v=conflict-fields-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
@@ -40,6 +40,9 @@ const managementModal = document.getElementById('management-modal');
 const settingsPanel = document.getElementById('settings-panel');
 const settingsToggleBtn = document.getElementById('settings-toggle-btn');
 const goalManagementView = document.getElementById('goal-management-view');
+const nextClassGoal = document.getElementById('next-class-goal');
+const nextClassGoalValue = document.getElementById('next-class-goal-score');
+const goalScoreFormat = new Intl.NumberFormat('ko-KR');
 const progress = document.getElementById('score-progress');
 const conversionRule = document.getElementById('conversion-rule');
 const conversionProgress = document.getElementById('conversion-progress');
@@ -316,9 +319,16 @@ function snapshot(version) {
     scoreLink: { enabled: linkEnabled, points: linkPoints }
   };
 }
-function renderGoalFeedback(announce) {
+function renderClassGoalFeedback(announce) {
   goalUI.update(goalSystem,announce);
   goalUI.giftGroup(document.getElementById('class-goal-gifts'));
+  const next = nextClassGoalScore(goalSystem,count);
+  nextClassGoal.hidden = next === null;
+  const label = next === null ? '' : `${goalScoreFormat.format(next)}점`;
+  if (nextClassGoalValue.textContent !== label) nextClassGoalValue.textContent = label;
+}
+function renderGoalFeedback(announce) {
+  renderClassGoalFeedback(announce);
   for (const gift of document.querySelectorAll('[data-team-gifts]')) goalUI.giftGroup(gift,gift.dataset.teamGifts);
 }
 function saveToStorage(effect = null, base = sharedScore?.state) {
@@ -375,8 +385,7 @@ window.addEventListener('storage', event => {
 function renderCurrentState(effect,announce=false,keepConversion=false) {
   if(!effect && !keepConversion){resetConversion();renderClassNumber(count);}
   renderLinkSettings();
-  goalUI.update(goalSystem,announce);
-  goalUI.giftGroup(document.getElementById('class-goal-gifts'));
+  renderClassGoalFeedback(announce);
   renderTeams();
   if(effect)presentScoreEffect(effect);
   else if(!keepConversion)updateScoreProgress();

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=conflict-fields-1">
+    <link rel="stylesheet" href="style.css?v=next-class-goal-1">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=1">
 </head>
@@ -28,6 +28,10 @@
                                 <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                             </div>
                         </header>
+                        <div id="next-class-goal" role="status" hidden>
+                            <span>다음 학급 목표</span>
+                            <strong id="next-class-goal-score"></strong>
+                        </div>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
                             <span id="number">0</span>
@@ -217,6 +221,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=score-tab-preview-1"></script><script type="module" src="panel-ui.js?v=panel-side-1"></script>
+    <script type="module" src="script.js?v=next-class-goal-1"></script><script type="module" src="panel-ui.js?v=panel-side-1"></script>
 </body>
 </html>

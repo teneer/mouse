@@ -23,6 +23,18 @@ function targets(state, goal) {
 }
 const recordId = (goal, teamId) => JSON.stringify([goal.id,teamId]);
 
+export function nextClassGoalScore(system, count) {
+  const completed = new Set(system.records
+    .filter(record => record.teamId === null && record.status === 'done')
+    .map(record => record.goalId));
+  let next = null;
+  for (const goal of system.goals) {
+    if (goal.type !== 'class' || goal.score <= count || completed.has(goal.id)) continue;
+    if (next === null || goal.score < next) next = goal.score;
+  }
+  return next;
+}
+
 export function goalStatus(goal, score, record) {
   if (record?.status==='done') return 'done';
   return score>=goal.score?'reached':'unreached';

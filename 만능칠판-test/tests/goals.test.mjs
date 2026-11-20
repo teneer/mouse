@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyScoreOperation} from '../js/shared-score.js';
+import {nextClassGoalScore} from '../score/goal-model.js';
 
 function scenario() {
   const board={}, send=(kind, key, fields)=>applyScoreOperation(board,{kind,key,authoredAt:1,...fields});
@@ -111,4 +112,20 @@ test('deleting a goal removes outstanding gifts while preserving unrelated recor
   assert.equal(score().records.length,2);
   send('score-goals','remove',{base:'new',goals:[goals[0]]});
   assert.deepEqual(score().records.map(record=>record.goalId),[goals[0].id]);
+});
+
+test('next class goal picks the closest upcoming class score and skips completed goals',()=>{
+  const system={
+    goals:[
+      {id:'high',type:'class',score:60},
+      {id:'team',type:'team',score:21},
+      {id:'next',type:'class',score:30},
+      {id:'done',type:'class',score:25}
+    ],
+    records:[{goalId:'done',teamId:null,status:'done'}]
+  };
+  assert.equal(nextClassGoalScore(system,20),30);
+  assert.equal(nextClassGoalScore(system,30),60);
+  assert.equal(nextClassGoalScore(system,60),null);
+  assert.equal(nextClassGoalScore({goals:[],records:[]},0),null);
 });
