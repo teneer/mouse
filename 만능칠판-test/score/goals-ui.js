@@ -1,5 +1,5 @@
-import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=recurring-goals-1';
-import {mountGoalCelebration} from './goal-celebration.js';
+import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=goal-queue-1';
+import {createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=goal-queue-1';
 
 const $ = id => document.getElementById(id);
 const button = (label,action,classes='dialog-action') => {
@@ -10,9 +10,10 @@ const button = (label,action,classes='dialog-action') => {
 
 export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confirmSave}) {
   const view = $('goal-management-view'), popup = $('goal-celebration');
-  const showLocalPopup=mountGoalCelebration(popup);
+  const localPopup=mountGoalCelebration(popup);
   const saveButton=$('close-goal-view-btn');
-  const queue = [];
+  const celebrations = createGoalCelebrationQueue(celebrate);
+  let records = new Map();
   let system, active, timer, editingRevision, previous;
   const dropdown=document.createElement('div');
   dropdown.className='goal-status-menu';
@@ -56,63 +57,75 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     window.frameElement?.dispatchEvent(new CustomEvent('score-management-modal',{detail:open}));
   };
   const emitPopup = detail => window.frameElement?.dispatchEvent(new CustomEvent('score-celebration',{detail}));
-  function show(record, replay) {
-    active=record;
-    const complete=record.status==='pending'?async ()=>{
-      const accepted=await change([record],true);
-      if (accepted && active===record) close();
+  function refreshSkip() {
+    const action = active && celebrations.hasPending(records) ? skipRemaining : null;
+    if (window.frameElement) window.frameElement.dispatchEvent(new CustomEvent('score-celebration-skip',{detail:action}));
+    else localPopup.setSkip(action);
+  }
+  function skipRemaining() {
+    celebrations.clear();
+    close();
+  }
+  function show(record) {
+    showGroup([record]);
+  }
+  function showGroup(group) {
+    active=group;
+    const record=group[0];
+    const pending=group.filter(row=>row.status==='pending');
+    const complete=pending.length ? async ()=>{
+      const accepted=await change(pending,true);
+      if (accepted && active===group) close();
       return accepted;
-    }:null;
+    } : null;
     const score=String(record.milestone??record.achievedScore??record.score)+'점';
+    const names=record.type==='team'
+      ? group.map(row=>teamList().find(team=>team.id===row.teamId)?.name || row.teamName || '모둠').join(', ')
+      : '';
     const detail={
       type:record.type,
-      title:record.type==='class'?'학급 목표 달성':'모둠 목표 달성',
-      achievement:record.type==='team'?(record.teamName||'모둠')+' · '+score:score,
+      title:names?'모둠 목표 달성':'학급 목표 달성',
+      achievement:names?`${names} · ${group.length>1 ? record.score+'점' : score}`:score,
       message:record.message,
-      accent:record.type==='team'?teamAccent(record.teamId):null,
+      accent:names && group.length===1 ? teamAccent(record.teamId) : null,
+      completeLabel:pending.length>1?'모두 완료 처리':'완료 처리',
       close,complete
     };
     if (window.frameElement) {
-      showLocalPopup(null);
+      localPopup.show(null);
       emitPopup(detail);
     } else {
       emitPopup(null);
-      showLocalPopup(detail);
+      localPopup.show(detail);
     }
     clearTimeout(timer);timer=setTimeout(close,4000);
-    if (!replay) celebrate();
+    refreshSkip();
   }
   function advance() {
-    while (!active && queue.length) {
-      const pending=queue.shift();
-      const record=system.records.find(row=>row.id===pending.id && row.reached===pending.reached);
-      if (record && record.status!=='withdrawn' && (record.status==='pending' || record.automatic)) show(record,false);
-    }
+    if (active) return;
+    const group = celebrations.take(records);
+    if (group.length) showGroup(group);
   }
   function close() {
-    clearTimeout(timer);active=null;showLocalPopup(null);emitPopup(null);advance();
+    clearTimeout(timer);active=null;localPopup.show(null);emitPopup(null);advance();
+    refreshSkip();
   }
   function update(model, announce) {
     system=model;
+    records=new Map(model.records.map(row=>[row.id,row]));
+    if (announce && previous) celebrations.enqueue(model.records,previous);
+    previous=new Map(model.records.map(row=>[row.id,row.reached]));
     if (active) {
-      const latest=system.records.find(row=>row.id===active.id);
-      if (!latest || latest.reached!==active.reached || latest.status==='withdrawn' || active.status==='pending' && latest.status==='done') close();
+      const remaining=active.filter(row=>{
+        const latest=records.get(row.id);
+        return latest && latest.reached===row.reached && latest.status!=='withdrawn' &&
+          !(row.status==='pending' && latest.status==='done');
+      });
+      if (!remaining.length) close();
+      else if (remaining.length!==active.length) showGroup(remaining);
     }
-    if (announce && previous) {
-      const seen=new Map(previous.records.map(row=>[row.id,row.reached]));
-      const recurring = new Map();
-      for (const row of system.records) {
-        if (row.silent || row.status==='withdrawn' || row.reached===seen.get(row.id)) continue;
-        if (row.milestone === undefined) queue.push(row);
-        else {
-          const batch = JSON.stringify([row.reached,row.goalId,row.teamId]);
-          if (!recurring.has(batch) || recurring.get(batch).milestone < row.milestone) recurring.set(batch,row);
-        }
-      }
-      queue.push(...recurring.values());
-    }
-    previous=structuredClone(system);
     advance();
+    refreshSkip();
     if (view.style.display==='flex') refreshRows();
   }
   function change(records,complete) {
@@ -138,8 +151,8 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       parent.append(control);
     };
     if (teamId===null && records.length<=2) {
-      for (const record of records) add(1,record.message,()=>show(record,true));
-    } else if (records.length===1) add(1,records[0].message,()=>show(records[0],true));
+      for (const record of records) add(1,record.message,()=>show(record));
+    } else if (records.length===1) add(1,records[0].message,()=>show(records[0]));
     else add(records.length,`달성 기록 ${records.length}개`,()=>openRecords(teamId));
   }
   function addRow(type,goal={}) {
@@ -212,7 +225,7 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       row.scrollIntoView({block:'nearest'});
       if (row.dataset.type==='team' && record.milestone===undefined) setExpanded(row,true);
       else row.querySelector('.goal-status').click();
-    } else show(record,true);
+    } else show(record);
   }
   function closeView() {
     closeDropdown();
@@ -269,7 +282,7 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
         control.removeAttribute('data-confirm-cancel');
         change([record],false);
       } else if (state==='reached') showDropdown(control,[
-        ['완료 처리',()=>change([record],true)],['메시지 보기',()=>show(record,true)]
+        ['완료 처리',()=>change([record],true)],['메시지 보기',()=>show(record)]
       ]);
       else showDropdown(control,[['목표 점수에 도달하면 완료할 수 있습니다.',null]]);
     };
@@ -396,5 +409,5 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
   $('goal-management-view').querySelectorAll('.add-row-btn').forEach(control=>{control.onclick=()=>addRow(control.dataset.type);});
   saveButton.onclick=saveGoals;
   $('cancel-goal-view').onclick=$('cancel-goal-edit').onclick=closeView;
-  return {openSettings,update,giftGroup,reset(){queue.length=0;close();previous=null;closeView();}};
+  return {openSettings,update,giftGroup,reset(){celebrations.reset();close();previous=null;closeView();}};
 }

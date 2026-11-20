@@ -1,19 +1,19 @@
-import {mountGoalCelebration} from './score/goal-celebration.js';
+import {mountGoalCelebration} from './score/goal-celebration.js?v=goal-queue-1';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=device-guide-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
-import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=recurring-goals-1';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js?v=whiteboard-7';
 import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=recurring-goals-1';
+import {CloudBoard} from './js/cloud.js?v=goal-queue-1';
 import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=recurring-goals-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=goal-queue-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
 import {validateContent} from './js/validation.js?v=whiteboard-7';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
@@ -1276,8 +1276,9 @@ function setupIntegratedScorePanel(){
     }
   });
   const celebration=$('appCelebration');
-  const showCelebration=mountGoalCelebration(celebration);
-  frame.addEventListener('score-celebration',event=>showCelebration(event.detail));
+  const celebrationPopup=mountGoalCelebration(celebration);
+  frame.addEventListener('score-celebration',event=>celebrationPopup.show(event.detail));
+  frame.addEventListener('score-celebration-skip',event=>celebrationPopup.setSkip(event.detail));
   document.addEventListener('pointerdown',event=>{
     if(!celebration.contains(event.target))frame.dispatchEvent(new Event('score-dismiss-celebration'));
   },true);

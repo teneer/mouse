@@ -173,3 +173,17 @@ test('recurring goals optionally add previously reached milestones as silent rec
   assert.deepEqual(score().records.map(({score,silent})=>[score,silent]),[[3,true],[6,true],[9,true]]);
   assert.equal(nextClassGoal(score(),9)?.score,12);
 });
+
+test('next class goal counts every matching goal and uses the first message',()=>{
+  const system={goals:[
+    {id:'far',type:'class',score:150,message:'나중 목표'},
+    {id:'repeat',type:'class',score:50,interval:50,message:'영화데이'},
+    {id:'once',type:'class',score:100,message:'자유시간'},
+    {id:'second',type:'class',score:100,message:'독서 시간'},
+    {id:'team',type:'team',score:100,message:'모둠 보상'}
+  ],records:[]};
+  const next=nextClassGoal(system,75);
+  assert.equal(next.score,100);
+  assert.equal(next.message,'영화데이');
+  assert.equal(next.additional,2);
+});

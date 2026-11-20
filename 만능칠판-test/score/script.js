@@ -1,6 +1,6 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
-import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal} from './goal-model.js?v=recurring-goals-1';
-import {wireGoals} from './goals-ui.js?v=recurring-goals-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal} from './goal-model.js?v=goal-queue-1';
+import {wireGoals} from './goals-ui.js?v=goal-queue-1';
 import {wireScoreAudio} from './score-audio.js';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
@@ -326,7 +326,9 @@ function renderClassGoalFeedback(announce) {
   const next = nextClassGoal(goalSystem,count);
   nextClassGoalBadge.hidden = next === null;
   const label = next === null ? '' : `${goalScoreFormat.format(next.score)}점`;
-  const message = next?.message ?? '';
+  const message = next?.additional
+    ? next.message ? `${next.message} 외 ${next.additional}개` : `목표 ${next.additional+1}개`
+    : next?.message ?? '';
   if (nextClassGoalValue.textContent !== label) nextClassGoalValue.textContent = label;
   if (nextClassGoalMessage.textContent !== message) nextClassGoalMessage.textContent = message;
   nextClassGoalMessage.hidden = !message;

@@ -9,7 +9,7 @@
   box-shadow:0 5px 24px #19394d2b;pointer-events:none;
   animation:goal-toast-enter .2s ease-out;
 }
-.goal-celebration-card[hidden], .goal-toast-complete[hidden] {display:none}
+.goal-celebration-card[hidden], .goal-toast-complete[hidden], .goal-toast-skip[hidden] {display:none}
 .goal-celebration-card[data-type="team"] {
   --toast-accent:var(--team-toast-accent,#277093);
   --toast-border:#9dc9df;
@@ -35,11 +35,20 @@
   border:1px solid transparent;border-radius:.45rem;font:inherit;font-size:1.15rem;cursor:pointer;pointer-events:auto;
 }
 .goal-toast-close:hover,.goal-toast-close:focus-visible {background:#18536e14;border-color:#18536e42}
+.goal-toast-actions {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.4rem .65rem;
+}
+.goal-toast-actions:has(> :not([hidden])) {margin-top:.8rem}
 .goal-toast-complete {
   display:flex;align-items:center;gap:.35rem;width:max-content;max-width:100%;
-  margin-top:.8rem;font-size:.8rem;line-height:1.2;cursor:pointer;pointer-events:auto;
+  margin-right:auto;font-size:.8rem;line-height:1.2;cursor:pointer;pointer-events:auto;
 }
 .goal-toast-complete input {appearance:auto;width:1rem;height:1rem;margin:0;accent-color:#18536e}
+.goal-celebration-card .goal-toast-skip {
+  padding:.35rem .55rem;background:#f3f8fa;color:#174866;border:1px solid #b9d1de;
+  border-radius:.45rem;font:inherit;font-size:.8rem;cursor:pointer;pointer-events:auto;
+}
+.goal-toast-skip:hover,.goal-toast-skip:focus-visible {background:#e2edf3}
 @keyframes goal-toast-enter {
   from {transform:var(--toast-position) translateY(.35rem);opacity:.45}
 }

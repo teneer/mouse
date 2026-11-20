@@ -1,4 +1,4 @@
-import {applyScoreOperation} from './shared-score.js?v=recurring-goals-1';
+import {applyScoreOperation} from './shared-score.js?v=goal-queue-1';
 import {reorderPages} from './board-navigation.js';
 import {normalizePattern} from './board-background.js';
 

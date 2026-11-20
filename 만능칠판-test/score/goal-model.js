@@ -53,7 +53,9 @@ export function nextClassGoal(system, count) {
       score = firstMilestoneAfter(goal,count,interval);
       while (score <= MAX_GOAL_SCORE && completed.has(recordId(goal,null,score))) score += interval;
     } else if (score <= count || completed.has(recordId(goal,null))) continue;
-    if (score <= MAX_GOAL_SCORE && (next === null || score < next.score)) next = {...goal,score};
+    if (score > MAX_GOAL_SCORE) continue;
+    if (next === null || score < next.score) next = {...goal,score,additional:0};
+    else if (score === next.score) next.additional++;
   }
   return next;
 }
