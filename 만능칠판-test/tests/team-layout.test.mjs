@@ -46,6 +46,12 @@ test('a narrow panel with many teams scrolls when fitting would make cards unrea
   assert.deepEqual(measure({ width: 172, height: 620, count: 24 }), { columns: 2, cardWidth: 72 });
 });
 
+test('a wider minimum for goal cards preserves fixed columns and scrolls in narrow panels', () => {
+  assert.deepEqual(measure({ width: 172, minimumWidth: 132, fixedColumns: 4 }), { columns: 4, cardWidth: 132 });
+  assert.deepEqual(measure({ width: 96, minimumWidth: 132 }), { columns: 1, cardWidth: 132 });
+  assert.deepEqual(measure({ width: 172, height: 60, minimumWidth: 132 }), { columns: 1, cardWidth: 132 });
+});
+
 test('small changes at the column boundary retain the previous arrangement', () => {
   const settings = { width: 430, count: 4, height: 157 };
   assert.equal(measure(settings).columns, 4);

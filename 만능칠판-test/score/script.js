@@ -42,12 +42,10 @@ const settingsToggleBtn = document.getElementById('settings-toggle-btn');
 const goalManagementView = document.getElementById('goal-management-view');
 const nextClassGoalBanner = document.getElementById('next-class-goal');
 const nextClassGoalMessage = document.getElementById('next-class-goal-message');
-const nextClassGoalValue = document.getElementById('next-class-goal-score');
-const goalMessageText = document.getElementById('goal-message-text');
-const goalMessageRepeat = document.getElementById('goal-message-repeat');
 const goalMessageToggle = document.getElementById('goal-message-toggle');
+const teamGoalMotionToggle = document.getElementById('team-goal-motion-toggle');
+const teamGoalTemplate = document.getElementById('team-goal-template');
 const goalMotion = matchMedia('(prefers-reduced-motion: reduce)');
-let goalMotionPaused = goalMotion.matches;
 const goalScoreFormat = new Intl.NumberFormat('ko-KR');
 const progress = document.getElementById('score-progress');
 const conversionRule = document.getElementById('conversion-rule');
@@ -328,49 +326,71 @@ function snapshot(version) {
     scoreLink: { enabled: linkEnabled, points: linkPoints }
   };
 }
-function fitGoalMessage() {
-  const width = goalMessageText.getBoundingClientRect().width;
-  const gap = parseFloat(getComputedStyle(nextClassGoalBanner).columnGap) || 0;
-  const available = nextClassGoalMessage.getBoundingClientRect().width +
-    (goalMessageToggle.hidden ? 0 : goalMessageToggle.getBoundingClientRect().width + gap);
+function fitGoalMessage(target,toggle) {
+  const viewport = target.querySelector('.goal-message-viewport');
+  const text = viewport.querySelector('.goal-message-text');
+  const width = text.getBoundingClientRect().width;
+  const available = viewport.getBoundingClientRect().width +
+    (toggle && !toggle.hidden ? toggle.getBoundingClientRect().width : 0);
   const overflows = available > 0 && width > available + 1;
-  nextClassGoalBanner.classList.toggle('goal-overflowing',overflows);
-  goalMessageToggle.hidden = !overflows;
-  if (overflows) nextClassGoalBanner.style.setProperty('--goal-message-duration',Math.max(8,(width+48)/34)+'s');
+  target.classList.toggle('goal-overflowing',overflows);
+  if (toggle) toggle.hidden = !overflows;
+  if (overflows) target.style.setProperty('--goal-message-duration',Math.max(8,(width+40)/34)+'s');
+  return overflows;
 }
-function updateGoalMotion() {
-  nextClassGoalBanner.classList.toggle('goal-paused',goalMotionPaused);
-  goalMessageToggle.textContent = goalMotionPaused ? '▶' : 'Ⅱ';
-  goalMessageToggle.setAttribute('aria-label',goalMotionPaused ? '목표 메시지 흐름 재생' : '목표 메시지 흐름 일시 정지');
+function wireGoalMotion(root,toggle,label) {
+  const setPaused = paused => {
+    root.classList.toggle('goal-paused',paused);
+    toggle.textContent = paused ? '▶' : 'Ⅱ';
+    toggle.setAttribute('aria-label',label + (paused ? ' 재생' : ' 일시 정지'));
+  };
+  toggle.onclick = ()=>setPaused(!root.classList.contains('goal-paused'));
+  goalMotion.addEventListener('change',event=>setPaused(event.matches));
+  setPaused(goalMotion.matches);
 }
-goalMessageToggle.onclick = ()=>{goalMotionPaused=!goalMotionPaused;updateGoalMotion();};
-goalMotion.addEventListener('change',event=>{goalMotionPaused=event.matches;updateGoalMotion();});
-updateGoalMotion();
+wireGoalMotion(nextClassGoalBanner,goalMessageToggle,'학급 목표 메시지');
+wireGoalMotion(scoreboard,teamGoalMotionToggle,'모둠 목표 메시지');
 let goalMessageFrame = null;
 function scheduleGoalMessageFit() {
   if (goalMessageFrame!==null) return;
-  goalMessageFrame=requestAnimationFrame(()=>{goalMessageFrame=null;fitGoalMessage();});
+  goalMessageFrame=requestAnimationFrame(()=>{
+    goalMessageFrame=null;
+    fitGoalMessage(nextClassGoalBanner,goalMessageToggle);
+    let teamOverflowing = false;
+    for (const target of scoreboard.querySelectorAll('.team-goal-target:not([hidden])')) {
+      if (fitGoalMessage(target)) teamOverflowing = true;
+    }
+    teamGoalMotionToggle.hidden = !teamOverflowing;
+  });
 }
 const goalMessageResize = new ResizeObserver(scheduleGoalMessageFit);
 goalMessageResize.observe(nextClassGoalMessage);
-goalMessageResize.observe(goalMessageText);
+goalMessageResize.observe(scoreboard);
+goalMessageResize.observe(document.getElementById('team-viewport'));
+document.fonts?.ready.then(scheduleGoalMessageFit);
 
-function renderClassGoalTarget() {
-  const next = nextClassGoal(goalSystem,count);
-  nextClassGoalBanner.hidden = next === null;
-  const label = next === null ? '' : `${goalScoreFormat.format(next.score)}점`;
-  const message = next?.additional
-    ? next.message ? `${next.message} 외 ${next.additional}개` : `목표 ${next.additional+1}개`
-    : next?.message ?? '';
-  if (nextClassGoalValue.textContent !== label) nextClassGoalValue.textContent = label;
-  if (goalMessageText.textContent !== message) {
-    goalMessageText.textContent = message;
-    goalMessageRepeat.textContent = message;
-    nextClassGoalMessage.title = message;
-    for (const animation of nextClassGoalMessage.firstElementChild.getAnimations()) animation.currentTime=0;
-  }
-  nextClassGoalMessage.hidden = !message;
+function renderNextGoal(target,next) {
+  target.hidden = next === null;
   scheduleGoalMessageFit();
+  if (!next) return;
+  const score = target.querySelector('.score-goal-value');
+  const messageCell = target.querySelector('.score-goal-message');
+  const text = messageCell.querySelector('.goal-message-text');
+  const label = `${goalScoreFormat.format(next.score)}점`;
+  const message = next.additional
+    ? next.message ? `${next.message} 외 ${next.additional}개` : `목표 ${next.additional+1}개`
+    : next.message ?? '';
+  if (score.textContent !== label) score.textContent = label;
+  if (text.textContent !== message) {
+    text.textContent = message;
+    text.nextElementSibling.textContent = message;
+    messageCell.title = message;
+    for (const animation of text.parentElement.getAnimations()) animation.currentTime=0;
+  }
+  messageCell.hidden = !message;
+}
+function renderClassGoalTarget() {
+  renderNextGoal(nextClassGoalBanner,nextClassGoal(goalSystem,count));
 }
 function renderClassGoalFeedback(announce) {
   goalUI.update(goalSystem,announce);
@@ -378,14 +398,7 @@ function renderClassGoalFeedback(announce) {
   renderClassGoalTarget();
 }
 function renderTeamGoal(target,team) {
-  if (!target) return;
-  const next = nextTeamGoal(goalSystem,team);
-  target.hidden = next === null;
-  if (!next) return;
-  const text = `${goalScoreFormat.format(next.score)}점`;
-  target.lastElementChild.textContent = text;
-  target.setAttribute('aria-label','모둠 목표 '+text);
-  target.title = next.message || '모둠 목표 '+text;
+  if (target) renderNextGoal(target,nextTeamGoal(goalSystem,team));
 }
 function renderGoalFeedback(announce) {
   renderClassGoalFeedback(announce);
@@ -555,17 +568,15 @@ function renderTeams() {
     nameSpan.textContent = team.name;
     nameSpan.title = team.name;
     selectButton.appendChild(nameSpan);
-    const controls = document.createElement('span'); controls.className = 'team-controls';
-    const target = document.createElement('span'); target.className = 'team-goal-target';
-    const targetMark = document.createElement('span'); targetMark.className = 'goal-target-mark';
-    targetMark.setAttribute('aria-hidden','true');
-    target.append(targetMark,document.createElement('span'));
+    const target = teamGoalTemplate.content.firstElementChild.cloneNode(true);
     renderTeamGoal(target,team);
+    const controls = document.createElement('span'); controls.className = 'team-controls';
     const numberSpan = document.createElement('span');
     numberSpan.id = `team-number-${idx}`;
     numberSpan.className = 'team-number';
     renderTeamNumber(numberSpan, team.score);
-    controls.append(target,numberSpan); selectButton.appendChild(controls);
+    controls.appendChild(numberSpan);
+    selectButton.append(target,controls);
     const gifts=document.createElement('div');
     gifts.className='team-goal-gifts';gifts.dataset.teamGifts=team.id;
     goalUI.giftGroup(gifts,team.id);card.appendChild(gifts);

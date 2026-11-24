@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=toolbar-goals-1">
+    <link rel="stylesheet" href="style.css?v=goal-cells-2">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=goal-queue-1">
 </head>
@@ -20,18 +20,17 @@
         <div id="display-area">
             <div id="top-row">
                 <section id="class-area" aria-labelledby="class-score-title">
-                    <div id="next-class-goal" role="group" aria-label="학급 목표" hidden>
-                        <div class="class-goal-value">
-                            <span class="goal-target-mark" aria-hidden="true"></span>
-                            <strong id="next-class-goal-score"></strong>
-                        </div>
-                        <div id="next-class-goal-message" hidden>
-                            <div class="goal-message-track">
-                                <span id="goal-message-text" role="status"></span>
-                                <span id="goal-message-repeat" aria-hidden="true"></span>
+                    <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
+                        <strong id="next-class-goal-score" class="score-goal-value"></strong>
+                        <div id="next-class-goal-message" class="score-goal-message" hidden>
+                            <div class="goal-message-viewport">
+                                <div class="goal-message-track">
+                                    <span id="goal-message-text" class="goal-message-text" role="status"></span>
+                                    <span class="goal-message-repeat" aria-hidden="true"></span>
+                                </div>
                             </div>
+                            <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
                         </div>
-                        <button id="goal-message-toggle" type="button" aria-label="목표 메시지 흐름 일시 정지" hidden>Ⅱ</button>
                     </div>
                     <div class="main-scoreboard">
                         <header class="class-heading">
@@ -64,7 +63,10 @@
             <section id="bottom-row" aria-labelledby="scoreboard-title">
                 <header class="team-heading">
                     <h2 id="scoreboard-title">모둠 점수</h2>
-                    <span id="selected-team-count" role="status"></span>
+                    <div class="team-heading-actions">
+                        <span id="selected-team-count" role="status"></span>
+                        <button id="team-goal-motion-toggle" class="goal-motion-toggle" type="button" aria-label="모둠 목표 메시지 일시 정지" hidden>Ⅱ</button>
+                    </div>
                 </header>
                 <div id="team-viewport" role="region" aria-label="모둠 카드 목록" tabindex="0">
                     <div id="scoreboard" class="scoreboard"></div>
@@ -75,6 +77,20 @@
                 </div>
             </section>
         </div>
+
+        <template id="team-goal-template">
+            <span class="score-goal team-goal-target" role="group" aria-label="모둠 목표" hidden>
+                <strong class="score-goal-value"></strong>
+                <span class="score-goal-message" hidden>
+                    <span class="goal-message-viewport">
+                        <span class="goal-message-track">
+                            <span class="goal-message-text"></span>
+                            <span class="goal-message-repeat" aria-hidden="true"></span>
+                        </span>
+                    </span>
+                </span>
+            </span>
+        </template>
 
         <form id="batch-score" hidden>
             <button type="button" id="select-all-teams">전체선택</button>
@@ -224,6 +240,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=toolbar-goals-1"></script><script type="module" src="panel-ui.js?v=toolbar-goals-1"></script>
+    <script type="module" src="script.js?v=goal-cells-1"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
 </body>
 </html>

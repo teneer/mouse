@@ -325,63 +325,55 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   cursor:pointer;
 }
 #settings-toggle-btn, #score-maximize {flex:none;width:min(44px, 24cqw);min-height:36px;font-size:clamp(12px, 12cqw, 21px);line-height:1}
-#next-class-goal {
+.score-goal {
+  --goal-accent:var(--card-accent,var(--primary-color));
+  --goal-border:color-mix(in srgb,var(--goal-accent) 20%,var(--panel-line));
   box-sizing:border-box;
   display:grid;
-  grid-template-columns:auto minmax(0,1fr) auto;
-  align-items:center;
-  gap:clamp(4px, 1.5vw, 8px);
-  min-height:42px;
-  margin:8px clamp(4px, 2vw, 12px) 6px;
-  padding:4px clamp(4px, 2vw, 9px);
-  border:1px solid #edca83;
-  border-radius:10px;
-  background:#fff3d4;
-  color:#6b4105;
+  grid-template-columns:auto minmax(0,1fr);
+  min-width:0;
+  overflow:hidden;
+  border:1px solid var(--goal-border);
+  border-radius:8px;
+  color:var(--text-color);
+  background:color-mix(in srgb,var(--goal-accent) 5%,var(--card-bg));
 }
-.class-goal-value {
-  display:inline-flex;align-items:center;gap:clamp(3px, 1vw, 6px);
-  font-size:clamp(13px, 4.2vw, 18px);
-  white-space:nowrap;
-  font-variant-numeric:tabular-nums;
+.score-goal-value {
+  display:grid;place-items:center;
+  padding:5px 8px;background:var(--summary-bg);
+  font-weight:800;line-height:1.15;white-space:nowrap;font-variant-numeric:tabular-nums;
 }
-#next-class-goal:has(#next-class-goal-message:not([hidden])) .class-goal-value {
-  padding-inline-end:clamp(3px, 1.5vw, 8px);
-  border-inline-end:1px solid #edca83;
+.score-goal-message {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+  min-width:0;padding:0 7px;border-inline-start:1px solid var(--goal-border);
+  font-weight:600;line-height:1.35;
 }
-.goal-target-mark {
-  display:inline-grid;place-items:center;flex:none;
-  width:1.05em;height:1.05em;border:1px solid currentColor;border-radius:50%;color:#9c5506;
-}
-.goal-target-mark::before {
-  content:"";width:62%;height:62%;border:1px solid currentColor;border-radius:50%;
-  background:radial-gradient(circle,currentColor 32%,transparent 40%);
-}
-#next-class-goal-message {
-  min-width:0;overflow:hidden;grid-column:2 / -1;
-  font-size:clamp(12px, 3.5vw, 15px);font-weight:550;
-}
+#next-class-goal {margin:8px clamp(4px,2vw,12px) 6px}
+#next-class-goal .score-goal-value {min-height:34px;font-size:clamp(14px,4.2vw,19px)}
+#next-class-goal .score-goal-message {font-size:clamp(12px,3.5vw,15px)}
+.goal-message-viewport {display:block;min-width:0;overflow:hidden}
 .goal-message-track {display:flex;gap:0;width:max-content;white-space:nowrap}
-#goal-message-repeat {display:none}
-#next-class-goal.goal-overflowing #next-class-goal-message {
-  grid-column:2;
+.goal-message-repeat {display:none}
+.goal-overflowing .goal-message-viewport {
   mask-image:linear-gradient(to right,black calc(100% - 8px),transparent);
 }
-.goal-overflowing #goal-message-repeat {display:inline-block}
-.goal-overflowing .goal-message-track > span {margin-inline-end:48px}
+.goal-overflowing .goal-message-repeat {display:inline-block}
+.goal-overflowing .goal-message-track > span {margin-inline-end:40px}
 .goal-overflowing .goal-message-track {
   animation:goal-message-scroll var(--goal-message-duration,16s) linear infinite;
 }
 .goal-paused .goal-message-track {animation-play-state:paused}
 @keyframes goal-message-scroll {from {transform:translateX(0)} to {transform:translateX(-50%)}}
-#goal-message-toggle {
-  width:clamp(24px, 7vw, 32px);height:32px;padding:0;
-  border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;
+.goal-motion-toggle {
+  flex:none;
+  width:clamp(24px,7vw,32px);height:30px;padding:0;
+  border:0;border-radius:6px;background:var(--control-bg);color:var(--primary-dark);cursor:pointer;
 }
-#goal-message-toggle:hover {background:#fce6ad}
+.goal-motion-toggle:hover {background:var(--summary-bg)}
 @media (pointer:coarse) {
-  #goal-message-toggle {width:40px;height:40px}
+  .goal-motion-toggle {width:40px;height:40px}
 }
+.team-heading-actions {display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px}
 .main-controls {gap:min(12px, 3cqw);margin:clamp(4px, 1dvh, 10px) 0 0;min-width:0}
 .main-btn {flex:0 0 auto;font-size:clamp(13px, 8cqw, 23px)}
 #number {
@@ -695,19 +687,30 @@ button, .main-scoreboard, .team-card, #batch-score {
 .team-controls {position:absolute;inset:0;pointer-events:none}
 .team-number {font-size:min(40px, 34cqh, 25cqw)}
 .team-number[data-long-score] {font-size:min(40px, 34cqh, 24cqw)}
-.team-controls:has(.team-goal-target:not([hidden])) {
-  inset:min(30px, 31cqh) 0 min(18px, 20cqh);
-  flex-direction:column;gap:min(3px, 3cqh);
+.team-select-btn:has(.team-goal-target:not([hidden])) {
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);
+  gap:min(4px, 3cqh);
+  padding:min(5px,5cqh) min(6px,5cqw) min(9px,12cqh);
 }
-.team-goal-target {
-  display:inline-flex;align-items:center;gap:min(4px, 4cqw);white-space:nowrap;
-  padding:min(2px, 2cqh) min(7px, 7cqw);border-radius:6px;
-  color:#6b4105;background:#fff3d4;line-height:1.12;
-  font-size:clamp(8px, min(16cqh, 13cqw), 13px);font-weight:750;font-variant-numeric:tabular-nums;
-  pointer-events:auto;
+.team-select-btn:has(.team-goal-target:not([hidden])) .team-name {
+  position:static;padding-inline-end:min(28px,24cqw);
 }
-.team-controls:has(.team-goal-target:not([hidden])) .team-number {
-  font-size:min(40px, 26cqh, 24cqw);
+.team-card:has(.team-goal-gifts:not([hidden])) .team-select-btn:has(.team-goal-target:not([hidden])) .team-name {
+  padding-inline-end:min(64px,55cqw);
+}
+.team-select-btn:has(.team-goal-target:not([hidden])) .team-controls {position:static;align-items:safe center}
+.team-goal-target {border-radius:5px;font-size:clamp(10px,14cqh,13px)}
+.team-goal-target .score-goal-value {
+  padding:2px 5px;
+  background:color-mix(in srgb,var(--goal-accent) 18%,var(--card-bg));
+}
+.team-goal-target .score-goal-message {padding:0 5px}
+.team-select-btn:has(.team-goal-target:not([hidden])) .team-number {
+  font-size:min(34px,25cqh,24cqw);
+}
+.team-select-btn:has(.team-goal-target:not([hidden])) .team-number[data-long-score] {
+  font-size:min(34px,23cqh,17cqw);
 }
 .team-steps {position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;padding:0;pointer-events:none}
 /* Keep the entire hit target below the centered score, including its pop effect. */
@@ -809,6 +812,12 @@ button, .main-scoreboard, .team-card, #batch-score {
 .goal-tabs {flex-wrap:wrap;padding:.5rem}
 .team-goal-gifts {
   position:absolute;z-index:2;left:50%;bottom:0;transform:translateX(-50%);max-width:36%;
+}
+.team-card:has(.team-goal-target:not([hidden])) .team-goal-gifts {
+  display:flex;top:0;right:min(34px,42cqw);bottom:auto;left:auto;transform:none;
+}
+.team-card:has(.team-goal-target:not([hidden])) .team-goal-gifts button {
+  min-height:min(22px,24cqh);padding:1px 2px;font-size:min(16px,20cqh);
 }
 #class-goal-gifts button {
   padding:.15em .25em;color:#174866;background:#ecf7ff;border:1px solid #afccdf;

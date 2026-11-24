@@ -3,10 +3,12 @@ const MIN_READABLE_WIDTH = 72;
 const MAX_CARD_WIDTH = 220;
 const COLUMN_CHANGE_MARGIN = 0.03;
 
-export function measureTeamLayout({ width, height, count, ratio, gap, fixedColumns, previousColumns, maxAutoColumns = MAX_COLUMNS, scale = 1 }) {
+export function measureTeamLayout({ width, height, count, ratio, gap, fixedColumns, previousColumns, maxAutoColumns = MAX_COLUMNS, scale = 1, minimumWidth }) {
   const maxWidth = Math.min(width, MAX_CARD_WIDTH, MAX_CARD_WIDTH * scale);
   const widthFor = columns => Math.max(0, Math.min(maxWidth, (width - gap * (columns - 1)) / columns));
-  const readableWidth = Math.min(MIN_READABLE_WIDTH, maxWidth);
+  const readableWidth = minimumWidth === undefined
+    ? Math.min(MIN_READABLE_WIDTH, maxWidth)
+    : Math.min(minimumWidth, MAX_CARD_WIDTH, MAX_CARD_WIDTH * scale);
 
   const maxOccupiedColumns = Math.min(MAX_COLUMNS, Math.max(1, count));
   if (fixedColumns) {
@@ -26,7 +28,7 @@ export function measureTeamLayout({ width, height, count, ratio, gap, fixedColum
   if (best.cardWidth < readableWidth) {
     // When readable cards require scrolling, choose the arrangement with the shortest scroll.
     const fitting = candidates.filter(item => item.horizontalWidth >= readableWidth);
-    const shortest = fitting.reduce((first, item) => item.rows < first.rows ? item : first);
+    const shortest = fitting.reduce((first, item) => item.rows < first.rows ? item : first, candidates[0]);
     return { columns: shortest.columns, cardWidth: readableWidth };
   }
 
