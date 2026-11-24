@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 7</title><link href="style.css?v=toolbar-scroll-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=celebration-2" rel="stylesheet"/></head>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 7</title><link href="style.css?v=view-sync-click-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=celebration-2" rel="stylesheet"/></head>
 <body>
 <div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
 <aside id="scorePanel" class="score-panel" aria-label="학급 점수판" aria-hidden="true" inert>
@@ -40,7 +40,7 @@
     <button aria-label="축소" class="action-btn" id="zoomOutBtn" type="button">−</button>
   </div>
 </div>
-<div class="toolbar-group"><label class="action-btn view-sync" id="viewSyncTrigger" aria-expanded="false" aria-controls="viewSyncMenu" title="길게 누르거나 아래쪽 화살표 키로 동기화 탭 선택"><input id="viewSync" type="checkbox"/><span data-board-icon="sync">화면 동기화</span></label></div>
+<div class="toolbar-group view-sync"><input id="viewSync" type="checkbox" aria-label="화면 동기화 켜기 또는 끄기" title="화면 동기화 켜기 또는 끄기"/><button type="button" class="action-btn" id="viewSyncTrigger" aria-expanded="false" aria-controls="viewSyncMenu" title="동기화할 탭 선택"><span data-board-icon="sync">화면 동기화</span></button></div>
 <div class="toolbar-group"><button id="scorePanelToggle" class="action-btn" type="button" aria-controls="scorePanel" aria-expanded="false" title="학급 점수판 표시/숨기기" data-board-icon="score"><span id="scorePanelLabel">점수판 열기</span></button></div>
 <div class="toolbar-group"><output id="cloudSyncStatus" role="status">로컬 모드</output></div>
 <div class="toolbar-group"><button aria-expanded="false" class="action-btn" data-popup="moreSettings" id="moreBtn">더 보기 ▲</button></div>
@@ -206,7 +206,7 @@
 </div>
 <input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
 <div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=celebration-2" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=view-sync-click-1" type="module"></script>
 <noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
 <div class="context-palette" role="group" aria-label="색상">
   <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>

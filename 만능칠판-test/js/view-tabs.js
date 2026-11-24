@@ -31,7 +31,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   const prefix='whiteboard.view-tab:'+path+':';
   const namePrefix='whiteboard.tab-name:'+path+':';
   const localKey=prefix+sync.id;
-  let members=[], scope, unsubscribe, timer, long=false, startPoint, generation=0;
+  let members=[], scope, unsubscribe, generation=0;
   let channel, lastPresence, lastSent=0, expiryTimer, watching=false, present=true;
   let finishNameEdit;
   const departed=new Map();
@@ -218,20 +218,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     if (!event.target.closest('.view-tab-name-input')) finishNameEdit?.();
   });
   function show(){togglePopup('viewSyncMenu',opener);announce();}
-  opener.addEventListener('pointerdown',event=>{
-    if(event.button!==0)return;
-    long=false;startPoint=[event.clientX,event.clientY];
-    timer=setTimeout(()=>{long=true;show();},550);
-  });
-  opener.addEventListener('pointermove',event=>{
-    if (startPoint && Math.hypot(event.clientX-startPoint[0],event.clientY-startPoint[1])>9) clearTimeout(timer);
-  });
-  for(const type of ['pointerup','pointercancel','pointerleave']) opener.addEventListener(type,()=>clearTimeout(timer));
-  opener.addEventListener('click',event=>{
-    if(long){event.preventDefault();event.stopImmediatePropagation();long=false;return;}
-    if(event.altKey){event.preventDefault();show();}
-  },true);
-  opener.addEventListener('contextmenu',event=>{event.preventDefault();clearTimeout(timer);if(!long){long=true;show();}});
+  opener.addEventListener('click',show);
   control.addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();show();}});
   control.onchange=()=>{
     const enabled=control.checked;
@@ -244,7 +231,6 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   root.querySelector('[data-view-none]').onclick=()=>update(()=>[]);
   window.addEventListener('pagehide',()=>{
     present=false;
-    clearTimeout(timer);
     clearTimeout(scheduled);
     clearTimeout(expiryTimer);
     unsubscribe?.();unsubscribe=null;watching=false;

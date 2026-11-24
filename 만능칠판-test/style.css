@@ -679,7 +679,7 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
   user-select:none;
 }
 .page-tile[data-page] {touch-action:none}
-.view-sync input {cursor:inherit}
+.view-sync input {cursor:pointer}
 #pageList {max-width:min(90vw, 550px)}
 #pageTiles {display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;width:min(76vw, 490px);max-height:55vh;overflow:auto}
 .page-tile {display:grid;gap:4px;place-items:center;background:#f4f7fa;border:1px solid #afc3d6;border-radius:8px;padding:4px;cursor:pointer}
@@ -731,7 +731,7 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 }
 #toolbar :is(.action-btn,.mode-btn) {gap:4px}
 #toolbar :is(.action-btn,.mode-btn), #toolbarHideBtn, #moreSettings .action-btn {color:#123c4b}
-#toolbar .view-sync > span {display:inline-flex;align-items:center;gap:4px}
+#toolbar #viewSyncTrigger > span {display:inline-flex;align-items:center;gap:4px}
 #moreSettings .action-btn {justify-content:flex-start;gap:7px}
 #objectContextMenu > button {display:flex;align-items:center;gap:7px}
 #sharedSettingsModal > .modal-content {width:min(810px,calc(100vw - 24px));max-width:none}
