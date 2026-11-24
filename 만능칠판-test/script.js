@@ -1,4 +1,4 @@
-import {mountGoalCelebration} from './score/goal-celebration.js?v=goal-queue-1';
+import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-2';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=toolbar-fit-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
@@ -1315,9 +1315,6 @@ function setupIntegratedScorePanel(){
   const celebrationPopup=mountGoalCelebration(celebration);
   frame.addEventListener('score-celebration',event=>celebrationPopup.show(event.detail));
   frame.addEventListener('score-celebration-skip',event=>celebrationPopup.setSkip(event.detail));
-  document.addEventListener('pointerdown',event=>{
-    if(!celebration.contains(event.target))frame.dispatchEvent(new Event('score-dismiss-celebration'));
-  },true);
   frame.addEventListener('score-frame-pointer',()=>{closePopups();closeContext();});
   let dragOffset=0;
   const changeShare=clientX=>{

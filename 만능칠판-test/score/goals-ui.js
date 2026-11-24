@@ -1,5 +1,5 @@
 import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=goal-queue-1';
-import {createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=goal-queue-1';
+import {createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=celebration-2';
 
 const $ = id => document.getElementById(id);
 const button = (label,action,classes='dialog-action') => {
@@ -85,7 +85,8 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     const detail={
       type:record.type,
       title:names?'모둠 목표 달성':'학급 목표 달성',
-      achievement:names?`${names} · ${group.length>1 ? record.score+'점' : score}`:score,
+      achievement:group.length>1 ? record.score+'점' : score,
+      names,
       message:record.message,
       accent:names && group.length===1 ? teamAccent(record.teamId) : null,
       completeLabel:pending.length>1?'모두 완료 처리':'완료 처리',
@@ -98,7 +99,7 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       emitPopup(null);
       localPopup.show(detail);
     }
-    clearTimeout(timer);timer=setTimeout(close,4000);
+    clearTimeout(timer);timer=setTimeout(close,10000);
     refreshSkip();
   }
   function advance() {
@@ -133,11 +134,9 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     return submit({kind:'score-records',records:records.map(({id,reached,goalId,teamId})=>
       reached===null?{id,reached,goalId,teamId}:{id,reached}),complete});
   }
-  document.addEventListener('pointerdown',event=>{
+  document.addEventListener('pointerdown',()=>{
     window.frameElement?.dispatchEvent(new Event('score-frame-pointer'));
-    if (active && !popup.contains(event.target)) close();
   },true);
-  window.frameElement?.addEventListener('score-dismiss-celebration',()=>{if (active) close();});
   function giftGroup(parent,teamId=null) {
     if (!parent) return;
     parent.replaceChildren();

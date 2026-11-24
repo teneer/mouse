@@ -33,7 +33,7 @@ export function createGoalCelebrationQueue(celebrate) {
         if (!group.length) continue;
         if (group[0].reached !== lastSoundEvent) {
           lastSoundEvent = group[0].reached;
-          celebrate();
+          celebrate(group[0].type);
         }
         return group;
       }
@@ -54,6 +54,7 @@ export function mountGoalCelebration(popup) {
     <div class="goal-toast-content" role="status" aria-atomic="true">
       <h2 class="goal-toast-title"></h2>
       <div class="goal-toast-achievement"></div>
+      <div class="goal-toast-teams" hidden></div>
       <p class="goal-toast-message"></p>
     </div>
     <div class="goal-toast-actions">
@@ -62,6 +63,7 @@ export function mountGoalCelebration(popup) {
     </div>`;
   const title=popup.querySelector('.goal-toast-title');
   const achievement=popup.querySelector('.goal-toast-achievement');
+  const teams=popup.querySelector('.goal-toast-teams');
   const message=popup.querySelector('.goal-toast-message');
   const completion=popup.querySelector('.goal-toast-complete');
   const checkbox=completion.querySelector('input');
@@ -95,6 +97,8 @@ export function mountGoalCelebration(popup) {
     else popup.style.removeProperty('--team-toast-accent');
     title.textContent=detail.title;
     achievement.textContent=detail.achievement;
+    teams.textContent=detail.names;
+    teams.hidden=!detail.names;
     message.textContent=detail.message;
     checkbox.checked=false;
     checkbox.disabled=false;

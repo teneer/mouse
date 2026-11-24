@@ -23,10 +23,11 @@
 }
 .goal-toast-title::before {content:'✦';margin-inline-end:.3em;color:var(--toast-accent)}
 .goal-toast-achievement {
-  font-size:clamp(1.2rem,7vw,2.45rem);font-weight:800;line-height:1.16;letter-spacing:-.025em;
+  font-size:clamp(1.75rem,8vw,3rem);font-weight:800;line-height:1.16;letter-spacing:-.025em;
 }
+.goal-toast-teams {margin-top:.3rem;font-size:clamp(.8rem,3vw,1rem);font-weight:600}
 .goal-toast-message {
-  margin:.6em 0 0;font-size:clamp(.9rem,4.6vw,1.45rem);font-weight:650;
+  margin:.6em 0 0;font-size:clamp(1.3rem,5vw,2rem);font-weight:650;
   line-height:1.42;white-space:pre-wrap;
 }
 .goal-celebration-card .goal-toast-close {

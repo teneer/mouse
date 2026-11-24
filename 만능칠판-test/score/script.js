@@ -1,7 +1,7 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=toolbar-goals-1';
-import {wireGoals} from './goals-ui.js?v=goal-queue-1';
-import {wireScoreAudio} from './score-audio.js';
+import {wireGoals} from './goals-ui.js?v=celebration-2';
+import {wireScoreAudio} from './score-audio.js?v=celebration-2';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
@@ -72,7 +72,7 @@ const conflictsButton = document.getElementById('score-conflicts');
 const conflictsDialog = document.getElementById('score-conflict-dialog');
 const bodyControls = document.querySelector('.container');
 const goalUI = wireGoals({
-  submit:submitGoal,teamList:()=>teams,classScore:()=>count,celebrate:()=>playSound(sounds.success),confirmSave:()=>playSound(sounds.confirm),
+  submit:submitGoal,teamList:()=>teams,classScore:()=>count,celebrate:type=>playSound(sounds.success,type==='team'?0.5:1),confirmSave:()=>playSound(sounds.confirm),
   teamAccent(id) {
     const index=teams.findIndex(team=>team.id===id), card=scoreboard.children[index];
     return card ? getComputedStyle(card).getPropertyValue('--card-accent').trim() : null;
