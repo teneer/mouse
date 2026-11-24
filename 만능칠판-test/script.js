@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-2';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=view-presence-2';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=view-split-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
@@ -64,10 +64,10 @@ function rememberView(publish=false) {
   try {sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));} catch {}
   $('zoomLabel').textContent=`${Math.round(c.getZoom()*100)}%`;
   if (publish) tabViews?.refresh();
-  if(publish && sync && !applyingView && $('viewSync').checked) {
+  if(publish && sync && !applyingView && $('viewSync').getAttribute('aria-pressed')==='true') {
     clearTimeout(viewTimer);
     viewTimer=setTimeout(()=>{
-      if($('viewSync').checked && !applyingView)publishView().catch(fail);
+      if($('viewSync').getAttribute('aria-pressed')==='true' && !applyingView)publishView().catch(fail);
     },350);
   }
 }
@@ -970,7 +970,7 @@ function requestCloudRefresh(delay=25) {
 }
 async function refreshCloud() {
   if(!cloudActive() || !current)return;
-  $('viewSync').checked=!!cloud.latestView?.enabled;
+  $('viewSync').setAttribute('aria-pressed',String(!!cloud.latestView?.enabled));
   if(cloudRefresh){requestCloudRefresh();return;}
   const board=cloud.projected();
   const remote=board.pages[current.id];
@@ -1051,7 +1051,7 @@ function applyViewport(view){
 function restoreLocalView(){
   const state=sync.readView();
   localView=validViewState(state)?state:null;
-  $('viewSync').checked=!!localView?.enabled;
+  $('viewSync').setAttribute('aria-pressed',String(!!localView?.enabled));
   applyLocalView().catch(fail);
 }
 async function applyLocalView(){
@@ -1370,7 +1370,7 @@ async function boot() {
     if(!validViewState(view))return;
     localView=view;
     if(!cloudActive()){
-      $('viewSync').checked=!!view?.enabled;
+      $('viewSync').setAttribute('aria-pressed',String(!!view?.enabled));
       tabViews?.render();
       applyLocalView().catch(fail);
     }

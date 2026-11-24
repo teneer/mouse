@@ -150,7 +150,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       page:Math.max(1,pages().findIndex(page=>page.id===view.pageId)+1),full:view.scoreFull===true};
   }
   function render() {
-    control.checked=!!readState()?.enabled;
+    control.setAttribute('aria-pressed',String(!!readState()?.enabled));
     clearTimeout(expiryTimer);
     if (root.style.display!=='block') return;
     const rows=available(), targets=viewTargets(readState()?.targets,rows.map(row=>row.id));
@@ -277,14 +277,35 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   root.addEventListener('pointerdown',event=>{
     if (!event.target.closest('.view-tab-name-input')) finishNameEdit?.();
   });
-  function show(){togglePopup('viewSyncMenu',opener);announce();}
+  const hint=document.getElementById('viewSyncHint');
+  let hintTimer;
+  function hideHint() {
+    clearTimeout(hintTimer);
+    hint.hidden=true;
+  }
+  function showHint() {
+    hideHint();
+    const rect=control.getBoundingClientRect();
+    hint.hidden=false;
+    hint.style.left=Math.max(4,Math.min(innerWidth-hint.offsetWidth-4,rect.left+(rect.width-hint.offsetWidth)/2))+'px';
+    hint.style.top=Math.max(4,rect.top-hint.offsetHeight-6)+'px';
+    hintTimer=setTimeout(hideHint,3500);
+  }
+  toolbar.addEventListener('scroll',hideHint);
+  window.addEventListener('resize',hideHint);
+  function show(){hideHint();togglePopup('viewSyncMenu',opener);announce();}
   opener.addEventListener('click',show);
   control.addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();show();}});
-  control.onchange=()=>{
-    const enabled=control.checked;
+  control.onclick=()=>{
     changes=changes.then(async()=>{
-      const ids=enabled?await liveIds():null;
-      await publish(enabled,enabled?old=>viewTargets(old,ids):undefined);
+      const ids=await liveIds();
+      const state=readState();
+      const targets=viewTargets(state?.targets,ids);
+      if (!targets.length) {
+        showHint();
+        if (!state?.enabled) return;
+      } else hideHint();
+      await publish(!state?.enabled,state?.enabled?undefined:old=>viewTargets(old,ids));
     }).catch(fail).finally(render);
   };
   root.querySelector('[data-view-all]').onclick=()=>update((_,ids)=>ids);

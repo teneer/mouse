@@ -679,7 +679,11 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
   user-select:none;
 }
 .page-tile[data-page] {touch-action:none}
-.view-sync input {cursor:pointer}
+#toolbar .view-sync {gap:0}
+#toolbar #viewSync {border-radius:6px 0 0 6px}
+#toolbar #viewSync[aria-pressed="true"] {background:#dceeff;border-color:#5a8dee;color:#164e83}
+#toolbar #viewSyncTrigger {min-width:26px;padding:0 6px;border-left:0;border-radius:0 6px 6px 0}
+#viewSyncHint {position:fixed;z-index:2000;max-width:calc(100vw - 8px);padding:5px 9px;border-radius:6px;background:#173f50;color:white;font-size:13px;pointer-events:none}
 #pageList {max-width:min(90vw, 550px)}
 #pageTiles {display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;width:min(76vw, 490px);max-height:55vh;overflow:auto}
 .page-tile {display:grid;gap:4px;place-items:center;background:#f4f7fa;border:1px solid #afc3d6;border-radius:8px;padding:4px;cursor:pointer}
@@ -731,7 +735,7 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 }
 #toolbar :is(.action-btn,.mode-btn) {gap:4px}
 #toolbar :is(.action-btn,.mode-btn), #toolbarHideBtn, #moreSettings .action-btn {color:#123c4b}
-#toolbar #viewSyncTrigger > span {display:inline-flex;align-items:center;gap:4px}
+#toolbar #viewSync > span {display:inline-flex;align-items:center;gap:4px}
 #moreSettings .action-btn {justify-content:flex-start;gap:7px}
 #objectContextMenu > button {display:flex;align-items:center;gap:7px}
 #sharedSettingsModal > .modal-content {width:min(810px,calc(100vw - 24px));max-width:none}
