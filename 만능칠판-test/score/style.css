@@ -301,9 +301,19 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   background:var(--summary-bg);
   box-shadow:none;
 }
-.class-heading, .team-heading {display:flex;align-items:center;justify-content:space-between;gap:8px}
-.class-heading {gap:min(8px, 4cqw)}
-.class-heading h1 {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team-heading {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.class-heading {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;gap:min(8px,4cqw);
+}
+.class-heading-main {
+  display:flex;align-items:center;gap:min(8px,4cqw);min-width:0;
+}
+.class-heading h1 {flex:none;white-space:nowrap}
+@container (max-width:250px) {
+  .class-heading:has(#next-class-goal:not([hidden])) {grid-template-columns:minmax(0,1fr)}
+  .class-heading:has(#next-class-goal:not([hidden])) .score-header-actions {justify-self:end}
+}
 .class-heading h1, .team-heading h2 {
   margin:0;
   color:var(--text-color);
@@ -326,31 +336,26 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 }
 #settings-toggle-btn, #score-maximize {flex:none;width:min(44px, 24cqw);min-height:36px;font-size:clamp(12px, 12cqw, 21px);line-height:1}
 .score-goal {
-  --goal-accent:var(--card-accent,var(--primary-color));
-  --goal-border:color-mix(in srgb,var(--goal-accent) 20%,var(--panel-line));
-  box-sizing:border-box;
   display:grid;
   grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  flex:1;
+  gap:.4em;
   min-width:0;
-  overflow:hidden;
-  border:1px solid var(--goal-border);
-  border-radius:8px;
-  color:var(--text-color);
-  background:color-mix(in srgb,var(--goal-accent) 5%,var(--card-bg));
+  padding-inline-start:.45em;
+  border-inline-start:1px solid var(--panel-line);
+  color:var(--muted-text);
 }
 .score-goal-value {
-  display:grid;place-items:center;
-  padding:5px 8px;background:var(--summary-bg);
+  color:color-mix(in srgb,var(--card-accent,var(--primary-color)) 65%,var(--text-color));
   font-weight:800;line-height:1.15;white-space:nowrap;font-variant-numeric:tabular-nums;
 }
 .score-goal-message {
-  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
-  min-width:0;padding:0 7px;border-inline-start:1px solid var(--goal-border);
+  min-width:0;
   font-weight:600;line-height:1.35;
 }
-#next-class-goal {margin:8px clamp(4px,2vw,12px) 6px}
-#next-class-goal .score-goal-value {min-height:34px;font-size:clamp(14px,4.2vw,19px)}
-#next-class-goal .score-goal-message {font-size:clamp(12px,3.5vw,15px)}
+#next-class-goal {font-size:clamp(11px,3.5cqw,15px)}
+#next-class-goal .score-goal-value {font-size:clamp(12px,3.8cqw,17px)}
 .goal-message-viewport {display:block;min-width:0;overflow:hidden}
 .goal-message-track {display:flex;gap:0;width:max-content;white-space:nowrap}
 .goal-message-repeat {display:none}
@@ -675,7 +680,7 @@ button, .main-scoreboard, .team-card, #batch-score {
   user-select:none;
 }
 #batch-delta {user-select:text;-webkit-user-select:text}
-.team-card {display:block}
+.team-card {display:block;--team-remove-width:min(34px,25cqw)}
 .team-select-btn {
   position:absolute;
   inset:0;
@@ -683,34 +688,19 @@ button, .main-scoreboard, .team-card, #batch-score {
   width:100%;
   height:100%;
 }
-.team-name {position:absolute;top:min(10px, 8cqh);left:min(8px, 10cqw);right:min(30px, 29cqw)}
+.team-title-row {
+  position:absolute;inset:0 var(--team-remove-width) auto min(8px,8cqw);
+  display:flex;align-items:center;gap:min(6px,4cqw);
+  height:min(34px,30cqh);
+}
+.team-title-row:has(.team-goal-target:not([hidden])) .team-name {flex:none;max-width:min(40%,8em)}
+.team-goal-target {font-size:clamp(10px,14cqh,13px)}
 .team-controls {position:absolute;inset:0;pointer-events:none}
+.team-score-line {display:flex;align-items:flex-end;gap:min(6px,4cqw)}
 .team-number {font-size:min(40px, 34cqh, 25cqw)}
 .team-number[data-long-score] {font-size:min(40px, 34cqh, 24cqw)}
-.team-select-btn:has(.team-goal-target:not([hidden])) {
-  display:grid;
-  grid-template-rows:auto auto minmax(0,1fr);
-  gap:min(4px, 3cqh);
-  padding:min(5px,5cqh) min(6px,5cqw) min(9px,12cqh);
-}
-.team-select-btn:has(.team-goal-target:not([hidden])) .team-name {
-  position:static;padding-inline-end:min(28px,24cqw);
-}
-.team-card:has(.team-goal-gifts:not([hidden])) .team-select-btn:has(.team-goal-target:not([hidden])) .team-name {
-  padding-inline-end:min(64px,55cqw);
-}
-.team-select-btn:has(.team-goal-target:not([hidden])) .team-controls {position:static;align-items:safe center}
-.team-goal-target {border-radius:5px;font-size:clamp(10px,14cqh,13px)}
-.team-goal-target .score-goal-value {
-  padding:2px 5px;
-  background:color-mix(in srgb,var(--goal-accent) 18%,var(--card-bg));
-}
-.team-goal-target .score-goal-message {padding:0 5px}
-.team-select-btn:has(.team-goal-target:not([hidden])) .team-number {
-  font-size:min(34px,25cqh,24cqw);
-}
-.team-select-btn:has(.team-goal-target:not([hidden])) .team-number[data-long-score] {
-  font-size:min(34px,23cqh,17cqw);
+.team-score-line:has(.team-goal-gifts:not([hidden])) .team-number[data-long-score] {
+  font-size:min(40px,28cqh,18cqw);
 }
 .team-steps {position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;padding:0;pointer-events:none}
 /* Keep the entire hit target below the centered score, including its pop effect. */
@@ -725,7 +715,7 @@ button, .main-scoreboard, .team-card, #batch-score {
   position:absolute;
   top:0;
   right:0;
-  width:min(34px, 42cqw);
+  width:var(--team-remove-width);
   min-height:min(34px, 30cqh);
   padding:0;
   border:0;
@@ -808,17 +798,12 @@ button, .main-scoreboard, .team-card, #batch-score {
 }
 #score-conflicts,#create-teams-btn {min-height:36px}
 
-.class-goal-heading, #class-goal-gifts, .goal-tabs {display:flex;align-items:baseline;gap:.35rem;min-width:0}
-.goal-tabs {flex-wrap:wrap;padding:.5rem}
-.team-goal-gifts {
-  position:absolute;z-index:2;left:50%;bottom:0;transform:translateX(-50%);max-width:36%;
+.goal-tabs {display:flex;align-items:baseline;gap:.35rem;min-width:0;flex-wrap:wrap;padding:.5rem}
+#class-goal-gifts {
+  display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:.35rem;
+  margin-top:clamp(4px,1dvh,10px);
 }
-.team-card:has(.team-goal-target:not([hidden])) .team-goal-gifts {
-  display:flex;top:0;right:min(34px,42cqw);bottom:auto;left:auto;transform:none;
-}
-.team-card:has(.team-goal-target:not([hidden])) .team-goal-gifts button {
-  min-height:min(22px,24cqh);padding:1px 2px;font-size:min(16px,20cqh);
-}
+.team-goal-gifts {display:flex;pointer-events:auto}
 #class-goal-gifts button {
   padding:.15em .25em;color:#174866;background:#ecf7ff;border:1px solid #afccdf;
   border-radius:.35rem;font-size:clamp(.65rem,8cqw,1rem);white-space:nowrap;
@@ -900,7 +885,7 @@ body.score-modal-open .container {visibility:hidden}
 .goal-status-menu:popover-open {display:grid;gap:.3rem}
 #goal-management-view .goal-status-menu button {text-align:left;font-size:.86rem}
 #management-modal > .dialog-sheet {width:min(740px,100%);max-height:94dvh}
-.score-header-actions {display:flex;flex:none;gap:min(6px,2cqw)}
+.score-header-actions {display:flex;align-items:center;gap:min(6px,2cqw)}
 #score-maximize {display:grid;place-items:center}
 .score-screen-icon {
   display:block;width:1em;height:1em;font-size:clamp(11px,7cqw,19px);
@@ -938,7 +923,7 @@ body.score-modal-open .container {visibility:hidden}
 }
 
 .team-goal-gifts button {
-  display:inline-flex;align-items:center;gap:.15em;min-height:22px;padding:2px;
+  display:inline-flex;align-items:flex-end;gap:.15em;min-height:min(22px,30cqh);padding:1px 2px;
   border:0;background:transparent;color:#216a91;font:inherit;
-  font-size:clamp(.65rem,9cqw,1.05rem);line-height:1;white-space:nowrap;cursor:pointer;
+  font-size:clamp(8px,min(9cqw,19cqh),16px);line-height:1;white-space:nowrap;cursor:pointer;
 }

@@ -330,9 +330,15 @@ function fitGoalMessage(target,toggle) {
   const viewport = target.querySelector('.goal-message-viewport');
   const text = viewport.querySelector('.goal-message-text');
   const width = text.getBoundingClientRect().width;
-  const available = viewport.getBoundingClientRect().width +
-    (toggle && !toggle.hidden ? toggle.getBoundingClientRect().width : 0);
-  const overflows = available > 0 && width > available + 1;
+  const bounds = viewport.getBoundingClientRect();
+  let available = bounds.width;
+  if (toggle && !toggle.hidden && bounds.height > 0) {
+    const button = toggle.getBoundingClientRect();
+    if (button.top < bounds.bottom && button.bottom > bounds.top) {
+      available += button.width + (parseFloat(getComputedStyle(toggle.parentElement).columnGap) || 0);
+    }
+  }
+  const overflows = bounds.width > 0 && width > available + 1;
   target.classList.toggle('goal-overflowing',overflows);
   if (toggle) toggle.hidden = !overflows;
   if (overflows) target.style.setProperty('--goal-message-duration',Math.max(8,(width+40)/34)+'s');
@@ -564,22 +570,31 @@ function renderTeams() {
     };
     card.appendChild(selectButton);
     const nameSpan = document.createElement('span');
+    nameSpan.id = `team-name-${idx}`;
     nameSpan.className = 'team-name';
     nameSpan.textContent = team.name;
     nameSpan.title = team.name;
-    selectButton.appendChild(nameSpan);
     const target = teamGoalTemplate.content.firstElementChild.cloneNode(true);
     renderTeamGoal(target,team);
-    const controls = document.createElement('span'); controls.className = 'team-controls';
+    const title = document.createElement('span');
+    title.className = 'team-title-row';
+    title.append(nameSpan,target);
+    selectButton.appendChild(title);
     const numberSpan = document.createElement('span');
     numberSpan.id = `team-number-${idx}`;
     numberSpan.className = 'team-number';
     renderTeamNumber(numberSpan, team.score);
-    controls.appendChild(numberSpan);
-    selectButton.append(target,controls);
+    selectButton.setAttribute('aria-labelledby',`${nameSpan.id} ${numberSpan.id}`);
     const gifts=document.createElement('div');
     gifts.className='team-goal-gifts';gifts.dataset.teamGifts=team.id;
-    goalUI.giftGroup(gifts,team.id);card.appendChild(gifts);
+    goalUI.giftGroup(gifts,team.id);
+    const scoreLine = document.createElement('div');
+    scoreLine.className = 'team-score-line';
+    scoreLine.append(numberSpan,gifts);
+    const controls = document.createElement('div');
+    controls.className = 'team-controls';
+    controls.appendChild(scoreLine);
+    card.appendChild(controls);
     const changeEl = document.createElement('div');
     changeEl.id = `team-change-${idx}`; changeEl.className = 'team-change';
     card.appendChild(changeEl);
