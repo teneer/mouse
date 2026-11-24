@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-title-2">
+    <link rel="stylesheet" href="style.css?v=goal-title-3">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=goal-queue-1">
 </head>
@@ -24,31 +24,31 @@
                         <header class="class-heading">
                             <div class="class-heading-main">
                                 <h1 id="class-score-title">학급 점수</h1>
-                                <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
-                                    <strong id="next-class-goal-score" class="score-goal-value"></strong>
-                                    <div id="next-class-goal-message" class="score-goal-message" hidden>
-                                        <div class="goal-message-viewport">
-                                            <div class="goal-message-track">
-                                                <span id="goal-message-text" class="goal-message-text" role="status"></span>
-                                                <span class="goal-message-repeat" aria-hidden="true"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div id="class-goal-gifts" hidden></div>
                             </div>
                             <div class="score-header-actions">
-                                <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
                                 <button type="button" id="score-maximize" aria-label="전체 화면" title="전체 화면" aria-pressed="false"><span class="score-screen-icon" aria-hidden="true"></span></button>
                                 <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                             </div>
                         </header>
+                        <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
+                            <strong id="next-class-goal-score" class="score-goal-value"></strong>
+                            <div id="next-class-goal-message" class="score-goal-message" hidden>
+                                <div class="goal-message-viewport">
+                                    <div class="goal-message-track">
+                                        <span id="goal-message-text" class="goal-message-text" role="status"></span>
+                                        <span class="goal-message-repeat" aria-hidden="true"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
+                        </div>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
                             <span id="number">0</span>
                             <button id="main-increase-btn" class="main-btn" aria-label="학급 점수 1점 추가">+</button>
                         </div>
                         <div id="change"></div>
-                        <div id="class-goal-gifts" hidden></div>
                         <div class="score-progress-group">
                             <div id="score-progress" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
                                 <div class="score-progress-fill"></div>
@@ -243,6 +243,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=goal-title-2"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
+    <script type="module" src="script.js?v=goal-title-3"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
 </body>
 </html>

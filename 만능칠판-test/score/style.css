@@ -310,10 +310,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   display:flex;align-items:center;gap:min(8px,4cqw);min-width:0;
 }
 .class-heading h1 {flex:none;white-space:nowrap}
-@container (max-width:250px) {
-  .class-heading:has(#next-class-goal:not([hidden])) {grid-template-columns:minmax(0,1fr)}
-  .class-heading:has(#next-class-goal:not([hidden])) .score-header-actions {justify-self:end}
-}
+
 .class-heading h1, .team-heading h2 {
   margin:0;
   color:var(--text-color);
@@ -354,7 +351,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   min-width:0;
   font-weight:600;line-height:1.35;
 }
-#next-class-goal {font-size:clamp(11px,3.5cqw,15px)}
+#next-class-goal {grid-template-columns:auto minmax(0,1fr) auto;margin-top:4px;padding:0;border:0;font-size:clamp(11px,3.5cqw,15px)}
 #next-class-goal .score-goal-value {font-size:clamp(12px,3.8cqw,17px)}
 .goal-message-viewport {display:block;min-width:0;overflow:hidden}
 .goal-message-track {display:flex;gap:0;width:max-content;white-space:nowrap}
@@ -796,14 +793,7 @@ button, .main-scoreboard, .team-card, #batch-score {
 #score-conflicts,#create-teams-btn {min-height:36px}
 
 .goal-tabs {display:flex;align-items:baseline;gap:.35rem;min-width:0;flex-wrap:wrap;padding:.5rem}
-#class-goal-gifts {
-  display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:.35rem;
-  margin-top:clamp(4px,1dvh,10px);
-}
-#class-goal-gifts, #class-goal-gifts[hidden] {
-  box-sizing:border-box;height:1.8rem;
-}
-#class-goal-gifts[hidden] {display:flex !important;visibility:hidden}
+#class-goal-gifts {display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}
 .team-goal-gifts {
   position:absolute;bottom:0;left:calc(100% + min(4px,2cqw));display:flex;pointer-events:auto;
   max-width:calc(50cqw - 50% - min(4px,2cqw));
