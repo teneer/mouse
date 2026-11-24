@@ -36,6 +36,45 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   let finishNameEdit;
   const departed=new Map();
   try {channel=new BroadcastChannel(prefix);} catch {}
+  const watches=new Map();
+  let releaseLease;
+  const leaseName=value=>prefix+'lease:'+value;
+  function claimPresence() {
+    if (!navigator.locks) {announce();return;}
+    navigator.locks.request(leaseName(instance),()=>new Promise(resolve=>{
+      if (!present) {resolve();return;}
+      releaseLease=resolve;
+      announce();
+    })).catch(()=>announce());
+  }
+  function forget(id,value,board) {
+    if (board!==scope || !value || departed.get(id)===value) return;
+    departed.set(id,value);
+    if (board && cloud.online && cloud.fs) {
+      const ref=cloud.ref('viewTabs',id);
+      cloud.fs.runTransaction(cloud.db,async tx=>{
+        const snapshot=await tx.get(ref);
+        if (snapshot.data()?.instance===value) tx.delete(ref);
+      }).catch(()=>{});
+    }
+    render();
+  }
+  function watchLocalPeers() {
+    for (const peer of localMembers()) {
+      if (!present || !navigator.locks || !peer.lease || peer.id===sync.id ||
+          (peer.board??null)!==scope || watches.has(peer.instance) || departed.get(peer.id)===peer.instance) continue;
+      const controller=new AbortController();
+      watches.set(peer.instance,controller);
+      navigator.locks.request(leaseName(peer.instance),{signal:controller.signal},()=>{
+        if (!present) return;
+        forget(peer.id,peer.instance,peer.board??null);
+        try {
+          const key=prefix+peer.id;
+          if (JSON.parse(localStorage.getItem(key))?.instance===peer.instance) localStorage.removeItem(key);
+        } catch {}
+      }).catch(()=>{}).finally(()=>watches.delete(peer.instance));
+    }
+  }
   function localName(id) {
     try {return normalizeTabName(localStorage.getItem(namePrefix+id));} catch {return '';}
   }
@@ -97,12 +136,12 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     return rows;
   }
   function available() {
-    const rows=(scope?members:localMembers()).filter(row=>
+    const rows=(scope?members:localMembers().filter(row=>!row.board)).filter(row=>
       Date.now()-row.time<maxAge && (!departed.has(row.id)||departed.get(row.id)!==row.instance));
     if (!rows.some(row=>row.id===sync.id)) rows.push(presence());
     return rows.sort((a,b)=>a.opened-b.opened||a.id.localeCompare(b.id));
   }
-  const instance=uid();
+  let instance=uid();
   const registeredLabel=id=>cloud.devices?.find(device=>device.id===id)?.label;
   function presence() {
     const view=currentView();
@@ -117,7 +156,13 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const rows=available(), targets=viewTargets(readState()?.targets,rows.map(row=>row.id));
     const expires=rows.filter(row=>row.id!==sync.id).map(row=>row.time+maxAge);
     if (expires.length) expiryTimer=setTimeout(render,Math.max(0,Math.min(...expires)-Date.now())+5);
-    if (finishNameEdit) {positionMenu();return;}
+    if (finishNameEdit) {
+      const editing=list.querySelector('.view-tab-name-input')?.closest('.view-tab-row');
+      if (editing && !rows.some(row=>row.id===editing.querySelector('[data-view-tab]').dataset.viewTab)) finishNameEdit(true);
+      else if (list.querySelectorAll('[data-view-tab]').length===rows.length &&
+        rows.every(row=>document.getElementById('view-tab-target-'+row.id))) {positionMenu();return;}
+      else finishNameEdit();
+    }
     const groups=new Map(), focused=document.activeElement;
     const names=scope ? cloud.projected().tabNames : null;
     const fragment=document.createDocumentFragment();
@@ -166,13 +211,13 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const desired=cloud.options?.boardId||null;
     if (scope!==desired) {
       unsubscribe?.();unsubscribe=null;members=[];scope=desired;lastPresence=null;watching=false;departed.clear();
-      try {localStorage.removeItem(localKey);channel?.postMessage('change');} catch {}
     }
-    if (!scope) {
-      try {
-        localStorage.setItem(localKey,JSON.stringify(presence()));channel?.postMessage('change');
-      } catch {}
-    } else if (cloud.online && cloud.fs) {
+    try {
+      localStorage.setItem(localKey,JSON.stringify({...presence(),board:scope,lease:!!releaseLease}));
+      channel?.postMessage('change');
+    } catch {}
+    watchLocalPeers();
+    if (scope && cloud.online && cloud.fs) {
       const target=cloud.ref('viewTabs',sync.id), owner=cloud.deviceId;
       const data={...presence(),owner};
       const signature=JSON.stringify([data.page,data.full,data.label,data.tabName,owner]);
@@ -200,10 +245,17 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   }
   if (channel) channel.onmessage=event=>{
     const message=event.data;
-    if (message?.closed && message.scope===scope) departed.set(message.closed,message.instance);
+    if (message?.closed) forget(message.closed,message.instance,message.scope);
+    watchLocalPeers();
     render();
   };
   window.addEventListener('storage',event=>{
+    if (event.key?.startsWith(prefix)) {
+      if (!event.newValue && event.oldValue) {
+        try {const row=JSON.parse(event.oldValue);forget(row.id,row.instance,row.board??null);} catch {}
+      }
+      watchLocalPeers();
+    }
     if (event.key?.startsWith(prefix) || event.key?.startsWith(namePrefix)) render();
   });
   async function liveIds() {
@@ -242,24 +294,18 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     clearTimeout(scheduled);
     clearTimeout(expiryTimer);
     unsubscribe?.();unsubscribe=null;watching=false;
-    if (scope && cloud.online) {
-      const ref=cloud.ref('viewTabs',sync.id);
-      // Refreshing claims the same tab ID. An outgoing document must not
-      // delete the replacement document's presence when requests race.
-      cloud.fs.runTransaction(cloud.db,async tx=>{
-        const snapshot=await tx.get(ref);
-        if (snapshot.data()?.instance===instance) tx.delete(ref);
-      }).catch(()=>{});
-    }
+    if (scope) forget(sync.id,instance,scope);
+    releaseLease?.();releaseLease=null;
+    for (const controller of watches.values()) controller.abort();
     try {
       if (JSON.parse(localStorage.getItem(localKey))?.instance===instance) localStorage.removeItem(localKey);
       channel?.postMessage({closed:sync.id,scope,instance});
     } catch {}
     closePopups();
   });
-  window.addEventListener('pageshow',()=>{present=true;lastPresence=null;announce();});
+  window.addEventListener('pageshow',()=>{if (!present) {present=true;instance=uid();departed.clear();lastPresence=null;claimPresence();}});
   document.addEventListener('visibilitychange',()=>{if (document.visibilityState==='visible') announce();});
   setInterval(announce,heartbeat);
-  announce();
+  claimPresence();
   return {render,refresh,position:positionMenu,finishRename:()=>finishNameEdit?.()};
 }
