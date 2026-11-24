@@ -339,12 +339,13 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   flex:1;
   gap:.4em;
   min-width:0;
-  padding-inline-start:.45em;
-  border-inline-start:1px solid var(--panel-line);
   color:var(--muted-text);
 }
 .score-goal-value {
-  color:color-mix(in srgb,var(--card-accent,var(--primary-color)) 65%,var(--text-color));
+  padding:.1em .4em;
+  border-radius:.35em;
+  background:color-mix(in srgb,var(--card-accent,var(--primary-color)) 25%,var(--card-bg));
+  color:color-mix(in srgb,var(--card-accent,var(--primary-color)) 30%,var(--text-color));
   font-weight:800;line-height:1.15;white-space:nowrap;font-variant-numeric:tabular-nums;
 }
 .score-goal-message {
@@ -352,7 +353,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   font-weight:600;line-height:1.35;
 }
 #next-class-goal {grid-template-columns:auto minmax(0,1fr) auto;box-sizing:border-box;width:min(100%,360px);margin:6px auto 0;padding:3px 8px;border:1px solid #e6c459;border-radius:9px;background:#fff0ac;color:#594519;font-size:clamp(14px,4.2cqw,18px)}
-#next-class-goal .score-goal-value {color:#664709;font-size:clamp(12px,3.8cqw,17px)}
+#next-class-goal .score-goal-value {background:#f4d477;color:#664709;font-size:clamp(12px,3.8cqw,17px)}
 .goal-message-viewport {display:block;min-width:0;overflow:hidden}
 .goal-message-track {display:flex;gap:0;width:max-content;margin-inline:auto;white-space:nowrap}
 .goal-message-repeat {display:none}
