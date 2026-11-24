@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGoalCelebrationQueue} from '../score/goal-celebration.js';
+import {celebrationSections,createGoalCelebrationQueue} from '../score/goal-celebration.js';
 
 const record = (id,reached,goalId,score,teamId=null) => ({
   id,reached,goalId,score,teamId,type:teamId===null?'class':'team',status:'pending'
@@ -8,7 +8,7 @@ const record = (id,reached,goalId,score,teamId=null) => ({
 const index = records => new Map(records.map(row=>[row.id,row]));
 const ids = group => group.map(row=>row.id);
 
-test('matching team rounds share one popup while other goals and rounds are queued',()=>{
+test('one input groups matching team rounds into sections and queues separate inputs',()=>{
   let sounds=0;
   const queue=createGoalCelebrationQueue(()=>sounds++);
   const entries=[
@@ -18,10 +18,11 @@ test('matching team rounds share one popup while other goals and rounds are queu
   ];
   const current=index(entries);
   queue.enqueue(entries,new Map());
-  assert.deepEqual(ids(queue.take(current)),['a10','b10']);
+  const batch=queue.take(current);
+  assert.deepEqual(ids(batch),['a20','a10','other','b10']);
+  const sections=celebrationSections(batch,[],()=>null);
+  assert.deepEqual(sections.map(section=>[section.score,section.names.length]),[[10,2],[10,1],[20,1]]);
   assert.equal(queue.hasPending(current),true);
-  assert.deepEqual(ids(queue.take(current)),['other']);
-  assert.deepEqual(ids(queue.take(current)),['a20']);
   assert.equal(sounds,1);
   assert.deepEqual(ids(queue.take(current)),['class']);
   assert.equal(sounds,2);
@@ -49,4 +50,14 @@ test('withdrawn or deleted goals are skipped when checking and advancing the que
   const current=index([{...entries[1],status:'withdrawn'}]);
   assert.equal(queue.hasPending(current),false);
   assert.deepEqual(queue.take(current),[]);
+});
+
+test('a mixed achievement plays one class sound and lists the class first',()=>{
+  const sounds=[],queue=createGoalCelebrationQueue(type=>sounds.push(type));
+  const entries=[record('a','batch','team',10,'a'),record('b','batch','class',100)];
+  queue.enqueue(entries,new Map());
+  const sections=celebrationSections(queue.take(index(entries)),[{id:'a',name:'Blue'}],()=>null);
+  assert.deepEqual(sections.map(s=>s.type),['class','team']);
+  assert.deepEqual(sections[1].names,['Blue']);
+  assert.deepEqual(sounds,['class']);
 });

@@ -1,5 +1,5 @@
 import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=goal-queue-1';
-import {createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=celebration-3';
+import {celebrationSections,createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=celebration-4';
 
 const $ = id => document.getElementById(id);
 const button = (label,action,classes='dialog-action') => {
@@ -71,24 +71,14 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
   }
   function showGroup(group) {
     active=group;
-    const record=group[0];
     const pending=group.filter(row=>row.status==='pending');
     const complete=pending.length ? async ()=>{
       const accepted=await change(pending,true);
       if (accepted && active===group) close();
       return accepted;
     } : null;
-    const score=String(record.milestone??record.achievedScore??record.score)+'점';
-    const names=record.type==='team'
-      ? group.map(row=>teamList().find(team=>team.id===row.teamId)?.name || row.teamName || '모둠').join(', ')
-      : '';
     const detail={
-      type:record.type,
-      title:names?'모둠 목표 달성':'학급 목표 달성',
-      achievement:group.length>1 ? record.score+'점' : score,
-      names,
-      message:record.message,
-      accent:names && group.length===1 ? teamAccent(record.teamId) : null,
+      sections:celebrationSections(group,teamList(),teamAccent),
       completeLabel:pending.length>1?'모두 완료 처리':'완료 처리',
       close,complete
     };

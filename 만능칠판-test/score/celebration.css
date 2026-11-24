@@ -56,3 +56,15 @@
 @media (prefers-reduced-motion:reduce) {
   .goal-celebration-card {animation:none}
 }
+
+.goal-toast-content:has(.goal-toast-section + .goal-toast-section) {
+  display:grid;gap:.5rem;max-height:65dvh;overflow:auto;
+}
+.goal-toast-section {border-radius:.65rem;padding:.45rem .3rem;background:#fff3ca}
+.goal-toast-section[data-type="team"] {
+  --toast-accent:#277093;
+  background:color-mix(in srgb,var(--toast-accent) 12%,white);
+}
+.goal-celebration-card .goal-toast-close {z-index:1}
+
+.goal-toast-content[data-scrollable] {pointer-events:auto}

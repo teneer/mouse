@@ -1,4 +1,4 @@
-import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-2';
+import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=view-split-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
