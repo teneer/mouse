@@ -111,20 +111,29 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       page:Math.max(1,pages().findIndex(page=>page.id===view.pageId)+1),full:view.scoreFull===true};
   }
   function render() {
-    control.checked=activeView(readState(),sync.id);
+    control.checked=!!readState()?.enabled;
     clearTimeout(expiryTimer);
     if (root.style.display!=='block') return;
     const rows=available(), targets=viewTargets(readState()?.targets,rows.map(row=>row.id));
     const expires=rows.filter(row=>row.id!==sync.id).map(row=>row.time+maxAge);
     if (expires.length) expiryTimer=setTimeout(render,Math.max(0,Math.min(...expires)-Date.now())+5);
     if (finishNameEdit) {positionMenu();return;}
-    const counts=new Map(), focused=document.activeElement;
+    const groups=new Map(), focused=document.activeElement;
     const names=scope ? cloud.projected().tabNames : null;
     const fragment=document.createDocumentFragment();
     let restoreFocus;
     for (const row of rows) {
-      const n=(counts.get(row.owner)||0)+1;
-      counts.set(row.owner,n);
+      let group=groups.get(row.owner);
+      if (!group) {
+        group=document.createElement('fieldset');
+        group.className='view-device';
+        const title=document.createElement('legend');
+        title.textContent=registeredLabel(row.owner)||row.label;
+        group.append(title);
+        groups.set(row.owner,group);
+        fragment.append(group);
+      }
+      const n=group.childElementCount;
       const line=document.createElement('div');line.className='view-tab-row';
       const input=document.createElement('input');
       input.type='checkbox';input.checked=targets.includes(row.id);input.dataset.viewTab=row.id;
@@ -133,8 +142,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       const sharedName=names && Object.hasOwn(names,row.id) ? names[row.id] : '';
       const name=sharedName || localName(row.id) || normalizeTabName(row.tabName) || '탭 '+n;
       const details=document.createElement('span');details.className='view-tab-details';
-      const description=(registeredLabel(row.owner)||row.label)+(row.id===sync.id?' (이 탭)':'')
-        +' · '+(row.full?'점수판 전체 화면':row.page+'쪽');
+      const description=(row.id===sync.id?'이 탭 · ':'')+(row.full?'점수판 전체 화면':row.page+'쪽');
       const display=document.createElement('label');display.htmlFor=input.id;
       display.className='view-tab-name';display.textContent=name;display.title=name;
       const info=document.createElement('span');info.className='view-tab-info';info.textContent=description;
@@ -145,7 +153,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       input.setAttribute('aria-label',name+' · '+description);
       details.append(display,info);
       line.append(input,details,edit);
-      fragment.append(line);
+      group.append(line);
       if (focused?.dataset.viewTab===row.id) restoreFocus=input;
       if (focused?.dataset.renameTab===row.id) restoreFocus=edit;
     }

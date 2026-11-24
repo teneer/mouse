@@ -454,7 +454,7 @@ export class CloudBoard {
       const targets=changeTargets?[...new Set(changeTargets(existing))]:(existing||[]);
       if (toggle===undefined && !changeTargets &&
         (!before?.enabled || before.epoch!==state.epoch || !targets.includes(state.sourceTab))) return false;
-      const enabled=targets.length>0 && (toggle??(changeTargets?true:before?.enabled));
+      const enabled=toggle ?? (before?.enabled===true);
       const view=changeTargets && !targets.includes(state.sourceTab) && before?.pageId ? before : state;
       tx.set(ref,{...view,enabled,targets,epoch:changeTargets||toggle!==undefined?state.epoch:before.epoch,
         device:this.deviceId,at:this.fs.serverTimestamp()});

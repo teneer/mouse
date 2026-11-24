@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-2';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=view-sync-click-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=view-groups-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
@@ -11,7 +11,7 @@ import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=toolbar-goals-1';
+import {CloudBoard} from './js/cloud.js?v=view-groups-1';
 import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=toolbar-goals-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
@@ -95,7 +95,7 @@ async function publishView(toggle,changeTargets){
   }else{
     const old=shared?.targets;
     const targets=changeTargets?[...new Set(changeTargets(old))]:(old||[]);
-    const enabled=targets.length>0&&(toggle??(!!changeTargets||shared?.enabled===true));
+    const enabled=toggle ?? (shared?.enabled===true);
     localView={...(changeTargets && !targets.includes(sync.id) && shared?.pageId ? shared:state),epoch,enabled,targets};
     sync.sendView(localView);
   }
@@ -970,7 +970,7 @@ function requestCloudRefresh(delay=25) {
 }
 async function refreshCloud() {
   if(!cloudActive() || !current)return;
-  $('viewSync').checked=activeView(cloud.latestView,sync.id);
+  $('viewSync').checked=!!cloud.latestView?.enabled;
   if(cloudRefresh){requestCloudRefresh();return;}
   const board=cloud.projected();
   const remote=board.pages[current.id];
@@ -1051,7 +1051,7 @@ function applyViewport(view){
 function restoreLocalView(){
   const state=sync.readView();
   localView=validViewState(state)?state:null;
-  $('viewSync').checked=activeView(localView,sync.id);
+  $('viewSync').checked=!!localView?.enabled;
   applyLocalView().catch(fail);
 }
 async function applyLocalView(){
@@ -1370,7 +1370,7 @@ async function boot() {
     if(!validViewState(view))return;
     localView=view;
     if(!cloudActive()){
-      $('viewSync').checked=activeView(view,sync.id);
+      $('viewSync').checked=!!view?.enabled;
       tabViews?.render();
       applyLocalView().catch(fail);
     }
