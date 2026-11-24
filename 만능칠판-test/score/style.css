@@ -592,11 +592,11 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 .settings-panel {
   display:grid;
   position:fixed;
-  top:var(--settings-top,52px);
-  right:min(8px, 3vw);
-  z-index:10;
-  width:min(290px, calc(100% - 2 * min(8px, 3vw)));
-  max-height:max(0px, calc(100dvh - var(--settings-top,52px) - 8px - var(--toolbar-clearance,0px)));
+  inset:0;
+  margin:auto;
+  box-sizing:border-box;
+  width:min(460px,calc(100% - 24px));
+  max-height:calc(100dvh - 24px);
   padding:clamp(5px, 4vw, 12px);
   gap:9px;
   overflow:auto;
@@ -606,7 +606,8 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   border-radius:14px;
   box-shadow:0 8px 22px var(--shadow-color);
 }
-.settings-panel:not(.open) {display:none}
+.settings-panel::backdrop {background:rgba(20,38,56,.32)}
+.settings-panel:not([open]) {display:none}
 .settings-panel h3 {margin:0;padding:0;text-align:left;border:0;font-size:16px}
 .score-settings-section {display:grid;min-width:0;gap:8px;padding-top:10px;border-top:1px solid var(--panel-line)}
 .score-settings-section h4 {margin:0;font-size:13px;color:var(--muted-text)}

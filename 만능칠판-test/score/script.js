@@ -1026,34 +1026,31 @@ document.getElementById('save-management-btn').onclick = closeAndSaveManagement;
 document.getElementById('close-management-btn').onclick = closeManagementModal;
 document.getElementById('open-goal-modal-btn').onclick = ()=>{setSettingsOpen(false);syncFromStorage();goalUI.openSettings();};
 function setSettingsOpen(open) {
-  settingsPanel.classList.toggle('open', open);
+  if (settingsPanel.open === open) return;
   settingsPanel.inert = !open;
   settingsToggleBtn.setAttribute('aria-expanded', String(open));
-  if (open) positionSettings();
-}
-function positionSettings() {
-  if (!settingsPanel.inert) {
-    settingsPanel.style.setProperty('--settings-top',Math.ceil(settingsToggleBtn.getBoundingClientRect().bottom+6)+'px');
+  scoreModalState(open);
+  if (open) settingsPanel.showModal();
+  else {
+    settingsPanel.close();
+    settingsToggleBtn.focus();
   }
 }
-const settingsPosition = new ResizeObserver(positionSettings);
-settingsPosition.observe(document.getElementById('class-area'));
-settingsPosition.observe(sharedBanner);
-window.addEventListener('resize',positionSettings);
-settingsToggleBtn.onclick = () => setSettingsOpen(settingsPanel.inert);
-document.getElementById('close-score-settings').onclick=()=>{setSettingsOpen(false);settingsToggleBtn.focus();};
-document.addEventListener('pointerdown', event => {
-  if (!settingsPanel.inert && !settingsPanel.contains(event.target) && !settingsToggleBtn.contains(event.target)) {
+settingsToggleBtn.onclick = () => setSettingsOpen(true);
+document.getElementById('close-score-settings').onclick = () => setSettingsOpen(false);
+settingsPanel.addEventListener('cancel',event=>{
+  event.preventDefault();
+  setSettingsOpen(false);
+});
+settingsPanel.addEventListener('click',event=>{
+  if (event.target !== settingsPanel) return;
+  const rect = settingsPanel.getBoundingClientRect();
+  if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
     setSettingsOpen(false);
   }
 });
 // 활성 탭 단축키: 1~9, 0은 모둠 1~10; Shift+숫자는 -1; 위/아래는 학급 ±1.
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !settingsPanel.inert) {
-    setSettingsOpen(false);
-    settingsToggleBtn.focus();
-    return;
-  }
   if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing || e.repeat) return;
 
   // 입력란과 관리 화면에서는 점수가 의도치 않게 바뀌지 않도록 합니다.
@@ -1063,7 +1060,7 @@ document.addEventListener('keydown', e => {
   if (document.getElementById('team-delete-dialog').open || getComputedStyle(teamSetupModal).display !== 'none' ||
       getComputedStyle(managementModal).display !== 'none' ||
       getComputedStyle(goalManagementView).display !== 'none' ||
-      settingsPanel.classList.contains('open') ||
+      settingsPanel.open ||
       document.body.classList.contains('goal-active')) return;
 
   if (!e.shiftKey && (e.code === 'ArrowUp' || e.key === '+')) {

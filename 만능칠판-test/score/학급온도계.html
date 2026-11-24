@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-layout-6">
+    <link rel="stylesheet" href="style.css?v=settings-center-1">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=celebration-2">
 </head>
@@ -109,62 +109,62 @@
             <button type="submit" id="apply-batch" disabled>반영</button>
         </form>
 
-        <div id="settings-panel" class="settings-panel" aria-labelledby="score-settings-title" inert>
-            <header class="dialog-header"><h3 id="score-settings-title">점수판 설정</h3><button id="close-score-settings" class="dialog-close" type="button" aria-label="닫기">×</button></header>
-            <section class="score-settings-section" aria-labelledby="display-settings-title">
-                <h4 id="display-settings-title">화면 표시</h4>
-                <div class="score-setting-row" id="score-panel-side-row" hidden>
-                    <span id="score-panel-side-label">점수판 위치</span>
-                    <button id="score-panel-side" type="button" aria-labelledby="score-panel-side-label score-panel-side">오른쪽</button>
-                </div>
-                <div class="score-setting-row">
-                    <span id="score-layout-mode-label">모둠 카드 배치</span>
-                    <button id="score-layout-mode" type="button" aria-labelledby="score-layout-mode-label score-layout-mode">자동 배치</button>
-                </div>
-                <label class="score-setting-row" id="score-fixed-columns-row" hidden>열 수
-                    <input id="score-fixed-columns" type="number" min="1" max="6" step="1" value="3" inputmode="numeric">
-                </label>
-                <p class="score-setting-hint" id="score-layout-hint">사용 가능한 가로·세로 공간에서 모둠카드가 가장 크게 보이도록 배치합니다.</p>
-                <div class="score-setting-row">
-                    <span id="score-card-ratio-label">모둠 카드 비율</span>
-                    <button id="score-card-ratio" type="button" aria-labelledby="score-card-ratio-label score-card-ratio">4:3</button>
-                </div>
-                <div class="score-setting-row">
-                    <span id="scale-label">표시 배율</span>
-                    <div class="score-size-controls" role="group" aria-labelledby="scale-label">
-                        <button type="button" id="scoreSizeDown" aria-label="점수판 축소">−</button>
-                        <output id="scoreSizeValue">100%</output>
-                        <button type="button" id="scoreSizeUp" aria-label="점수판 확대">+</button>
-                        <button type="button" id="scoreSizeReset" aria-label="배율을 100%로 초기화">초기화</button>
-                    </div>
-                </div>
-            </section>
-            <section class="score-settings-section" aria-labelledby="link-settings-title">
-                <h4 id="link-settings-title">점수 연동</h4>
-                <label class="score-setting-row">모둠 점수 연동
-                    <input type="checkbox" id="score-link-mode" checked>
-                </label>
-                <label class="score-setting-row score-link-rule" id="score-link-rule">
-                    <span>모둠</span>
-                    <input id="score-link-points" type="number" min="1" step="1" value="3" aria-label="학급 1점에 필요한 모둠 점수">
-                    <span>점 = 학급 1점</span>
-                </label>
-            </section>
-            <section class="score-settings-section">
-                <h4>효과음</h4>
-                <label class="score-setting-row">음량 <input id="score-volume" type="range" min="0" max="120" step="1" value="100"><output id="score-volume-level">100%</output></label>
-                <label class="score-setting-row">음소거 <input id="score-mute" type="checkbox"></label>
-            </section>
-            <section class="score-settings-section" aria-labelledby="manage-settings-title">
-                <h4 id="manage-settings-title">관리</h4>
-                <div class="score-settings-actions">
-                    <button type="button" id="open-goal-modal-btn">목표·달성 기록</button>
-                    <button type="button" id="open-management-modal-btn">점수판 관리</button>
-                </div>
-            </section>
-        </div>
-
     </div>
+
+    <dialog id="settings-panel" class="settings-panel" aria-labelledby="score-settings-title" inert>
+        <header class="dialog-header"><h3 id="score-settings-title">점수판 설정</h3><button id="close-score-settings" class="dialog-close" type="button" aria-label="닫기">×</button></header>
+        <section class="score-settings-section" aria-labelledby="display-settings-title">
+            <h4 id="display-settings-title">화면 표시</h4>
+            <div class="score-setting-row" id="score-panel-side-row" hidden>
+                <span id="score-panel-side-label">점수판 위치</span>
+                <button id="score-panel-side" type="button" aria-labelledby="score-panel-side-label score-panel-side">오른쪽</button>
+            </div>
+            <div class="score-setting-row">
+                <span id="score-layout-mode-label">모둠 카드 배치</span>
+                <button id="score-layout-mode" type="button" aria-labelledby="score-layout-mode-label score-layout-mode">자동 배치</button>
+            </div>
+            <label class="score-setting-row" id="score-fixed-columns-row" hidden>열 수
+                <input id="score-fixed-columns" type="number" min="1" max="6" step="1" value="3" inputmode="numeric">
+            </label>
+            <p class="score-setting-hint" id="score-layout-hint">사용 가능한 가로·세로 공간에서 모둠카드가 가장 크게 보이도록 배치합니다.</p>
+            <div class="score-setting-row">
+                <span id="score-card-ratio-label">모둠 카드 비율</span>
+                <button id="score-card-ratio" type="button" aria-labelledby="score-card-ratio-label score-card-ratio">4:3</button>
+            </div>
+            <div class="score-setting-row">
+                <span id="scale-label">표시 배율</span>
+                <div class="score-size-controls" role="group" aria-labelledby="scale-label">
+                    <button type="button" id="scoreSizeDown" aria-label="점수판 축소">−</button>
+                    <output id="scoreSizeValue">100%</output>
+                    <button type="button" id="scoreSizeUp" aria-label="점수판 확대">+</button>
+                    <button type="button" id="scoreSizeReset" aria-label="배율을 100%로 초기화">초기화</button>
+                </div>
+            </div>
+        </section>
+        <section class="score-settings-section" aria-labelledby="link-settings-title">
+            <h4 id="link-settings-title">점수 연동</h4>
+            <label class="score-setting-row">모둠 점수 연동
+                <input type="checkbox" id="score-link-mode" checked>
+            </label>
+            <label class="score-setting-row score-link-rule" id="score-link-rule">
+                <span>모둠</span>
+                <input id="score-link-points" type="number" min="1" step="1" value="3" aria-label="학급 1점에 필요한 모둠 점수">
+                <span>점 = 학급 1점</span>
+            </label>
+        </section>
+        <section class="score-settings-section">
+            <h4>효과음</h4>
+            <label class="score-setting-row">음량 <input id="score-volume" type="range" min="0" max="120" step="1" value="100"><output id="score-volume-level">100%</output></label>
+            <label class="score-setting-row">음소거 <input id="score-mute" type="checkbox"></label>
+        </section>
+        <section class="score-settings-section" aria-labelledby="manage-settings-title">
+            <h4 id="manage-settings-title">관리</h4>
+            <div class="score-settings-actions">
+                <button type="button" id="open-goal-modal-btn">목표·달성 기록</button>
+                <button type="button" id="open-management-modal-btn">점수판 관리</button>
+            </div>
+        </section>
+    </dialog>
 
     <div id="team-setup-modal" class="modal-background" role="dialog" aria-modal="true" aria-labelledby="team-setup-title">
         <div class="modal-box">
@@ -243,6 +243,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=celebration-2"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
+    <script type="module" src="script.js?v=settings-center-1"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
 </body>
 </html>
