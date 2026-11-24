@@ -696,12 +696,9 @@ button, .main-scoreboard, .team-card, #batch-score {
 .team-title-row:has(.team-goal-target:not([hidden])) .team-name {flex:none;max-width:min(40%,8em)}
 .team-goal-target {font-size:clamp(10px,14cqh,13px)}
 .team-controls {position:absolute;inset:0;pointer-events:none}
-.team-score-line {display:flex;align-items:flex-end;gap:min(6px,4cqw)}
+.team-score-line {position:relative;display:flex}
 .team-number {font-size:min(40px, 34cqh, 25cqw)}
-.team-number[data-long-score] {font-size:min(40px, 34cqh, 24cqw)}
-.team-score-line:has(.team-goal-gifts:not([hidden])) .team-number[data-long-score] {
-  font-size:min(40px,28cqh,18cqw);
-}
+.team-number[data-long-score] {font-size:min(40px,28cqh,15cqw)}
 .team-steps {position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;padding:0;pointer-events:none}
 /* Keep the entire hit target below the centered score, including its pop effect. */
 .team-steps button {
@@ -803,7 +800,15 @@ button, .main-scoreboard, .team-card, #batch-score {
   display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:.35rem;
   margin-top:clamp(4px,1dvh,10px);
 }
-.team-goal-gifts {display:flex;pointer-events:auto}
+#class-goal-gifts, #class-goal-gifts[hidden] {
+  box-sizing:border-box;height:1.8rem;
+}
+#class-goal-gifts[hidden] {display:flex !important;visibility:hidden}
+.team-goal-gifts {
+  position:absolute;bottom:0;left:calc(100% + min(4px,2cqw));display:flex;pointer-events:auto;
+  max-width:calc(50cqw - 50% - min(4px,2cqw));
+}
+.team-goal-gifts button {max-width:100%;overflow:hidden}
 #class-goal-gifts button {
   padding:.15em .25em;color:#174866;background:#ecf7ff;border:1px solid #afccdf;
   border-radius:.35rem;font-size:clamp(.65rem,8cqw,1rem);white-space:nowrap;
