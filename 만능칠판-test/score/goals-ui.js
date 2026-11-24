@@ -1,5 +1,5 @@
 import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=goal-queue-1';
-import {createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=celebration-2';
+import {createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=celebration-3';
 
 const $ = id => document.getElementById(id);
 const button = (label,action,classes='dialog-action') => {
@@ -114,9 +114,11 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
   function update(model, announce) {
     system=model;
     records=new Map(model.records.map(row=>[row.id,row]));
-    if (announce && previous) celebrations.enqueue(model.records,previous);
+    const added=announce && previous && celebrations.enqueue(model.records,previous,!!active);
     previous=new Map(model.records.map(row=>[row.id,row.reached]));
-    if (active) {
+    const next=active && added ? celebrations.take(records) : [];
+    if (next.length) showGroup(next);
+    else if (active) {
       const remaining=active.filter(row=>{
         const latest=records.get(row.id);
         return latest && latest.reached===row.reached && latest.status!=='withdrawn' &&

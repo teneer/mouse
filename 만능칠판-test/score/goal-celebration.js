@@ -1,6 +1,6 @@
 export function createGoalCelebrationQueue(celebrate) {
   const queue = [];
-  let lastSoundEvent;
+  const sounded=new Set();
 
   function recordFor(records, pending) {
     const record = records.get(pending.id);
@@ -9,7 +9,8 @@ export function createGoalCelebrationQueue(celebrate) {
   }
 
   return {
-    enqueue(records, previous) {
+    enqueue(records, previous, prioritize=false) {
+      const added=[];
       const byEvent = new Map();
       for (const record of records) {
         if (record.silent || record.status === 'withdrawn' || record.reached === previous.get(record.id)) continue;
@@ -24,17 +25,24 @@ export function createGoalCelebrationQueue(celebrate) {
           if (!groups.has(key)) groups.set(key,[]);
           groups.get(key).push({id,reached});
         }
-        queue.push(...groups.values());
+        added.push(...groups.values());
       }
+      if (prioritize) queue.unshift(...added);
+      else queue.push(...added);
+      return added.length>0;
     },
     take(records) {
       while (queue.length) {
-        const group = queue.shift().map(pending => recordFor(records,pending)).filter(Boolean);
-        if (!group.length) continue;
-        if (group[0].reached !== lastSoundEvent) {
-          lastSoundEvent = group[0].reached;
+        const pending=queue.shift();
+        const event=pending[0].reached;
+        const play=!sounded.has(event);
+        const group = pending.map(pending => recordFor(records,pending)).filter(Boolean);
+        if (group.length && play) {
           celebrate(group[0].type);
+          sounded.add(event);
         }
+        if (!queue.some(next=>next[0].reached===event)) sounded.delete(event);
+        if (!group.length) continue;
         return group;
       }
       return [];
@@ -42,8 +50,8 @@ export function createGoalCelebrationQueue(celebrate) {
     hasPending(records) {
       return queue.some(group => group.some(pending => recordFor(records,pending)));
     },
-    clear() {queue.length = 0;},
-    reset() {queue.length = 0;lastSoundEvent = undefined;}
+    clear() {queue.length = 0;sounded.clear();},
+    reset() {queue.length = 0;sounded.clear();}
   };
 }
 
