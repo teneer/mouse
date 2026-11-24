@@ -45,7 +45,6 @@ const nextClassGoalMessage = document.getElementById('next-class-goal-message');
 const goalMessageToggle = document.getElementById('goal-message-toggle');
 const teamGoalMotionToggle = document.getElementById('team-goal-motion-toggle');
 const teamGoalTemplate = document.getElementById('team-goal-template');
-const goalMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const goalScoreFormat = new Intl.NumberFormat('ko-KR');
 const progress = document.getElementById('score-progress');
 const conversionRule = document.getElementById('conversion-rule');
@@ -351,8 +350,7 @@ function wireGoalMotion(root,toggle,label) {
     toggle.setAttribute('aria-label',label + (paused ? ' 재생' : ' 일시 정지'));
   };
   toggle.onclick = ()=>setPaused(!root.classList.contains('goal-paused'));
-  goalMotion.addEventListener('change',event=>setPaused(event.matches));
-  setPaused(goalMotion.matches);
+  setPaused(false);
 }
 wireGoalMotion(nextClassGoalBanner,goalMessageToggle,'학급 목표 메시지');
 wireGoalMotion(scoreboard,teamGoalMotionToggle,'모둠 목표 메시지');
@@ -578,8 +576,7 @@ function renderTeams() {
     renderTeamGoal(target,team);
     const title = document.createElement('span');
     title.className = 'team-title-row';
-    title.append(nameSpan,target);
-    selectButton.appendChild(title);
+    selectButton.appendChild(target);
     const numberSpan = document.createElement('span');
     numberSpan.id = `team-number-${idx}`;
     numberSpan.className = 'team-number';
@@ -590,7 +587,9 @@ function renderTeams() {
     goalUI.giftGroup(gifts,team.id);
     const scoreLine = document.createElement('div');
     scoreLine.className = 'team-score-line';
-    scoreLine.append(numberSpan,gifts);
+    title.append(nameSpan,gifts);
+    card.appendChild(title);
+    scoreLine.appendChild(numberSpan);
     const controls = document.createElement('div');
     controls.className = 'team-controls';
     controls.appendChild(scoreLine);
