@@ -40,25 +40,27 @@ function firstMilestoneAfter(goal, count, interval) {
   return goal.score + (Math.floor((count-goal.score)/interval)+1)*interval;
 }
 
-export function nextClassGoal(system, count) {
+function nextGoal(system, count, type, teamId) {
   const completed = new Set(system.records
-    .filter(record => record.teamId === null && record.status === 'done')
+    .filter(record => record.teamId === teamId && record.status === 'done')
     .map(record => record.id));
   let next = null;
   for (const goal of system.goals) {
-    if (goal.type !== 'class') continue;
+    if (goal.type !== type) continue;
     const interval = intervalOf(goal);
     let score = goal.score;
     if (interval) {
       score = firstMilestoneAfter(goal,count,interval);
-      while (score <= MAX_GOAL_SCORE && completed.has(recordId(goal,null,score))) score += interval;
-    } else if (score <= count || completed.has(recordId(goal,null))) continue;
+      while (score <= MAX_GOAL_SCORE && completed.has(recordId(goal,teamId,score))) score += interval;
+    } else if (score <= count || completed.has(recordId(goal,teamId))) continue;
     if (score > MAX_GOAL_SCORE) continue;
     if (next === null || score < next.score) next = {...goal,score,additional:0};
     else if (score === next.score) next.additional++;
   }
   return next;
 }
+export const nextClassGoal = (system, count) => nextGoal(system,count,'class',null);
+export const nextTeamGoal = (system, team) => nextGoal(system,team.score,'team',team.id);
 
 export function goalStatus(goal, score, record) {
   if (record?.status==='done') return 'done';

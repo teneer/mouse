@@ -31,8 +31,7 @@ body {
 #toolbarScaleWrap{
   position: fixed;
   bottom: 0; left: 0;
-  width: 100%;                 
-  transform-origin: bottom left;
+  width: 100%;
   z-index: 1000;
 }
 
@@ -68,20 +67,17 @@ body {
 }
 
 #toolbar {
-  width: calc(100% - 16px);
   background: #e0e4ea;
   border-radius: 18px 18px 0 0;
   box-shadow: 0 -2px 16px rgba(90,110,130,0.08);
   padding: 8px 0 8px 0;
   margin-bottom: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 28px;
   border-top: 1.5px solid #b6c8e8;
   transition: box-shadow 0.2s;
-  overflow-x: auto; 
 
 }
 
@@ -206,7 +202,7 @@ body {
 }
 
 @keyframes fadeInAbove { 
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -462,8 +458,8 @@ button:focus-visible,select:focus-visible,input:focus-visible {outline:3px solid
 #saveStatus {font-size:12px;color:#1c3d5a;background:#f0f4fa;border:1px solid #b6c8e8;padding:5px 8px;border-radius:6px;opacity:1;transition:opacity .45s ease;}
 #saveStatus[data-state="error"] {color:#9f1239;background:#fff1f2;border-color:#fda4af;}
 #saveStatus.fade-out {opacity:0;}
-#zoomLabel {min-width:55px;font-size:13px;text-align:center;color:#1c3d5a;}
-.tip-up-settings {position:fixed !important;z-index:1500;max-width:calc(100vw - 24px);box-sizing:border-box;}
+#zoomLabel {min-width:40px;font-size:13px;text-align:center;color:#1c3d5a;font-variant-numeric:tabular-nums}
+.tip-up-settings {position:fixed !important;z-index:1500;max-width:calc(100vw - 24px);box-sizing:border-box;overflow-y:auto}
 .options-row {display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
 .options-row label {display:flex;align-items:center;gap:6px;font-size:13px;}
 .tip-note,.help-text {font-size:12px;color:#555;line-height:1.6;}
@@ -588,7 +584,7 @@ button:focus-visible,select:focus-visible,input:focus-visible {outline:3px solid
 .context-palette{display:grid;gap:6px;padding:3px 3px 8px;border-bottom:1px solid #dde7f0;font-size:13px}
 #quickColorSlots{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 #quickColorSlots button{min-height:36px;border:1px solid #b6c8e8;background:#fff;border-radius:5px;cursor:pointer}
-#toolbar{max-height:min(38vh,240px);overflow-y:auto}.upper-canvas{touch-action:none}
+.upper-canvas{touch-action:none}
 @media(max-width:700px){#toolbar .mode-btn,#toolbar .action-btn{min-height:40px;max-height:none;height:40px} .quick-sizes button{min-width:38px;height:38px} .quick-colors button{width:38px;height:38px}}
 
 /* 점수판은 전체 화면 칠판 위에 겹쳐 표시합니다. */
@@ -606,12 +602,25 @@ body.score-open #scoreSplitter{display:flex}
 body.score-resizing #canvas-container canvas,body.score-resizing #scoreFrame{pointer-events:none}
 #scorePanelToggle[aria-expanded="true"]{background:#d1edff;border-color:#5093c6}
 #toolbar{
-  width:100%;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;
-  gap:10px;overflow-x:auto;overflow-y:hidden;max-height:none;
-  white-space:nowrap;scrollbar-width:thin;padding:8px 10px;
+  width:100%;flex-wrap:nowrap;justify-content:flex-start;
+  gap:10px;white-space:nowrap;padding:8px 10px;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-y;
 }
+#toolbar::-webkit-scrollbar {display:none}
 #toolbar>.toolbar-group{display:flex;align-items:center;flex:0 0 auto;gap:5px;margin:0}
+#toolbar>.toolbar-group:first-child {margin-inline-start:auto}
+#toolbar>.toolbar-group:last-child {margin-inline-end:auto}
 #toolbar button,#toolbar input{flex:0 0 auto;margin:0}
+#toolbar .appearance-button {padding-inline:0}
+#toolbar .page-step {width:33px;padding:0;font-size:17px}
+#toolbar .zoom-stepper {display:grid;gap:2px}
+#toolbar .zoom-stepper button {
+  width:34px;height:21px;min-height:0;max-height:none;padding:0;
+  border-radius:6px;font-size:16px;line-height:1;
+}
+@media (pointer:coarse) {
+  #toolbar .zoom-stepper button {height:27px;width:40px}
+}
 
 .view-sync {
   display: inline-flex;
@@ -669,12 +678,7 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
   -webkit-user-select:none;
   user-select:none;
 }
-#toolbar {touch-action:pan-y}
 .page-tile[data-page] {touch-action:none}
-#toolbar {scrollbar-width:none}
-#toolbar::-webkit-scrollbar {display:none}
-#toolbar > .toolbar-group:first-child {margin-inline-start:auto}
-#toolbar > .toolbar-group:last-child {margin-inline-end:auto}
 .view-sync input {cursor:inherit}
 #pageList {max-width:min(90vw, 550px)}
 #pageTiles {display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;width:min(76vw, 490px);max-height:55vh;overflow:auto}
@@ -767,9 +771,24 @@ body.score-full :is(#scoreSplitter,#toolbarScaleWrap) {display:none}
 body.score-full #canvas-container {visibility:hidden}
 body.score-modal-open #scorePanel {display:block;position:fixed;inset:0;width:100%;height:100%;z-index:2800;background:transparent}
 body.score-modal-open #scoreFrame {background:transparent}
-#viewSyncMenu {display:none;position:fixed;overflow-y:auto;z-index:1900;padding:.6rem;background:#f7fbfd;border:1px solid #b9d1de;border-radius:.6rem;box-shadow:0 4px 18px #21445634;max-width:calc(100vw - 16px)}
+#viewSyncMenu {display:none;position:fixed;overflow-y:auto;z-index:1900;padding:.6rem;background:#f7fbfd;border:1px solid #b9d1de;border-radius:.6rem;box-shadow:0 4px 18px #21445634;width:min(23rem,calc(100vw - 16px))}
 #viewSyncMenu [data-view-tabs] {display:grid;gap:.35rem;max-height:min(55vh,22rem);overflow:auto;margin-top:.45rem}
-#viewSyncMenu label {display:flex;align-items:center;gap:.45rem}
+#viewSyncMenu .view-tab-row {
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;gap:.5rem;padding:.25rem;border-radius:.35rem;background:#edf5f7;
+}
+#viewSyncMenu .view-tab-details {display:grid;min-width:0}
+#viewSyncMenu .view-tab-name {font-weight:650;cursor:pointer}
+#viewSyncMenu :is(.view-tab-name,.view-tab-info) {overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#viewSyncMenu .view-tab-info {font-size:.75rem;color:#45616d}
+#viewSyncMenu .view-tab-name-input {
+  width:100%;min-width:0;padding:.15rem .25rem;border:1px solid #b9d1de;border-radius:4px;font:inherit;
+}
+#viewSyncMenu .view-tab-rename {
+  min-width:34px;min-height:34px;padding:0;border:1px solid #b9d1de;border-radius:6px;
+  background:#fff;color:#123c4b;font-size:17px;cursor:pointer;
+}
+#viewSyncMenu .view-tab-rename:hover {background:#dcecf1}
 
 #viewSyncMenu :is([data-view-all],[data-view-none]) {
   min-height:34px;padding:.35rem .65rem;border:1px solid #b9d1de;border-radius:8px;

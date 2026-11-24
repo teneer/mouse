@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyScoreOperation} from '../js/shared-score.js';
-import {nextClassGoal} from '../score/goal-model.js';
+import {nextClassGoal,nextTeamGoal} from '../score/goal-model.js';
 
 function scenario() {
   const board={}, send=(kind, key, fields)=>applyScoreOperation(board,{kind,key,authoredAt:1,...fields});
@@ -12,6 +12,23 @@ const goals=[
   {id:'class',type:'class',score:10,message:'학급 달성',automatic:true,reward:false},
   {id:'team',type:'team',score:3,message:'모둠 달성',automatic:false,reward:true}
 ];
+test('the next team goal uses each team’s score and its own completed milestones',()=>{
+  const system={
+    goals:[
+      {id:'class',type:'class',score:9},
+      {id:'one',type:'team',score:15},
+      {id:'repeat',type:'team',score:10,interval:10},
+    ],
+    records:[
+      {id:'["one","a"]',teamId:'a',status:'done'},
+      {id:'["repeat","a",10]',teamId:'a',status:'done'},
+    ],
+  };
+  assert.equal(nextTeamGoal(system,{id:'a',score:8})?.score,20);
+  assert.equal(nextTeamGoal(system,{id:'b',score:8})?.score,10);
+  assert.equal(nextTeamGoal(system,{id:'b',score:12})?.score,15);
+  assert.equal(nextTeamGoal(system,{id:'b',score:10000}),null);
+});
 test('simultaneous class and team goals create independent records and legacy goals are discarded',()=>{
   const {score,send}=scenario();
   assert.deepEqual(score().goals,[]);

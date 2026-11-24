@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-queue-1">
+    <link rel="stylesheet" href="style.css?v=toolbar-goals-1">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=goal-queue-1">
 </head>
@@ -20,6 +20,19 @@
         <div id="display-area">
             <div id="top-row">
                 <section id="class-area" aria-labelledby="class-score-title">
+                    <div id="next-class-goal" role="group" aria-label="학급 목표" hidden>
+                        <div class="class-goal-value">
+                            <span class="goal-target-mark" aria-hidden="true"></span>
+                            <strong id="next-class-goal-score"></strong>
+                        </div>
+                        <div id="next-class-goal-message" hidden>
+                            <div class="goal-message-track">
+                                <span id="goal-message-text" role="status"></span>
+                                <span id="goal-message-repeat" aria-hidden="true"></span>
+                            </div>
+                        </div>
+                        <button id="goal-message-toggle" type="button" aria-label="목표 메시지 흐름 일시 정지" hidden>Ⅱ</button>
+                    </div>
                     <div class="main-scoreboard">
                         <header class="class-heading">
                             <div class="class-goal-heading"><h1 id="class-score-title">학급 점수</h1><div id="class-goal-gifts" hidden></div></div>
@@ -28,10 +41,6 @@
                                 <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                             </div>
                         </header>
-                        <div id="next-class-goal" role="status" hidden>
-                            <div>다음 목표 <strong id="next-class-goal-score"></strong></div>
-                            <div id="next-class-goal-message" hidden></div>
-                        </div>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
                             <span id="number">0</span>
@@ -85,28 +94,22 @@
             <header class="dialog-header"><h3 id="score-settings-title">점수판 설정</h3><button id="close-score-settings" class="dialog-close" type="button" aria-label="닫기">×</button></header>
             <section class="score-settings-section" aria-labelledby="display-settings-title">
                 <h4 id="display-settings-title">화면 표시</h4>
-                <label class="score-setting-row" id="score-panel-side-row" hidden>점수판 위치
-                    <select id="score-panel-side">
-                        <option value="left">왼쪽</option>
-                        <option value="right" selected>오른쪽</option>
-                    </select>
-                </label>
-                <label class="score-setting-row">모둠카드 배치
-                    <select id="score-layout-mode">
-                        <option value="auto">자동 배치</option>
-                        <option value="fixed">열 수 고정</option>
-                    </select>
-                </label>
-                <label class="score-setting-row" id="score-fixed-columns-row" hidden>고정 열 수
+                <div class="score-setting-row" id="score-panel-side-row" hidden>
+                    <span id="score-panel-side-label">점수판 위치</span>
+                    <button id="score-panel-side" type="button" aria-labelledby="score-panel-side-label score-panel-side">오른쪽</button>
+                </div>
+                <div class="score-setting-row">
+                    <span id="score-layout-mode-label">모둠 카드 배치</span>
+                    <button id="score-layout-mode" type="button" aria-labelledby="score-layout-mode-label score-layout-mode">자동 배치</button>
+                </div>
+                <label class="score-setting-row" id="score-fixed-columns-row" hidden>열 수
                     <input id="score-fixed-columns" type="number" min="1" max="6" step="1" value="3" inputmode="numeric">
                 </label>
                 <p class="score-setting-hint" id="score-layout-hint">사용 가능한 가로·세로 공간에서 모둠카드가 가장 크게 보이도록 배치합니다.</p>
-                <label class="score-setting-row">모둠 카드 비율
-                    <select id="score-card-ratio">
-                        <option value="4:3">4:3</option>
-                        <option value="16:9">16:9</option>
-                    </select>
-                </label>
+                <div class="score-setting-row">
+                    <span id="score-card-ratio-label">모둠 카드 비율</span>
+                    <button id="score-card-ratio" type="button" aria-labelledby="score-card-ratio-label score-card-ratio">4:3</button>
+                </div>
                 <div class="score-setting-row">
                     <span id="scale-label">표시 배율</span>
                     <div class="score-size-controls" role="group" aria-labelledby="scale-label">
@@ -221,6 +224,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=goal-queue-1"></script><script type="module" src="panel-ui.js?v=panel-side-1"></script>
+    <script type="module" src="script.js?v=toolbar-goals-1"></script><script type="module" src="panel-ui.js?v=toolbar-goals-1"></script>
 </body>
 </html>

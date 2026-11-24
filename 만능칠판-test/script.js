@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js?v=goal-queue-1';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=device-guide-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=toolbar-fit-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
@@ -11,14 +11,14 @@ import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=goal-queue-1';
+import {CloudBoard} from './js/cloud.js?v=toolbar-goals-1';
 import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=goal-queue-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=toolbar-goals-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
 import {validateContent} from './js/validation.js?v=whiteboard-7';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
-import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js';
+import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
 const $=id=>document.getElementById(id);
 let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
 let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,importLayoutResolver=null,passwordResolver=null;
@@ -208,6 +208,11 @@ async function activatePage(id) {
   if(!p || p.deleted)throw Error('삭제된 페이지입니다.');
   await setPage(p);rememberView(true);
 }
+function stepPage(direction) {
+  const index=pages.findIndex(page=>page.id===current?.id);
+  const target=index<0?null:pages[index+direction];
+  if(target)run(()=>activatePage(target.id));
+}
 async function createPage(content,title) {
   await flush();
   if(pages.length>=MAX_PAGES){notify(`페이지는 최대 ${MAX_PAGES}개까지 사용할 수 있습니다.`);return;}
@@ -225,7 +230,10 @@ function displayPageTitle(page,index) {
 }
 function renderPages() {
   pages=pages.slice(0,MAX_PAGES);
-  const index=Math.max(0,pages.findIndex(p=>p.id===current?.id));
+  const activeIndex=pages.findIndex(page=>page.id===current?.id);
+  $('previousPageBtn').disabled=activeIndex<=0;
+  $('nextPageBtn').disabled=activeIndex<0 || activeIndex>=pages.length-1;
+  const index=Math.max(0,activeIndex);
   $('pageListLabel').textContent=`${index+1}쪽`;
   const title=displayPageTitle(pages[index],index);
   $('pageListBtn').title=title;
@@ -771,15 +779,44 @@ function closePageActions(){
   pageActions.actions.hidePopover();
   pageActions=null;
 }
-function closePopups() {closePageActions();closeContext();document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');document.querySelectorAll('[data-popup],#viewSyncTrigger').forEach(b=>b.setAttribute('aria-expanded','false'));openedPopup=null;}
+function closePopups() {
+  tabViews?.finishRename();
+  closePageActions();closeContext();
+  document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');
+  document.querySelectorAll('[data-popup],#viewSyncTrigger').forEach(b=>b.setAttribute('aria-expanded','false'));
+  openedPopup=null;
+}
+function positionToolbarPopup() {
+  if(!openedPopup || openedPopup==='viewSyncMenu')return;
+  const popup=$(openedPopup);
+  const trigger=document.querySelector('[data-popup="'+openedPopup+'"][aria-expanded="true"]');
+  if(!trigger)return;
+  const margin=8;
+  const edge=$('toolbar').getBoundingClientRect().top-margin;
+  const rect=trigger.getBoundingClientRect();
+  popup.style.maxHeight=Math.max(0,edge-margin)+'px';
+  popup.style.left=Math.max(margin,Math.min(innerWidth-popup.offsetWidth-margin,rect.left+(rect.width-popup.offsetWidth)/2))+'px';
+  popup.style.top='auto';
+  popup.style.bottom=(innerHeight-edge)+'px';
+}
+function updateToolbarLayout() {
+  const height=$('toolbar').getBoundingClientRect().height;
+  const frame=$('scoreFrame'), clearance=String(Math.ceil(height));
+  if(frame.dataset.toolbarHeight!==clearance)frame.dataset.toolbarHeight=clearance;
+  updateFeedbackPosition();
+  if(height>0){
+    positionToolbarPopup();
+    tabViews?.position();
+  }else if(openedPopup){
+    closePopups();
+  }
+}
 function togglePopup(id,button) {
   if(busy)return;
   const was=openedPopup===id;closePopups();if(was)return;
   const p=$(id);p.style.display='block';openedPopup=id;button.setAttribute('aria-expanded','true');
   if(id==='pageList')renderPageTiles();
-  if(id==='viewSyncMenu')return;
-  const rect=button.getBoundingClientRect();p.style.left=Math.max(8,Math.min(window.innerWidth-p.offsetWidth-8,rect.left+rect.width/2-p.offsetWidth/2))+'px';
-  p.style.top=Math.max(8,rect.top-p.offsetHeight-8)+'px';
+  positionToolbarPopup();
 }
 function openModal(id) {closePopups();finishText();modalFocus=document.activeElement;$(id).style.display='flex';$(id).querySelector('input,button')?.focus();}
 function closeModal(id) {
@@ -1063,6 +1100,9 @@ function wireUI() {
   });
   document.addEventListener('pointerdown',e=>{if(shouldClosePopups(e.target))closePopups();});
   $('toolbar').addEventListener('scroll',()=>{if(openedPopup)closePopups();});
+  const toolbarLayout=new ResizeObserver(updateToolbarLayout);
+  toolbarLayout.observe($('toolbar'));
+  updateToolbarLayout();
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
   $('confirmModalOkBtn').onclick=()=>resolveConfirm(true);$('confirmModalCancelBtn').onclick=()=>resolveConfirm(false);
   $('passwordModalOkBtn').onclick=()=>resolvePassword($('pdfPasswordInput').value);
@@ -1072,7 +1112,6 @@ function wireUI() {
   Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
   $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
   wireAppearanceSettings();wireBackgroundSettings();
-  wireToolbarDrag($('toolbar'),()=>{cancelDeletePress();closePopups();});
   wirePageReorder($('pageTiles'),(source,target)=>movePage(source,target).catch(fail));
   $('pageTiles').addEventListener('scroll',closePageActions);
   $('pageRenameForm').onsubmit=event=>savePageTitle(event).catch(fail);
@@ -1128,14 +1167,17 @@ function wireUI() {
   c.on('selection:cleared',()=>{if(!suppressSelection&&groupSession&&!isTextEditing())closeGroupSession();});
   surface.addEventListener('pointerdown',e=>{if(isTextEditing() && e.button!==2 && !c.findTarget(e)?.isEditing)finishText();},true);
   $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
+  $('previousPageBtn').onclick=()=>stepPage(-1);
+  $('nextPageBtn').onclick=()=>stepPage(1);
   const clearPage=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지에서 편집 가능한 개체를 모두 지울까요? 언두로 되돌릴 수 있습니다.',{title:'현재 페이지 전체 지우기',confirmText:'전체 지우기'})){finishText();c.discardActiveObject();const list=c.getObjects().filter(object=>!object.wbAssetMissing && !object.wbPinned);if(list.length){list.forEach(o=>c.remove(o));c.requestRenderAll();changed();}}};
   let deleteTimer=null,deleteLong=false;
   const cancelDeletePress=()=>{clearTimeout(deleteTimer);deleteTimer=null;};
+  wireToolbarDrag($('toolbar'),()=>{cancelDeletePress();closePopups();});
   $('deleteSelectionBtn').addEventListener('pointerdown',e=>{if(e.button!==0)return;deleteLong=false;deleteTimer=setTimeout(()=>{deleteLong=true;clearPage().catch(fail);},600);});
   for(const type of ['pointerup','pointercancel','pointerleave'])$('deleteSelectionBtn').addEventListener(type,cancelDeletePress);
   $('deleteSelectionBtn').onclick=e=>{if(deleteLong){e.preventDefault();deleteLong=false;return;}deleteSelected();};
   $('zoomInBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()*1.25);};$('zoomOutBtn').onclick=()=>{if(allowed())tools.zoom(c.getZoom()/1.25);};$('homeBtn').onclick=()=>{if(allowed())tools.home(current.content.frame);};
-  $('toolbarHideBtn').onclick=()=>{const hidden=!$('toolbar').hidden;$('toolbar').hidden=hidden;setBoardIcon($('toolbarHideBtn'),hidden?'up':'down');$('toolbarHideBtn').setAttribute('aria-label',hidden?'툴바 펼치기':'툴바 접기');$('toolbarHideBtn').setAttribute('aria-expanded',String(!hidden));closePopups();updateFeedbackPosition();};
+  $('toolbarHideBtn').onclick=()=>{const hidden=!$('toolbar').hidden;$('toolbar').hidden=hidden;setBoardIcon($('toolbarHideBtn'),hidden?'up':'down');$('toolbarHideBtn').setAttribute('aria-label',hidden?'툴바 펼치기':'툴바 접기');$('toolbarHideBtn').setAttribute('aria-expanded',String(!hidden));closePopups();updateToolbarLayout();};
   $('saveBtn').onclick=()=>{if(!allowed())return;$('saveScreenNameInput').value=displayPageTitle(pages.find(page=>page.id===current.id),pages.findIndex(page=>page.id===current.id));openModal('saveConfirmModal');$('saveScreenNameInput').focus();$('saveScreenNameInput').select();};
   $('confirmSaveBtn').onclick=()=>run(async()=>{
     const name=$('saveScreenNameInput').value.trim() || '제목 없음';await flush();const content=capture(),view={viewportTransform:c.viewportTransform.slice(),width:c.width,height:c.height},thumbnail=await makeCurrentViewportThumbnail();
@@ -1187,7 +1229,7 @@ function wireUI() {
   });
   const releaseSpace=()=>{if(spaceMode){tools.up();tools.setMode(spaceMode);spaceMode=null;}};
   document.addEventListener('keyup',e=>{if(e.code==='Space')releaseSpace();});window.addEventListener('blur',()=>{releaseSpace();tools.up();});
-  window.addEventListener('resize',()=>{updateFeedbackPosition();closePopups();resizeBoardViewport();});
+  window.addEventListener('resize',()=>{closePageActions();updateToolbarLayout();resizeBoardViewport();});
   window.addEventListener('beforeunload',e=>{if(dirty||saving){e.preventDefault();e.returnValue='';}});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){finishText();flush().catch(fail);}else refreshRemote();});
   window.addEventListener('focus',refreshRemote);
@@ -1245,7 +1287,7 @@ function setupIntegratedScorePanel(){
       const open=typeof view.scoreOpen==='boolean'?view.scoreOpen:scoreOpen;
       const share=Number.isFinite(view.scoreShare)?clamp(view.scoreShare):scoreShare;
       const full=typeof view.scoreFull==='boolean'?view.scoreFull:scoreFull;
-      if(open!==scoreOpen || share!==scoreShare || full!==scoreFull){scoreOpen=open;scoreShare=share;scoreFull=full && open;update();updateToolbarHeight();save();}
+      if(open!==scoreOpen || share!==scoreShare || full!==scoreFull){scoreOpen=open;scoreShare=share;scoreFull=full && open;update();updateToolbarLayout();save();}
     }
     if(Number.isFinite(view.scoreScale))frame.dataset.syncedScoreScale=String(view.scoreScale);
   };
@@ -1257,15 +1299,9 @@ function setupIntegratedScorePanel(){
     save();
   });
   frame.addEventListener('score-display-scale',()=>rememberView(true));
-  const toolbar=$('toolbar');
-  const updateToolbarHeight=()=>{
-    frame.dataset.toolbarHeight=String(scoreFull?0:Math.ceil(toolbar.getBoundingClientRect().height));
-  };
-  new ResizeObserver(updateToolbarHeight).observe(toolbar);
-  updateToolbarHeight();
   toggle.addEventListener('click',()=>{scoreOpen=!scoreOpen;if(!scoreOpen)scoreFull=false;update();save();rememberView(true);});
   frame.addEventListener('score-toggle-full',()=>{
-    scoreFull=!scoreFull;scoreOpen=true;update();updateToolbarHeight();save();rememberView(true);
+    scoreFull=!scoreFull;scoreOpen=true;update();updateToolbarLayout();save();rememberView(true);
   });
   frame.addEventListener('score-management-modal',event=>{
     if(event.detail){closePopups();closeContext();finishText();}
@@ -1358,7 +1394,7 @@ async function boot() {
   };
   reloadLocalAfterDisconnect = useLocal;
   cloud=new CloudBoard(store,{
-    board:()=>{requestCloudRefresh();scoreSync?.refresh();},
+    board:()=>{requestCloudRefresh();scoreSync?.refresh();tabViews?.refresh();},
     view:()=>{requestCloudRefresh();tabViews?.render();},error:fail,
     status:()=>{cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
   });

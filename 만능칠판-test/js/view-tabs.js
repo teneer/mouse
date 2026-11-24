@@ -1,4 +1,5 @@
 import {uid} from './constants.js';
+import {normalizeTabName} from './tab-identity.js?v=toolbar-goals-1';
 
 export const activeView = (view,id) => !!view?.enabled && Array.isArray(view.targets) && view.targets.includes(id);
 export function viewTargets(previous,available) {
@@ -26,12 +27,63 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     root.style.left=Math.max(margin,Math.min(window.innerWidth-root.offsetWidth-margin,
       trigger.left+(trigger.width-root.offsetWidth)/2))+'px';
   }
-  const prefix='whiteboard.view-tab:'+new URL('.',location.href).pathname+':';
+  const path=new URL('.',location.href).pathname;
+  const prefix='whiteboard.view-tab:'+path+':';
+  const namePrefix='whiteboard.tab-name:'+path+':';
   const localKey=prefix+sync.id;
   let members=[], scope, unsubscribe, timer, long=false, startPoint, generation=0;
   let channel, lastPresence, lastSent=0, expiryTimer, watching=false, present=true;
+  let finishNameEdit;
   const departed=new Map();
   try {channel=new BroadcastChannel(prefix);} catch {}
+  function localName(id) {
+    try {return normalizeTabName(localStorage.getItem(namePrefix+id));} catch {return '';}
+  }
+  async function rename(row,name) {
+    if (cloud.options) await cloud.enqueue({kind:'tab-rename',tabId:row.id,name});
+    else {
+      localStorage.setItem(namePrefix+row.id,name);
+      channel?.postMessage('change');
+    }
+  }
+  function editName(row,display,button,checkbox,description) {
+    const name=display.textContent;
+    const input=document.createElement('input');
+    input.type='text';input.maxLength=40;input.value=name;input.className='view-tab-name-input';
+    input.setAttribute('aria-label','탭 이름 변경');
+    input.enterKeyHint='done';
+    const finish=(cancel=false,focus=false)=>{
+      finishNameEdit=null;
+      input.onblur=null;
+      input.replaceWith(display);
+      if (focus) button.focus({preventScroll:true});
+      const next=normalizeTabName(input.value);
+      if (!cancel && next && next!==name) {
+        rename(row,next).then(()=>{
+          display.textContent=next;
+          display.title=next;
+          button.setAttribute('aria-label',next+' 이름 변경');
+          checkbox.setAttribute('aria-label',next+' · '+description);
+          positionMenu();
+        }).catch(fail);
+      }
+    };
+    finishNameEdit=finish;
+    input.onblur=()=>finish();
+    input.onkeydown=event=>{
+      if (event.isComposing || event.keyCode===229) {
+        event.stopPropagation();
+        return;
+      }
+      if (event.key==='Enter' || event.key==='Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(event.key==='Escape',true);
+      }
+    };
+    display.replaceWith(input);
+    input.focus();input.select();
+  }
   function localMembers() {
     const rows=[];
     try {
@@ -55,7 +107,8 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   function presence() {
     const view=currentView();
     return {id:sync.id,owner:cloud.deviceId||'local',label:registeredLabel(cloud.deviceId)||cloud.options?.label||'이 브라우저',
-      instance,opened:sync.opened,time:Date.now(),page:Math.max(1,pages().findIndex(page=>page.id===view.pageId)+1),full:view.scoreFull===true};
+      tabName:localName(sync.id),instance,opened:sync.opened,time:Date.now(),
+      page:Math.max(1,pages().findIndex(page=>page.id===view.pageId)+1),full:view.scoreFull===true};
   }
   function render() {
     control.checked=activeView(readState(),sync.id);
@@ -64,18 +117,40 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     const rows=available(), targets=viewTargets(readState()?.targets,rows.map(row=>row.id));
     const expires=rows.filter(row=>row.id!==sync.id).map(row=>row.time+maxAge);
     if (expires.length) expiryTimer=setTimeout(render,Math.max(0,Math.min(...expires)-Date.now())+5);
-    const counts=new Map(), focused=document.activeElement?.dataset.viewTab;
-    list.replaceChildren();
+    if (finishNameEdit) {positionMenu();return;}
+    const counts=new Map(), focused=document.activeElement;
+    const names=scope ? cloud.projected().tabNames : null;
+    const fragment=document.createDocumentFragment();
+    let restoreFocus;
     for (const row of rows) {
       const n=(counts.get(row.owner)||0)+1;
       counts.set(row.owner,n);
-      const label=document.createElement('label'), input=document.createElement('input');
+      const line=document.createElement('div');line.className='view-tab-row';
+      const input=document.createElement('input');
       input.type='checkbox';input.checked=targets.includes(row.id);input.dataset.viewTab=row.id;
+      input.id='view-tab-target-'+row.id;
       input.onchange=()=>{const checked=input.checked;update(values=>checked?[...values,row.id]:values.filter(id=>id!==row.id));};
-      label.append(input,document.createTextNode((registeredLabel(row.owner)||row.label)+' · 탭 '+n+(row.id===sync.id?' (이 탭)':'')+' · '+(row.full?'점수판 전체 화면':row.page+'쪽')));
-      list.append(label);
-      if (focused===row.id) input.focus({preventScroll:true});
+      const sharedName=names && Object.hasOwn(names,row.id) ? names[row.id] : '';
+      const name=sharedName || localName(row.id) || normalizeTabName(row.tabName) || '탭 '+n;
+      const details=document.createElement('span');details.className='view-tab-details';
+      const description=(registeredLabel(row.owner)||row.label)+(row.id===sync.id?' (이 탭)':'')
+        +' · '+(row.full?'점수판 전체 화면':row.page+'쪽');
+      const display=document.createElement('label');display.htmlFor=input.id;
+      display.className='view-tab-name';display.textContent=name;display.title=name;
+      const info=document.createElement('span');info.className='view-tab-info';info.textContent=description;
+      const edit=document.createElement('button');
+      edit.type='button';edit.className='view-tab-rename';edit.dataset.renameTab=row.id;
+      edit.textContent='✎';edit.title='탭 이름 변경';edit.setAttribute('aria-label',name+' 이름 변경');
+      edit.onclick=()=>editName(row,display,edit,input,description);
+      input.setAttribute('aria-label',name+' · '+description);
+      details.append(display,info);
+      line.append(input,details,edit);
+      fragment.append(line);
+      if (focused?.dataset.viewTab===row.id) restoreFocus=input;
+      if (focused?.dataset.renameTab===row.id) restoreFocus=edit;
     }
+    list.replaceChildren(fragment);
+    restoreFocus?.focus({preventScroll:true});
     positionMenu();
   }
   function announce() {
@@ -92,7 +167,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     } else if (cloud.online && cloud.fs) {
       const target=cloud.ref('viewTabs',sync.id), owner=cloud.deviceId;
       const data={...presence(),owner};
-      const signature=JSON.stringify([data.page,data.full,data.label,owner]);
+      const signature=JSON.stringify([data.page,data.full,data.label,data.tabName,owner]);
       if (signature!==lastPresence || Date.now()-lastSent>=heartbeat) {
         lastPresence=signature;lastSent=Date.now();
         cloud.fs.setDoc(target,data).catch(error=>{lastPresence=null;if(root.style.display==='block')fail(error);});
@@ -120,7 +195,9 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
     if (message?.closed && message.scope===scope) departed.set(message.closed,message.instance);
     render();
   };
-  window.addEventListener('storage',event=>{if (event.key?.startsWith(prefix)) render();});
+  window.addEventListener('storage',event=>{
+    if (event.key?.startsWith(prefix) || event.key?.startsWith(namePrefix)) render();
+  });
   async function liveIds() {
     announce();
     if (scope && !watching && cloud.online) {
@@ -137,8 +214,9 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       await publish(undefined,values=>makeTargets(viewTargets(values,ids),ids));
     }).catch(error=>{if (call===generation) fail(error);}).finally(render);
   };
-  window.addEventListener('resize',positionMenu);
-  if (typeof ResizeObserver!=='undefined') new ResizeObserver(positionMenu).observe(toolbar);
+  root.addEventListener('pointerdown',event=>{
+    if (!event.target.closest('.view-tab-name-input')) finishNameEdit?.();
+  });
   function show(){togglePopup('viewSyncMenu',opener);announce();}
   opener.addEventListener('pointerdown',event=>{
     if(event.button!==0)return;
@@ -189,5 +267,5 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   document.addEventListener('visibilitychange',()=>{if (document.visibilityState==='visible') announce();});
   setInterval(announce,heartbeat);
   announce();
-  return {render,refresh};
+  return {render,refresh,position:positionMenu,finishRename:()=>finishNameEdit?.()};
 }

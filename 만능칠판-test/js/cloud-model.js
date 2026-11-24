@@ -1,6 +1,7 @@
 import {applyScoreOperation} from './shared-score.js?v=goal-queue-1';
 import {reorderPages} from './board-navigation.js';
 import {normalizePattern} from './board-background.js';
+import {normalizeTabName,validTabId} from './tab-identity.js?v=toolbar-goals-1';
 
 // Firestore orders completed operations. The same reducer runs on each device
 // and when replaying locally saved operations that are awaiting upload.
@@ -60,6 +61,14 @@ export function applyOperation(board, operation, revision) {
   board.revision = revision;
   if (kind.startsWith('score-')) {
     applyScoreOperation(board,operation);
+    return;
+  }
+  if (kind === 'tab-rename') {
+    const name=normalizeTabName(operation.name);
+    if (validTabId(operation.tabId) && name) {
+      board.tabNames??={};
+      board.tabNames[operation.tabId]=name;
+    }
     return;
   }
   if (kind === 'seed' && operation.score) {

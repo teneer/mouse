@@ -6,6 +6,16 @@ import {validateContent} from '../js/validation.js';
 
 const text = (id, value) => ({id,type:'i-text',text:value});
 const content = (...objects) => ({canvas:{objects,background:'#fe0'},frame:{width:100,height:100,cx:0,cy:0}});
+test('tab renames replay independently of pages and reject invalid names and IDs',()=>{
+  const board=seed();
+  const tabId='5afa1fe2-b0fb-411b-a468-22876a184a18';
+  applyOperation(board,{kind:'tab-rename',tabId,name:'  교사용\n 화면  '},2);
+  applyOperation(board,{kind:'tab-rename',tabId,name:'   '},3);
+  applyOperation(board,{kind:'tab-rename',tabId:'__proto__',name:'무시'},4);
+  assert.deepEqual(board.tabNames,{[tabId]:'교사용  화면'});
+  assert.equal(board.pages.page.version,1);
+  assert.equal(board.revision,4);
+});
 function seed(...objects) {
   const board = newBoard();
   applyOperation(board,{kind:'seed',pages:[

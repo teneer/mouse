@@ -1,6 +1,9 @@
 import {uid} from './constants.js';
 
-const validId = /^[0-9a-f-]{36}$/i;
+export const validTabId = value => typeof value==='string' && /^[0-9a-f-]{36}$/i.test(value);
+export function normalizeTabName(value) {
+  return typeof value==='string' ? value.replace(/[\r\n]+/g,' ').trim().slice(0,40).trimEnd() : '';
+}
 
 function claimLock(name) {
   const locks = globalThis.navigator?.locks;
@@ -30,7 +33,7 @@ export async function acquireTabIdentity(key, {
     try {saved=JSON.parse(storage?.getItem(key));} catch {}
   }
   let identity;
-  if (validId.test(saved?.id) && Number.isFinite(saved.opened) &&
+  if (validTabId(saved?.id) && Number.isFinite(saved.opened) &&
       await acquire(key+':'+saved.id)) {
     identity=saved;
   } else {

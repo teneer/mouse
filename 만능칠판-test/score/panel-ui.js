@@ -13,14 +13,14 @@ import { measureTeamLayout } from './team-layout.js?v=3';
   const classControls = classScore.parentElement;
   const classButtons = [...classControls.querySelectorAll('button')];
   const measure = document.createElement('canvas').getContext('2d');
-  const modeSelect = document.getElementById('score-layout-mode');
+  const modeButton = document.getElementById('score-layout-mode');
   const columnsRow = document.getElementById('score-fixed-columns-row');
   const columnsInput = document.getElementById('score-fixed-columns');
   const hint = document.getElementById('score-layout-hint');
   const frame = window.frameElement;
   const scaleOutput = document.getElementById('scoreSizeValue');
   const sideRow = document.getElementById('score-panel-side-row');
-  const sideSelect = document.getElementById('score-panel-side');
+  const sideButton = document.getElementById('score-panel-side');
 
   function readSetting(key) {
     try { return localStorage.getItem(key); } catch { return null; }
@@ -41,11 +41,11 @@ import { measureTeamLayout } from './team-layout.js?v=3';
     const width = viewport.clientWidth;
     const height = viewport.clientHeight;
     if (width > 0 && height > 0) {
-      const ratio = ratioSelect.value === '16:9' ? 16 / 9 : 4 / 3;
+      const ratio = cardRatio === '16:9' ? 16 / 9 : 4 / 3;
       const gap = Math.min(10, Math.floor(width / 18));
       const { columns, cardWidth } = measureTeamLayout({
         width, height, count: scoreboard.childElementCount, ratio, gap, previousColumns,
-        fixedColumns: modeSelect.value === 'fixed' ? fixedColumns : null,
+        fixedColumns: mode === 'fixed' ? fixedColumns : null,
         maxAutoColumns: Number(frame?.dataset.panelPercent) <= 10 ? 1 : 6,
         scale: scale / 100,
       });
@@ -72,20 +72,22 @@ import { measureTeamLayout } from './team-layout.js?v=3';
   }
 
   function applyLayoutSetting() {
-    const fixed = modeSelect.value === 'fixed';
+    const fixed = mode === 'fixed';
+    modeButton.textContent = fixed ? '열 지정' : '자동 배치';
     columnsRow.hidden = !fixed;
     hint.hidden = fixed;
     previousColumns = undefined;
     scheduleLayout();
   }
 
-  modeSelect.value = readSetting(modeKey) === 'fixed' ? 'fixed' : 'auto';
+  let mode = readSetting(modeKey) === 'fixed' ? 'fixed' : 'auto';
   const isColumnCount = value => Number.isInteger(value) && value >= 1 && value <= 6;
   const savedColumns = Number(readSetting(columnsKey));
   let fixedColumns = isColumnCount(savedColumns) ? savedColumns : 3;
   columnsInput.value = String(fixedColumns);
-  modeSelect.addEventListener('change', () => {
-    writeSetting(modeKey, modeSelect.value);
+  modeButton.addEventListener('click', () => {
+    mode = mode === 'fixed' ? 'auto' : 'fixed';
+    writeSetting(modeKey, mode);
     applyLayoutSetting();
   });
   columnsInput.addEventListener('input', () => {
@@ -118,21 +120,22 @@ import { measureTeamLayout } from './team-layout.js?v=3';
     scheduleLayout();
   }
 
-  const ratioSelect = document.getElementById('score-card-ratio');
-  const ratio = [
+  const ratioButton = document.getElementById('score-card-ratio');
+  let cardRatio = [
     readSetting(ratioKey),
     readSetting('whiteboard.test.team-card-ratio.v1'),
     readSetting('whiteboard.test.class-card-ratio.v1'),
   ].find(value => value === '16:9' || value === '4:3') ?? '4:3';
-  ratioSelect.value = ratio;
   function applyRatio() {
+    ratioButton.textContent = cardRatio;
     previousColumns = undefined;
-    root.style.setProperty('--score-card-ratio', ratioSelect.value.replace(':', ' / '));
+    root.style.setProperty('--score-card-ratio', cardRatio.replace(':', ' / '));
     scheduleLayout();
   }
-  ratioSelect.addEventListener('change', () => {
+  ratioButton.addEventListener('click', () => {
+    cardRatio = cardRatio === '4:3' ? '16:9' : '4:3';
     applyRatio();
-    writeSetting(ratioKey, ratioSelect.value);
+    writeSetting(ratioKey, cardRatio);
   });
   applyRatio();
 
@@ -143,11 +146,12 @@ import { measureTeamLayout } from './team-layout.js?v=3';
     const applySide = () => {
       const side = frame.dataset.scoreSide;
       sideRow.hidden = side !== 'left' && side !== 'right';
-      if (!sideRow.hidden) sideSelect.value = side;
+      if (!sideRow.hidden) sideButton.textContent = side === 'left' ? '왼쪽' : '오른쪽';
     };
     applySide();
-    sideSelect.addEventListener('change', () => {
-      frame.dispatchEvent(new CustomEvent('score-panel-side', { detail: sideSelect.value }));
+    sideButton.addEventListener('click', () => {
+      const side = frame.dataset.scoreSide === 'left' ? 'right' : 'left';
+      frame.dispatchEvent(new CustomEvent('score-panel-side', { detail: side }));
       applySide();
     });
     new MutationObserver(() => {
