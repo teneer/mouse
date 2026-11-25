@@ -4,7 +4,7 @@ import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-confl
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=pursuit-manager-1';
 import {wireGoals} from './goals-ui.js?v=device-audio-2';
 import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
-import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
+import {conversionFrame,conversionStarFlight,conversionStarPosition,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-2';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
 // 점수는 즉시 확정하고, 애니메이션은 확정된 점수를 설명하는 시각 효과로만 사용합니다.
@@ -866,6 +866,37 @@ async function moveProgress(from,to,rate,signal) {
   renderProgress(to,rate);
 }
 
+function moveStar(node,flight,delay,signal) {
+  signal.throwIfAborted();
+  return new Promise((resolve,reject)=>{
+    const duration=680,start=performance.now()+delay;
+    let frame,deadline;
+    const cleanup=()=>{
+      cancelAnimationFrame(frame);
+      clearTimeout(deadline);
+      signal.removeEventListener('abort',abort);
+    };
+    const finish=()=>{cleanup();resolve();};
+    const abort=()=>{cleanup();reject(signal.reason);};
+    function draw(now) {
+      const elapsed=now-start;
+      if (elapsed>=0) {
+        const point=conversionStarPosition(flight.points,elapsed/duration);
+        node.style.left=flight.from.x+point.x+'px';
+        node.style.top=flight.from.y+point.y+'px';
+        node.style.scale=point.scale;
+        node.style.opacity=point.opacity;
+      }
+      if (elapsed>=duration) finish();
+      else frame=requestAnimationFrame(draw);
+    }
+    signal.addEventListener('abort',abort,{once:true});
+    frame=requestAnimationFrame(draw);
+    // Hidden tabs can stop receiving frames. The score still needs to settle.
+    deadline=setTimeout(finish,delay+duration+100);
+  });
+}
+
 async function sendStars(rate,direction,signal) {
   const bar=progress.getBoundingClientRect();
   if(!bar.width){await waitForEffect(200,signal);return;}
@@ -873,16 +904,15 @@ async function sendStars(rate,direction,signal) {
   // Continuous bars do not draw individual divisions.
   const segments=rate<=20?rate:1;
   await Promise.all(Array.from({length:segments},async (_,index)=>{
-    const {from,frames}=conversionStarFlight(bar,score,index,segments,direction<0);
+    const flight=conversionStarFlight(bar,score,index,segments,direction<0);
     const node=document.createElement('span');
     node.className='score-conversion-star';
     node.textContent='★';
     node.setAttribute('aria-hidden','true');
-    node.style.left=from.x+'px';node.style.top=from.y+'px';
+    node.style.left=flight.from.x+'px';node.style.top=flight.from.y+'px';
     document.body.append(node);
     try{
-      await animateEffect(node,frames,
-        {duration:680,delay:Math.min(55,220/Math.max(1,segments-1))*index,easing:'ease-in-out',fill:'both'},signal);
+      await moveStar(node,flight,Math.min(55,220/Math.max(1,segments-1))*index,signal);
     }finally{node.remove();}
   }));
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fitScoreFont, conversionFrame, conversionStarFlight, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
+import {fitScoreFont, conversionFrame, conversionStarFlight, conversionStarPosition, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
 import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
 import {movePageId,movePageSelection} from '../js/board-navigation.js';
@@ -109,12 +109,11 @@ test('deduction stars leave the class score, rise and fade; earned stars still a
   const score={left:70,top:40,width:60,height:60};
   const lost=conversionStarFlight(bar,score,0,3,true);
   assert.deepEqual(lost.from,{x:100,y:70});
-  assert.match(lost.frames.at(-1).transform,/translate\(-48px, -62px\)/);
-  assert.equal(lost.frames.at(-1).opacity,0);
+  assert.deepEqual(conversionStarPosition(lost.points,1),{x:-48,y:-62,scale:.5,opacity:0});
   const gained=conversionStarFlight(bar,score,1,3,false);
   assert.deepEqual(gained.from,{x:100,y:120});
-  assert.match(gained.frames.at(-1).transform,/translate\(0px, -50px\)/);
-  assert.equal(gained.frames.at(-1).opacity,1);
+  assert.deepEqual(conversionStarPosition(gained.points,1),{x:0,y:-50,scale:.62,opacity:1});
+  assert(conversionStarPosition(gained.points,.5).y<0);
 });
 
 

@@ -32,18 +32,27 @@ export function conversionStarFlight(bar,score,index,segments,decrease) {
     const spread=Math.min(64,bar.width*.3);
     const x=spread*(segments===1 ? 0.35 : 2*index/(segments-1)-1);
     const y=-Math.min(88,Math.max(22,scoreCenter.y-8));
-    return {from:scoreCenter,frames:[
-      {transform:'translate(0, 0) scale(1)',opacity:1},
-      {transform:'translate(0, -5px) scale(1.15)',opacity:1,offset:.22},
-      {transform:'translate('+x+'px, '+y+'px) scale(.5)',opacity:0}
+    return {from:scoreCenter,points:[
+      {at:0,x:0,y:0,scale:1,opacity:1},
+      {at:.22,x:0,y:-5,scale:1.15,opacity:1},
+      {at:1,x,y,scale:.5,opacity:0}
     ]};
   }
   const from={x:bar.left+bar.width*(index+.5)/segments,y:bar.top+bar.height/2-6};
   const x=scoreCenter.x-from.x,y=scoreCenter.y-from.y;
-  return {from,frames:[
-    {transform:'translate(0, 0) scale(1)',opacity:1},
-    {transform:'translate(0, 0) scale(1.18)',opacity:1,offset:.32},
-    {transform:'translate('+x*.55+'px, '+(y*.55-12)+'px) scale(1)',opacity:1,offset:.65},
-    {transform:'translate('+x+'px, '+y+'px) scale(.62)',opacity:1}
+  return {from,points:[
+    {at:0,x:0,y:0,scale:1,opacity:1},
+    {at:.32,x:x*.13,y:y*.13-4,scale:1.18,opacity:1},
+    {at:.65,x:x*.55,y:y*.55-12,scale:1,opacity:1},
+    {at:1,x,y,scale:.62,opacity:1}
   ]};
+}
+
+export function conversionStarPosition(points,progress) {
+  const time=Math.min(1,Math.max(0,progress));
+  const index=points.findIndex((point,i)=>i>0 && point.at>=time);
+  const from=points[index-1],to=points[index];
+  const fraction=(time-from.at)/(to.at-from.at);
+  const mix=key=>from[key]+(to[key]-from[key])*fraction;
+  return {x:mix('x'),y:mix('y'),scale:mix('scale'),opacity:mix('opacity')};
 }
