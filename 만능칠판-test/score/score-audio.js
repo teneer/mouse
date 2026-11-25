@@ -1,6 +1,22 @@
 const storageKey='whiteboard.score-audio.v1';
 const tabKey=storageKey+':tab';
 
+// Browsers release the lock if its tab closes. Only successful playback claims the sound.
+export async function playScoreSoundOnce(eventKey,src,play) {
+  if (!eventKey) return play();
+  const historyKey='whiteboard.score-sounds:'+src;
+  const claim=async()=>{
+    let recent=[];
+    try {recent=JSON.parse(localStorage.getItem(historyKey)||'[]');} catch {}
+    if (recent.includes(eventKey)) return;
+    await play();
+    recent.push(eventKey);
+    try {localStorage.setItem(historyKey,JSON.stringify(recent.slice(-256)));} catch {}
+  };
+  if (navigator.locks) return navigator.locks.request(historyKey,claim);
+  return claim();
+}
+
 export function wireScoreAudio() {
   let settings={volume:100,muted:false}, context;
   try {
@@ -30,7 +46,7 @@ export function wireScoreAudio() {
     } catch {unlock.hidden=false;}
   }
   unlock.onclick=enable;
-  return async (sound,scale=1)=>{
+  return async (sound,scale=1,eventKey)=>{
     if (!sound || settings.muted || settings.volume===0) return;
     const element=sound.cloneNode();
     const volume=settings.volume/100*scale;
@@ -50,10 +66,12 @@ export function wireScoreAudio() {
         const cleanup=()=>{source.disconnect();gain.disconnect();limiter.disconnect();};
         element.addEventListener('ended',cleanup,{once:true});
         element.addEventListener('error',cleanup,{once:true});
-        try {await element.play();} catch (error) {cleanup();throw error;}
+        try {await playScoreSoundOnce(eventKey,sound.src,()=>element.play());} finally {
+          if (element.paused) cleanup();
+        }
       } else {
         element.volume=Math.min(1,volume);
-        await element.play();
+        await playScoreSoundOnce(eventKey,sound.src,()=>element.play());
       }
       unlock.hidden=true;
     } catch (error) {if (error.name==='NotAllowedError') unlock.hidden=false;else console.warn(error);}

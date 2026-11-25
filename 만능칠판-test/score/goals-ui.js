@@ -1,5 +1,5 @@
 import {goalStatus,parseGoalScore,parseGoalInterval} from './goal-model.js?v=goal-queue-1';
-import {celebrationSections,createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=celebration-4';
+import {celebrationSections,createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=device-audio-1';
 
 const $ = id => document.getElementById(id);
 const button = (label,action,classes='dialog-action') => {

@@ -1,7 +1,7 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=toolbar-goals-1';
-import {wireGoals} from './goals-ui.js?v=celebration-4';
-import {wireScoreAudio} from './score-audio.js?v=celebration-2';
+import {wireGoals} from './goals-ui.js?v=device-audio-1';
+import {wireScoreAudio} from './score-audio.js?v=device-audio-1';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
@@ -72,7 +72,7 @@ const conflictsButton = document.getElementById('score-conflicts');
 const conflictsDialog = document.getElementById('score-conflict-dialog');
 const bodyControls = document.querySelector('.container');
 const goalUI = wireGoals({
-  submit:submitGoal,teamList:()=>teams,classScore:()=>count,celebrate:type=>playSound(sounds.success,type==='team'?0.5:1),confirmSave:()=>playSound(sounds.confirm),
+  submit:submitGoal,teamList:()=>teams,classScore:()=>count,celebrate:(type,key)=>playSound(sounds.success,type==='team'?0.5:1,key),confirmSave:()=>playSound(sounds.confirm),
   teamAccent(id) {
     const index=teams.findIndex(team=>team.id===id), card=scoreboard.children[index];
     return card ? getComputedStyle(card).getPropertyValue('--card-accent').trim() : null;
@@ -94,9 +94,9 @@ function submitGoal(operation) {
   renderCurrentState();
   return false;
 }
-function speakEffect(effect) {
-  if (effect?.kind==='team') playSound(effect.amount>0?sounds.teamIncrease:sounds.teamDecrease);
-  if (effect?.classDiff) playSound(effect.classDiff>0?sounds.mainIncrease:sounds.mainDecrease);
+function speakEffect(effect,key) {
+  if (effect?.kind==='team') playSound(effect.amount>0?sounds.teamIncrease:sounds.teamDecrease,1,key);
+  if (effect?.classDiff) playSound(effect.classDiff>0?sounds.mainIncrease:sounds.mainDecrease,1,key);
 }
 
 function clearTabScorePreview() {
@@ -141,7 +141,7 @@ function applySharedScore(model,live) {
   }
   if (live && previous) {
     const seen = new Set((previous.sounds || []).map(item=>item.key));
-    for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect);
+    for (const item of model.sounds || []) if (!seen.has(item.key) && !ownScoreEvents.has(item.key)) speakEffect(item.effect,item.key);
   }
   const {count: nextCount, teams: nextTeams, scoreLink, goalSystem: nextGoals} = model.state;
   const previewEffect = tabScorePreview?.effect;
@@ -216,21 +216,20 @@ window.whiteboardScore = {
   }
 };
 
-function sendScore(operation,preview) {
+function sendScore(operation,preview,key=crypto.randomUUID()) {
   if (!sharedScore || !sharedSend) return;
-  const key = crypto.randomUUID();
   ownScoreEvents.add(key);
   if (ownScoreEvents.size>128) ownScoreEvents.delete(ownScoreEvents.values().next().value);
   return sharedSend({...operation,key,authoredAt:Date.now()},preview);
 }
-function sharedDelta(amount, targets = null, effect) {
+function sharedDelta(amount, targets = null, effect,key) {
   const signature = JSON.stringify([amount,targets]), now = performance.now();
   if (scoreGroup?.signature !== signature || now-scoreGroup.time > undoWindow) {
     scoreGroup = {id:crypto.randomUUID(),signature};
   }
   scoreGroup.time = now;
   const preview = effect?.kind === 'team' && effect.classDiff ? {baseVersion:sharedScore.version,effect} : undefined;
-  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,fieldBasis:scoreDeltaBasis(sharedScore)},preview);
+  sendScore({kind:'score-delta',amount,targets,group:scoreGroup.id,fieldBasis:scoreDeltaBasis(sharedScore)},preview,key);
 }
 function drawConflicts(conflicts) {
   if (!conflicts.length) {
@@ -413,10 +412,10 @@ function renderGoalFeedback(announce) {
     goalUI.giftGroup(card.querySelector('[data-team-gifts]'),team.id);
   }
 }
-function saveToStorage(effect = null, base = sharedScore?.state) {
+function saveToStorage(effect = null, base = sharedScore?.state,key) {
   if (sharedMode) {
     if (!sharedScore) return;
-    if (effect) sharedDelta(effect.inputAmount ?? effect.classDiff,effect.targets,effect);
+    if (effect) sharedDelta(effect.inputAmount ?? effect.classDiff,effect.targets,effect,key);
     else {
       scoreGroup = null;
       const patch=scorePatch(base,snapshot(undefined));
@@ -426,7 +425,7 @@ function saveToStorage(effect = null, base = sharedScore?.state) {
     }
     return;
   }
-  const version = tabId + ':' + (++serial);
+  const version = key ?? (tabId + ':' + (++serial));
   reconcileGoals({count,teams,goalSystem},localBaseline||{count,teams},{key:version,authoredAt:Date.now()});
   localBaseline={count,teams:structuredClone(teams)};
   renderGoalFeedback(true);
@@ -451,7 +450,7 @@ function syncFromStorage(state = readStoredState()) {
   applyStateFields(state);
   lastAppliedVersion = state.version;
   renderCurrentState(state.effect, true);
-  speakEffect(state.effect);
+  speakEffect(state.effect,state.version);
 }
 window.addEventListener('storage', event => {
   if (event.key !== STORAGE_KEY || !event.newValue || !initialized) return;
@@ -521,9 +520,10 @@ function changeClassScore(amount) {
   const old = count;
   count = next;
   const effect={kind:'class',oldCount:old,classDiff:amount};
-  presentScoreEffect(effect,true);
+  const key=crypto.randomUUID();
+  presentScoreEffect(effect,key);
   renderBatchControls();
-  saveToStorage(effect);
+  saveToStorage(effect,undefined,key);
 }
 function increment() { changeClassScore(step); }
 function decrement() { changeClassScore(-step); }
@@ -705,9 +705,10 @@ function changeTeamScores(indices, amount, undoKey = null) {
   count += classDiff;
   renderBatchControls();
   const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldCount,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
-  saveToStorage({...effect,inputAmount:amount,targets:indices.map(index=>teams[index].id)});
-  playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease);
-  presentScoreEffect(effect,true);
+  const key=crypto.randomUUID();
+  saveToStorage({...effect,inputAmount:amount,targets:indices.map(index=>teams[index].id)},undefined,key);
+  playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease,1,key);
+  presentScoreEffect(effect,key);
 }
 
 function resetConversion() {
@@ -782,9 +783,9 @@ async function sendStars(rate,direction,reduced,signal) {
   }));
 }
 
-function showClassDelta(delta,audible,reduced) {
+function showClassDelta(delta,key,reduced) {
   renderClassNumber(displayedClassScore+delta);
-  if(audible)playSound(delta>0?sounds.mainIncrease:sounds.mainDecrease);
+  if(key)playSound(delta>0?sounds.mainIncrease:sounds.mainDecrease,1,key);
   const label=document.createElement('span');
   label.className=delta>0?'class-score-delta gain':'class-score-delta loss';
   label.textContent=(delta>0?'+':'−')+Math.abs(delta);

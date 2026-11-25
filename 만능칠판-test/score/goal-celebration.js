@@ -28,7 +28,7 @@ export function createGoalCelebrationQueue(celebrate) {
         const pending=queue.shift();
         const group=pending.map(row=>recordFor(records,row)).filter(Boolean);
         if (!group.length) continue;
-        celebrate(group.some(row=>row.type==='class')?'class':'team');
+        celebrate(group.some(row=>row.type==='class')?'class':'team',group[0].reached);
         return group;
       }
       return [];
