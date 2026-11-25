@@ -9,8 +9,12 @@ export function installAnswerCoverDrawing(Rect) {
     return this.wbAnswerCover ? (this.ownCaching=false) : shouldCache.call(this);
   };
   Rect.prototype._render=function(ctx){
-    render.call(this,ctx);
-    if (!this.wbAnswerCover || this.fill==='transparent') return;
+    if (!this.wbAnswerCover) {render.call(this,ctx);return;}
+    const original=this.fill;
+    const open=this.wbCoverOpen ?? original==='transparent';
+    this.fill=open?'transparent':'#375467';
+    try {render.call(this,ctx);} finally {this.fill=original;}
+    if (open) return;
     const size=Math.min(18,this.height*.65,this.width*.55);
     ctx.save();
     ctx.font='600 '+size+'px sans-serif';
@@ -28,19 +32,23 @@ export function answerCoverAt(canvas,event) {
   return top?.wbAnswerCover ? top : null;
 }
 
-export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify}) {
+export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,setOpen}) {
   const surface=canvas.upperCanvasEl;
   let armed=false,gesture=null;
   const overlay=document.createElement('div');
   overlay.className='cover-rectangle';overlay.hidden=true;document.body.append(overlay);
-  function reset() {
-    gesture=null;armed=false;overlay.hidden=true;
-    surface.classList.remove('drawing-cover');
+  function reset() {gesture=null;overlay.hidden=true;}
+  function setArmed(value) {
+    reset();
+    armed=value;
+    surface.classList.toggle('drawing-cover',value);
+    document.getElementById('answerCoverTool').setAttribute('aria-pressed',String(value));
+    if (value) notify('가릴 영역을 연속으로 드래그하세요. Esc로 종료합니다.');
   }
   function stop(e){e.preventDefault();e.stopImmediatePropagation();}
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')reset();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')setArmed(false);});
   document.addEventListener('pointerdown',e=>{
-    if (e.target!==surface) {if (armed) reset();return;}
+    if (e.target!==surface) return;
     if (!allowed() || e.button!==0 || !e.isPrimary) return;
     const point=canvas.getPointer(e);
     let cover=null;
@@ -79,15 +87,25 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify}) {
     reset();
     if (!allowed()) return;
     if (cover) {
-      if (!moved) cover.set({fill:cover.fill==='transparent'?'#375467':'transparent',strokeWidth:1});
+      if (!moved) {setOpen([cover],!isOpen(cover));return;}
     } else {
       if (Math.abs(e.clientX-x)<5 || Math.abs(e.clientY-y)<5) return;
       const end=canvas.getPointer(e);
       const names=new Set(canvas.getObjects().filter(obj=>obj.wbAnswerCover).map(coverName));
       let number=canvas.getObjects().filter(obj=>obj.wbAnswerCover).length+1;
       while(names.has(String(number))) number++;
-      canvas.add(new fabric.Rect({id:uid(),wbAnswerCover:true,wbCoverName:String(number),left:Math.min(point.x,end.x),top:Math.min(point.y,end.y),
-        width:Math.abs(end.x-point.x),height:Math.abs(end.y-point.y),fill:'#375467',stroke:'#86b0c7',strokeWidth:1}));
+      const left=Math.min(point.x,end.x), top=Math.min(point.y,end.y);
+      const width=Math.abs(end.x-point.x), height=Math.abs(end.y-point.y);
+      let anchor,best=0;
+      for (const object of canvas.getObjects().slice().reverse()) {
+        if (object.wbAnswerCover || !object.visible) continue;
+        const box=object.getBoundingRect(true,true);
+        const area=Math.max(0,Math.min(left+width,box.left+box.width)-Math.max(left,box.left)) *
+          Math.max(0,Math.min(top+height,box.top+box.height)-Math.max(top,box.top));
+        if (area>best) {best=area;anchor=object;}
+      }
+      canvas.add(new fabric.Rect({id:uid(),wbAnswerCover:true,wbCoverName:String(number),wbCoverAnchor:anchor?.id,
+        left,top,width,height,fill:'#375467',stroke:'#86b0c7',strokeWidth:1}));
     }
     canvas.requestRenderAll();changed();
   },true);
@@ -99,5 +117,43 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify}) {
     }
     reset();
   },true);
-  return ()=>{armed=true;surface.classList.add('drawing-cover');notify('가릴 영역을 드래그하세요.');};
+  return {activate:()=>setArmed(true),toggle:()=>setArmed(!armed),deactivate:()=>{if (armed) setArmed(false);}};
+}
+
+export function keepCoversAboveAnchors(canvas) {
+  const objects=canvas.getObjects();
+  for (const cover of objects) {
+    if (!cover.wbCoverAnchor) continue;
+    const stack=canvas.getObjects();
+    const index=stack.findIndex(obj=>obj.id===cover.wbCoverAnchor);
+    if (index>stack.indexOf(cover)) canvas.moveTo(cover,index);
+  }
+}
+
+export function wireCoverAnchors(canvas) {
+  let movers=[];
+  function follow() {
+    for (const entry of movers) {
+      const [, , , , x,y]=entry.anchor.calcTransformMatrix();
+      for (const {cover,left,top} of entry.covers) {
+        cover.set({left:left+x-entry.x,top:top+y-entry.y});
+        cover.setCoords();
+      }
+    }
+  }
+  canvas.on('before:transform',({transform})=>{
+    const selected=transform.target.type==='activeSelection'?transform.target.getObjects():[transform.target];
+    const chosen=new Set(selected);
+    movers=selected.filter(anchor=>anchor.id && !anchor.wbAnswerCover).map(anchor=>{
+      const [, , , , x,y]=anchor.calcTransformMatrix();
+      const covers=canvas.getObjects().filter(cover=>cover.wbCoverAnchor===anchor.id && !chosen.has(cover))
+        .map(cover=>({cover,left:cover.left,top:cover.top}));
+      return {anchor,x,y,covers};
+    });
+  });
+  canvas.on('object:moving',follow);
+  canvas.on('object:modified',({action})=>{
+    if (action==='drag') follow();
+    movers=[];
+  });
 }

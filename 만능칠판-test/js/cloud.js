@@ -1,7 +1,7 @@
 import {startFieldConflicts} from './score-conflicts.js';
 import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=pursuit-manager-1';
-import {uid} from './constants.js?v=pursuit-manager-1';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=pursuit-manager-1';
+import {uid} from './constants.js?v=magnetic-cover-1';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=magnetic-cover-1';
 import {applyScoreOperation} from './shared-score.js?v=pursuit-manager-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 

@@ -2,7 +2,7 @@ export const VERSION = '7';
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 10;
 export const DEFAULT_BG = '#D6B588';
-export const SERIAL_PROPS = ['id', 'isHighlighter', 'wbAsset', 'wbPage', 'wbPinned', 'wbTextBorder', 'wbInkGroup','wbAnswerCover','wbCoverName'];
+export const SERIAL_PROPS = ['id', 'isHighlighter', 'wbAsset', 'wbPage', 'wbPinned', 'wbTextBorder', 'wbInkGroup','wbAnswerCover','wbCoverName','wbCoverAnchor'];
 export const MAX_FILE_BYTES = 40 * 1024 * 1024;
 export const MAX_BACKUP_BYTES = 100 * 1024 * 1024;
 export const uid = () => crypto.randomUUID();

@@ -1,22 +1,22 @@
-import {answerCoverAt,coverName,installAnswerCoverDrawing,wireAnswerCover} from './js/lesson-tools.js?v=answer-cover-2';
+import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=magnetic-cover-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
 import {setBoardIcon} from './js/board-icons.js?v=answer-cover-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
-import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=answer-cover-1';
+import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=magnetic-cover-1';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
-import {SystemClipboard} from './clipboard.js?v=answer-cover-1';
+import {SystemClipboard} from './clipboard.js?v=magnetic-cover-1';
 import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=pursuit-manager-1';
+import {CloudBoard} from './js/cloud.js?v=magnetic-cover-1';
 import {wireScoreSync} from './js/score-sync.js?v=pursuit-manager-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=pursuit-manager-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=magnetic-cover-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
-import {validateContent} from './js/validation.js?v=answer-cover-1';
+import {validateContent} from './js/validation.js?v=magnetic-cover-1';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
 import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
@@ -72,9 +72,34 @@ function rememberView(publish=false) {
     },350);
   }
 }
+let answerCoverTool;
+const answerCovers=()=>c.getObjects().filter(object=>object.wbAnswerCover);
+const isCoverOpen=cover=>cover.wbCoverOpen ?? cover.fill==='transparent';
+function refreshCoverControls() {
+  const covers=answerCovers();
+  const allOpen=covers.length>0 && covers.every(isCoverOpen);
+  const button=$('answerCoverAll');
+  button.disabled=!covers.length;
+  button.textContent=allOpen?'모두 닫기':'모두 열기';
+}
+function applyCoverView(states) {
+  for (const cover of answerCovers()) {
+    cover.wbCoverOpen=states && Object.hasOwn(states,cover.id)?states[cover.id]:undefined;
+  }
+  refreshCoverControls();
+}
+function setCoverView(covers,open) {
+  const states=(session.coverViews??={})[current.id]??={};
+  for (const cover of covers) {
+    cover.wbCoverOpen=open;
+    states[cover.id]=open;
+  }
+  refreshCoverControls();c.requestRenderAll();rememberView(true);
+}
 function currentView(){
   const [zoom,,,,left,top]=c.viewportTransform;
   const view={pageId:current.id,zoom,x:(c.width/2-left)/zoom,y:(c.height/2-top)/zoom};
+  view.covers=Object.fromEntries(answerCovers().map(cover=>[cover.id,isCoverOpen(cover)]));
   const frame=$('scoreFrame');
   if(frame){
     view.scoreOpen=scoreOpen;
@@ -114,6 +139,7 @@ function capture() {
 }
 function changed({recordHistory=true}={}) {
   if(!current || cancelledText || isTextEditing())return;
+  keepCoversAboveAnchors(c);refreshCoverControls();
   current.content=capture();dirty=true;generation++;
   if(recordHistory && !cloudActive())history.push(current.id,current.content);
   status('저장 대기 중입니다.');updateHistory();
@@ -194,6 +220,7 @@ async function setPage(page,reset=false,keepView=true) {
     current=previous;cloudBase=cloudActive()?previous?.content:null;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
   }
   tools.setMode('select');
+  keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);
   const view=keepView?session.views[current.id]:null;
   if(Array.isArray(view)&&view.length===6&&view.every(Number.isFinite)&&view[0]>=0.1&&view[0]<=10) {
     c.setViewportTransform(view.slice());rememberView();
@@ -396,6 +423,7 @@ async function stepHistory(direction) {
   try {
     await loadCanvas(c,content.canvas);await checkFiles(content);
     current.content=content;
+    keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);
     tools.setMode('select');
     dirty=true; generation++;
     // Save the resulting state, but do not create another history entry.
@@ -908,7 +936,20 @@ async function exportBackup() {
   downloadJSON({format:'whiteboard-pages',schema:2,appVersion:VERSION,exportedAt:new Date().toISOString(),pages:all,screens,assets},`만능칠판-백업-${new Date().toISOString().slice(0,10)}.json`);
   if(saveError)notify('자동저장 실패 상태의 현재 작업도 백업 파일에 포함했습니다.');
 }
-function reidentify(json) {json.objects?.forEach(o=>{o.id=uid();reidentify(o);});}
+function reidentify(json) {
+  const ids=new Map(),covers=[];
+  function visit(node) {
+    for (const object of node.objects||[]) {
+      const id=uid();
+      if(object.id)ids.set(object.id,id);
+      object.id=id;
+      if(object.wbCoverAnchor)covers.push(object);
+      visit(object);
+    }
+  }
+  visit(json);
+  for (const cover of covers) cover.wbCoverAnchor=ids.get(cover.wbCoverAnchor);
+}
 async function importBackup(file) {
   if(file.size>MAX_BACKUP_BYTES)throw Error('백업 파일은 100MB 이하여야 합니다.');
   const input=JSON.parse(await file.text());
@@ -1034,6 +1075,7 @@ async function refreshCloud() {
           tools.setMode(mode);
           const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbAssetMissing && !object.wbPinned);
           if(mode==='select' && objects.length)c.setActiveObject(objects.length===1?objects[0]:new fabric.ActiveSelection(objects,{canvas:c}));
+          keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);
           c.requestRenderAll();
         });
       }
@@ -1056,6 +1098,10 @@ async function refreshCloud() {
 
 function applyViewport(view){
   receiveScoreView(view);
+  if (view.covers) {
+    (session.coverViews??={})[current.id]=view.covers;
+    applyCoverView(view.covers);
+  }
   c.setViewportTransform([view.zoom,0,0,view.zoom,c.width/2-view.x*view.zoom,c.height/2-view.y*view.zoom]);
   c.requestRenderAll();rememberView();
 }
@@ -1104,8 +1150,13 @@ async function refreshRemote() {
   await applyLocalView();
 }
 function wireUI() {
-  const armCover=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify});
-  $('contextAnswerCover').onclick=()=>{closeContext();armCover();};
+  answerCoverTool=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify,isOpen:isCoverOpen,setOpen:setCoverView});
+  $('contextAnswerCover').onclick=()=>{closeContext();answerCoverTool.activate();};
+  $('answerCoverTool').onclick=()=>answerCoverTool.toggle();
+  $('answerCoverAll').onclick=()=>{
+    const covers=answerCovers();
+    if (allowed() && covers.length) setCoverView(covers,!covers.every(isCoverOpen));
+  };
   let renameCover;
   $('contextRenameCover').onclick=()=>{
     const cover=c.getActiveObject();
@@ -1396,7 +1447,9 @@ async function boot() {
   for(const element of document.querySelectorAll('[data-board-icon]'))setBoardIcon(element,element.dataset.boardIcon);
   c=new fabric.Canvas('whiteboardCanvas',{width:boardViewportWidth(),height:boardViewportHeight(),preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true,enablePointerEvents:true});
   fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});
+  wireCoverAnchors(c);
   tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&canEditBoard()&&!busy&&!modalOpen(),onChange:changed,onViewport:()=>rememberView(true),onText:p=>addText('텍스트',p,true),onMode:mode=>{
+    answerCoverTool?.deactivate();
     const map={selectMoveToggleBtn:'select',penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
     for(const [id,m] of Object.entries(map))$(id).classList.toggle('active-select',mode===m);
     $('selectMoveLabel').textContent=mode==='move'?'이동':'선택';setBoardIcon($('selectMoveToggleBtn'),mode==='move'?'hand':'select');$('selectMoveToggleBtn').classList.toggle('active-move',mode==='move');

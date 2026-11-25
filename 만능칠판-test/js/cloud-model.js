@@ -125,6 +125,8 @@ export function pageTitle(value) {
 export function validView(view) {
   return typeof view?.pageId === 'string' && Number.isFinite(view.zoom) &&
     view.zoom >= .1 && view.zoom <= 10 && Number.isFinite(view.x) && Number.isFinite(view.y) &&
+    (view.covers===undefined || view.covers && typeof view.covers==='object' && !Array.isArray(view.covers) &&
+      Object.values(view.covers).every(open=>typeof open==='boolean')) &&
     (view.scoreShare===undefined || Number.isFinite(view.scoreShare) && view.scoreShare>=20 && view.scoreShare<=90) &&
     (view.scoreScale===undefined || Number.isFinite(view.scoreScale) && view.scoreScale>=60 && view.scoreScale<=150);
 }

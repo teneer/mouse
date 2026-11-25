@@ -868,3 +868,8 @@ body.score-modal-open #scoreFrame {background:transparent}
 
 .cover-rectangle {position:fixed;pointer-events:none;z-index:2500;background:#37546799;border:1px solid #86b0c7}
 .drawing-cover {cursor:crosshair!important}
+
+.answer-cover-tool {display:inline-flex;flex:none}
+#toolbar #answerCoverTool {border-radius:8px 0 0 8px}
+#toolbar #answerCoverTool[aria-pressed=true] {background:#dceeff;border-color:#5a8dee}
+#toolbar #answerCoverAll {border-left:0;border-radius:0 8px 8px 0;padding-inline:6px;font-size:.8rem}
