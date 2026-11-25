@@ -139,6 +139,20 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
 
 export function changeGoals(state, operation) {
   const system = state.goalSystem ??= freshGoals();
+  if (operation.kind==='score-activity') {
+    const {slot,value,base}=operation;
+    if (!['classPursuit','teamPursuit','presenter'].includes(slot) || (system[slot]?.revision??null)!==base) return false;
+    if (!value) return false;
+    if (slot==='presenter') {
+      if (!Array.isArray(value.seen) || !value.seen.every(id=>typeof id==='string') ||
+          !(value.id===null || value.seen.includes(value.id))) return false;
+    } else if (typeof value.enabled!=='boolean' || !Number.isSafeInteger(value.score) || Math.abs(value.score)>10000 ||
+        !Number.isSafeInteger(value.day) || !Number.isSafeInteger(value.step) || value.step<1 || value.step>10000 ||
+        !Number.isInteger(value.weekday) || value.weekday<0 || value.weekday>6 ||
+        !['daily','weekly','manual'].includes(value.mode) || typeof value.message!=='string' || value.message.length>180) return false;
+    system[slot]={...clone(value),revision:operation.key};
+    return true;
+  }
   if (operation.kind === 'score-goals') {
     if (operation.base !== system.revision) return false;
     const oldIds = new Set(system.goals.map(goal=>goal.id));

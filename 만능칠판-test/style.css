@@ -865,3 +865,12 @@ body.score-modal-open #scoreFrame {background:transparent}
 #viewSyncMenu .view-tab-row:has(.view-tab-speaker) {grid-template-columns:auto minmax(0,1fr) auto auto}
 .view-tab-speaker {min-height:32px;border:1px solid #b9d1de;border-radius:6px;background:white;cursor:pointer}
 .view-tab-speaker[aria-pressed="true"] {background:#c9e8ff;border-color:#3376aa}
+
+.cover-rectangle {position:fixed;pointer-events:none;z-index:2500;background:#37546799;border:2px solid #86b0c7}
+.drawing-cover {cursor:crosshair!important}
+#lesson-preview {max-width:95vw;max-height:94dvh;border:1px solid #a7bec9;border-radius:10px;padding:12px;background:#f6fafb}
+#lesson-preview::backdrop {background:#14263866}
+#lesson-preview header,#lesson-preview footer {display:flex;align-items:center;gap:8px;padding:5px}
+#lesson-preview header {justify-content:space-between;font-weight:700}
+#lesson-preview footer {justify-content:flex-end}
+#lesson-preview canvas {display:block;touch-action:none;cursor:grab}

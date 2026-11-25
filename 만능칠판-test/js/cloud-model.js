@@ -1,4 +1,4 @@
-import {applyScoreOperation} from './shared-score.js?v=goal-queue-1';
+import {applyScoreOperation} from './shared-score.js?v=activities-1';
 import {reorderPages} from './board-navigation.js';
 import {normalizePattern} from './board-background.js';
 import {normalizeTabName,validTabId} from './tab-identity.js?v=toolbar-goals-1';

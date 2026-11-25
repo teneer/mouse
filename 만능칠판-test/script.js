@@ -1,21 +1,22 @@
+import {wireAnswerCover,wireLessonPreview} from './js/lesson-tools.js';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=class-tools-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=activities-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
-import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
+import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=activities-1';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
-import {SystemClipboard} from './clipboard.js?v=whiteboard-7';
+import {SystemClipboard} from './clipboard.js?v=activities-1';
 import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=view-groups-1';
-import {wireScoreSync} from './js/score-sync.js?v=score-tab-preview-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=toolbar-goals-1';
+import {CloudBoard} from './js/cloud.js?v=activities-1';
+import {wireScoreSync} from './js/score-sync.js?v=activities-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=activities-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
-import {validateContent} from './js/validation.js?v=whiteboard-7';
+import {validateContent} from './js/validation.js?v=activities-1';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
 import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
@@ -49,7 +50,7 @@ function updateFeedbackPosition(){
 }
 function fail(error) {console.error(error);notify(error?.message || String(error));}
 let tabViews, scoreFull=false;
-function modalOpen() {return document.body.classList.contains('score-modal-open') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
+function modalOpen() {return !!document.querySelector('#lesson-preview[open]') || document.body.classList.contains('score-modal-open') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
 function isTextEditing() {
   return !!c?.getActiveObject()?.isEditing;
 }
@@ -299,6 +300,7 @@ async function deletePageTile(id,title){
     else renderPages();
   });
 }
+let openLessonPreview;
 function renderPageTiles() {
   const generation=++pageListGeneration;
   const grid=$('pageTiles');
@@ -329,6 +331,10 @@ function renderPageTiles() {
       const button=document.createElement('button');button.type='button';button.className='action-btn';
       button.textContent=label;button.onclick=handler;button.disabled=disabled;actions.append(button);
     }
+    addAction('교사용 미리보기',()=>{
+      closePopups();
+      openLessonPreview(page.id===current.id?current:page,session.views[page.id]).catch(fail);
+    });
     addAction('이름 편집',()=>openPageRename(page,index));
     addAction('페이지 복제',()=>run(async()=>{
       await flush();
@@ -1102,6 +1108,16 @@ async function refreshRemote() {
   await applyLocalView();
 }
 function wireUI() {
+  const armCover=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify});
+  $('contextAnswerCover').onclick=()=>{closeContext();armCover();};
+  openLessonPreview=wireLessonPreview({board:c,settle:canvas=>boardFiles.settlePreview(canvas),send:(id,view)=>run(async()=>{
+    const targets=await tabViews.selectedTargets();
+    if (!targets.length) {notify('화면 동기화에서 교실 탭을 선택하세요.');return;}
+    await activatePage(id);
+    clearTimeout(viewTimer);
+    c.setViewportTransform(view);c.requestRenderAll();rememberView();
+    await publishView(true,viewState()?.targets ? undefined : ()=>targets);
+  })});
   document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=()=>{
     const mode=b.dataset.toolMode;
     if(mode && allowed()){finishText();tools.setMode(mode);}

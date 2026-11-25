@@ -1,5 +1,6 @@
+import {schoolDay,pursuitScore,nextPresenter} from './class-activities.js';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
-import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=toolbar-goals-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=activities-1';
 import {wireGoals} from './goals-ui.js?v=device-audio-2';
 import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
@@ -396,6 +397,83 @@ function renderNextGoal(target,next) {
   }
   messageCell.hidden = !message;
 }
+function renderActivities() {
+  for (const kind of ['class','team']) {
+    const rule=goalSystem[kind+'Pursuit'];
+    const limit=pursuitScore(rule);
+    const bar=document.getElementById(kind+'-pursuit');
+    bar.hidden=!rule?.enabled;
+    if (rule?.enabled) {
+      const label='현재 '+(kind==='class'?'학급':'모둠')+' 추격자 '+limit+'점'+(rule.message?' · '+rule.message:'');
+      const track=bar.querySelector('.pursuit-track');
+      if (track.firstElementChild.textContent!==label) {
+        for (const span of track.children) span.textContent=label;
+        track.style.animationDuration=Math.max(8,label.length*.38)+'s';
+      }
+    }
+    if (kind==='class') document.querySelector('.main-scoreboard').classList.toggle('pursuit-behind',!!rule?.enabled && count<limit);
+    else teams.forEach((team,i)=>{
+      const card=scoreboard.children[i];
+      card?.classList.toggle('pursuit-behind',!!rule?.enabled && team.score<limit);
+      card?.classList.toggle('presenting',goalSystem.presenter?.id===team.id);
+    });
+  }
+  const draw=document.getElementById('draw-presenter');
+  draw.disabled=!teams.length;
+  const presenter=teams.find(team=>team.id===goalSystem.presenter?.id);
+  draw.textContent=presenter ? (teams.every(t=>goalSystem.presenter.seen.includes(t.id))?'다시 시작':'다음 모둠') : '발표 순서';
+  draw.title=presenter?'발표 중: '+presenter.name:'발표할 모둠 뽑기';
+}
+async function drawPresenter() {
+  syncFromStorage();
+  const previous=goalSystem.presenter;
+  const value=nextPresenter(previous,teams) || {id:null,seen:[]};
+  await submitGoal({kind:'score-activity',slot:'presenter',base:previous?.revision??null,value});
+}
+document.getElementById('draw-presenter').onclick=drawPresenter;
+const pursuitEditor=document.getElementById('pursuit-editor');
+const pursuitForm=document.getElementById('pursuit-form');
+const fields=pursuitForm.elements;
+let pursuitSlot,pursuitBase;
+function pursuitFields() {
+  fields.step.parentElement.hidden=fields.mode.value==='manual';
+  fields.weekday.parentElement.hidden=fields.mode.value!=='weekly';
+}
+fields.mode.onchange=pursuitFields;
+function editPursuit(kind) {
+  setSettingsOpen(false);
+  pursuitSlot=kind+'Pursuit';
+  const rule=goalSystem[pursuitSlot];
+  pursuitBase=rule?.revision??null;
+  fields.enabled.checked=rule?.enabled??true;
+  fields.score.value=pursuitScore(rule);
+  fields.message.value=rule?.message??'';
+  fields.mode.value=rule?.mode??'manual';
+  fields.weekday.value=rule?.weekday??1;
+  fields.step.value=rule?.step??1;
+  document.getElementById('pursuit-title').textContent=(kind==='class'?'학급':'모둠')+' 추격자 설정';
+  document.getElementById('pursuit-error').textContent='';
+  pursuitFields();scoreModalState(true);pursuitEditor.showModal();
+}
+for (const kind of ['class','team']) {
+  document.getElementById(kind+'-pursuit').onclick=()=>editPursuit(kind);
+  document.querySelector('[data-edit-pursuit="'+kind+'"]').onclick=()=>editPursuit(kind);
+}
+document.getElementById('pursuit-close').onclick=()=>pursuitEditor.close();
+pursuitEditor.onclose=()=>scoreModalState(false);
+pursuitForm.onsubmit=async event=>{
+  event.preventDefault();
+  const value={enabled:fields.enabled.checked,score:fields.score.valueAsNumber,message:fields.message.value.trim(),
+    mode:fields.mode.value,weekday:Number(fields.weekday.value),step:fields.step.valueAsNumber,day:schoolDay()};
+  if (await submitGoal({kind:'score-activity',slot:pursuitSlot,base:pursuitBase,value})) pursuitEditor.close();
+  else document.getElementById('pursuit-error').textContent='다른 화면에서 변경했습니다. 닫고 다시 열어 주세요.';
+};
+function schedulePursuitDay() {
+  renderActivities();
+  setTimeout(schedulePursuitDay,86400000-(Date.now()+9*3600000)%86400000+100);
+}
+setTimeout(schedulePursuitDay,0);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) renderActivities();});
 function renderClassGoalTarget() {
   renderNextGoal(nextClassGoalBanner,nextClassGoal(goalSystem,count));
 }
@@ -408,6 +486,7 @@ function renderTeamGoal(target,team) {
   if (target) renderNextGoal(target,nextTeamGoal(goalSystem,team));
 }
 function renderGoalFeedback(announce) {
+  renderActivities();
   renderClassGoalFeedback(announce);
   for (const [index,team] of teams.entries()) {
     const card = scoreboard.children[index];
@@ -668,6 +747,7 @@ function renderTeamNumber(element, score) {
 }
 
 function renderBatchControls() {
+  renderActivities();
   Array.from(scoreboard.children).forEach((card, index) => {
     const selected = selectedTeams.has(index);
     card.classList.toggle('team-selected', selected);
@@ -1083,7 +1163,7 @@ document.addEventListener('keydown', e => {
   if (document.getElementById('team-delete-dialog').open || getComputedStyle(teamSetupModal).display !== 'none' ||
       getComputedStyle(managementModal).display !== 'none' ||
       getComputedStyle(goalManagementView).display !== 'none' ||
-      settingsPanel.open ||
+      settingsPanel.open || pursuitEditor.open ||
       document.body.classList.contains('goal-active')) return;
 
   if (!e.shiftKey && (e.code === 'ArrowUp' || e.key === '+')) {

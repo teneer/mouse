@@ -1,5 +1,5 @@
 import {applyFieldPatch,resolveFieldConflict,startFieldConflicts,trackFieldDelta} from './score-conflicts.js';
-import {changeGoals,completeReachedAutomaticGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=goal-queue-1';
+import {changeGoals,completeReachedAutomaticGoals,readGoals,reconcileGoals} from '../score/goal-model.js?v=activities-1';
 const min = -10000, max = 10000;
 const empty = () => ({count:0,teams:[],scoreLink:{enabled:true,points:3}});
 const copy = value => structuredClone(value);
@@ -51,7 +51,7 @@ export function applyScoreOperation(board, operation) {
   score.state.goalSystem ??= readGoals();
   completeReachedAutomaticGoals(score.state);
   const before = {count:score.state.count,teams:copy(score.state.teams)};
-  if (kind === 'score-goals' || kind === 'score-records') {
+  if (kind === 'score-goals' || kind === 'score-records' || kind==='score-activity') {
     if (!changeGoals(score.state,operation)) score.notice = {key,text:'다른 기기에서 목표나 달성 기록이 변경되었습니다. 다시 확인해 주세요.'};
     else score.notice = null;
     return;

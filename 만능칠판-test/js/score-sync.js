@@ -42,6 +42,7 @@ export function wireScoreSync(frame, cloud, store, notify) {
   function send(data,preview) {
     if (!cloud.options || cloud.detaching) return false;
     const connection = cloud.options;
+    if (data.kind==='score-activity' && data.base!==(cloud.projectedScore(drafts.values())?.state.goalSystem?.[data.slot]?.revision??null)) return false;
     if (data.kind==='score-goals' && data.base!==(cloud.projectedScore(drafts.values())?.state.goalSystem?.revision??null)) return false;
     const operation = structuredClone({...data,device:cloud.deviceId||'local',deviceLabel:cloud.options.label||'연결 기기'});
     drafts.set(operation.key,operation);

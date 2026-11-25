@@ -353,5 +353,5 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   document.addEventListener('visibilitychange',()=>{if (document.visibilityState==='visible') announce();});
   setInterval(announce,heartbeat);
   claimPresence();
-  return {render,refresh,position:positionMenu,finishRename:()=>finishNameEdit?.()};
+  return {render,refresh,selectedTargets:async()=>viewTargets(readState()?.targets,await liveIds()),position:positionMenu,finishRename:()=>finishNameEdit?.()};
 }
