@@ -978,6 +978,9 @@ function togglePopup(id,button) {
   const was=openedPopup===id;closePopups();if(was)return;
   const p=$(id);p.style.display='block';openedPopup=id;button.setAttribute('aria-expanded','true');
   if(id==='pageList'){
+    $('pageJumpNumber').value='';
+    $('pageJumpNumber').placeholder=pages.length>1?'1–'+pages.length:'1';
+    clearPageJumpError();
     renderPageTiles();
     requestAnimationFrame(()=>$('pageTiles').querySelector('[aria-current="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'}));
   }
@@ -1271,8 +1274,29 @@ async function refreshRemote() {
   finally{syncing=false;}
   await applyLocalView();
 }
+function clearPageJumpError() {
+  $('pageJumpError').hidden=true;
+  $('pageJumpError').textContent='';
+  $('pageJumpNumber').removeAttribute('aria-invalid');
+}
 function wireUI() {
   wireTooltips();
+  const pageNumber=$('pageJumpNumber');
+  pageNumber.oninput=clearPageJumpError;
+  $('pageJumpForm').onsubmit=event=>{
+    event.preventDefault();
+    const value=pageNumber.value.trim().normalize('NFKC');
+    const page=/^\d+$/.test(value) ? pages[Number(value)-1] : null;
+    if (!page) {
+      const error=$('pageJumpError');
+      error.hidden=false;
+      error.textContent=`1~${pages.length} 사이의 쪽 번호를 입력하세요.`;
+      pageNumber.setAttribute('aria-invalid','true');
+      pageNumber.focus();
+      return;
+    }
+    run(()=>activatePage(page.id)).finally(()=>$('pageListBtn').focus({preventScroll:true}));
+  };
   $('contextImportSet').onclick=()=>openImportSet(contextImportSet);
   $('recentImportBtn').onclick=$('recentImportProperties').onclick=()=>openImportSet(session.recentImports?.[current?.id]);
   $('importSetColumns').onchange=previewImportSet;
@@ -1315,10 +1339,11 @@ function wireUI() {
     closeModal('answerCoverRenameModal');
     c.requestRenderAll();changed();
   };
-  document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=event=>{
     const mode=b.dataset.toolMode;
     if(mode && allowed()){finishText();tools.setMode(mode);}
     togglePopup(b.dataset.popup,b);
+    if (event.detail===0 && openedPopup==='pageList') pageNumber.focus({preventScroll:true});
   });
   document.addEventListener('pointerdown',e=>{if(shouldClosePopups(e.target))closePopups();});
   const bar=$('toolbar');

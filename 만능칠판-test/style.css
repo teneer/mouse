@@ -869,3 +869,8 @@ body.score-modal-open #scoreFrame {background:transparent}
 
 #importSetActions {pointer-events:auto}
 #importSetPreview {position:fixed;pointer-events:none;z-index:10000;border:2px dashed #66bbff;background:#29aaff16;box-sizing:border-box}
+
+#pageJumpForm {display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
+#pageJumpNumber {width:4.2em;min-height:32px;padding:3px 6px;border:1px solid #b9cddb;border-radius:6px}
+#pageJumpForm button {min-height:32px;height:auto;padding:3px 9px}
+#pageJumpError {width:100%;color:#9c302a;font-size:.82rem}
