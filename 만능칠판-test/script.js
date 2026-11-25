@@ -8,7 +8,7 @@ import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES}
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js?v=cover-sync-2';
-import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
+import {CanvasTools} from './js/canvas-tools.js?v=file-placeholders-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
@@ -227,16 +227,10 @@ async function checkFiles(content) {
   await Promise.all([...assetReferences(content.canvas.objects).keys()].map(id=>boardFiles.checkAvailability(id)));
   updateFileInteraction();
 }
-function containsUnavailableFile(object) {
-  return !!(object.wbAsset && boardFiles?.unavailable.has(object.wbAsset.id) ||
-    object.getObjects?.().some(containsUnavailableFile));
-}
 function updateFileInteraction() {
   c.getObjects().forEach(object=>{
-    const missing=containsUnavailableFile(object);
     if(object.type==='group' && object.getObjects().some(child=>child.wbAsset || child.type==='group'))object.objectCaching=false;
-    object.wbAssetMissing=!!missing;
-    const locked=missing || object.wbPinned;
+    const locked=object.wbPinned;
     object.set({selectable:tools.mode==='select' && !locked,evented:!locked});
     if(locked && c.getActiveObjects().includes(object))c.discardActiveObject();
   });
@@ -1117,7 +1111,7 @@ async function refreshCloud() {
         await run(async()=>{
           await setPage(remote,true);
           tools.setMode(mode);
-          const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbAssetMissing && !object.wbPinned);
+          const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbPinned);
           if(mode==='select' && objects.length)c.setActiveObject(objects.length===1?objects[0]:new fabric.ActiveSelection(objects,{canvas:c}));
           keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);receiveCoverSync();
           c.requestRenderAll();
@@ -1311,7 +1305,7 @@ function wireUI() {
   $('undoBtn').onclick=()=>stepHistory(-1).catch(fail);$('redoBtn').onclick=()=>stepHistory(1).catch(fail);
   $('previousPageBtn').onclick=()=>stepPage(-1);
   $('nextPageBtn').onclick=()=>stepPage(1);
-  const clearPage=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지에서 편집 가능한 개체를 모두 지울까요? 언두로 되돌릴 수 있습니다.',{title:'현재 페이지 전체 지우기',confirmText:'전체 지우기'})){finishText();c.discardActiveObject();const list=c.getObjects().filter(object=>!object.wbAssetMissing && !object.wbPinned);if(list.length){list.forEach(o=>c.remove(o));c.requestRenderAll();changed();}}};
+  const clearPage=async()=>{if(!allowed())return;if(await askConfirm('현재 페이지에서 편집 가능한 개체를 모두 지울까요? 언두로 되돌릴 수 있습니다.',{title:'현재 페이지 전체 지우기',confirmText:'전체 지우기'})){finishText();c.discardActiveObject();const list=c.getObjects().filter(object=>!object.wbPinned);if(list.length){list.forEach(o=>c.remove(o));c.requestRenderAll();changed();}}};
   let deleteTimer=null,deleteLong=false;
   const cancelDeletePress=()=>{clearTimeout(deleteTimer);deleteTimer=null;};
   wireToolbarDrag($('toolbar'),()=>{cancelDeletePress();closePopups();});
@@ -1363,7 +1357,7 @@ function wireUI() {
     if(e.key==='F10'&&e.shiftKey&&c.getActiveObject()){e.preventDefault();const o=c.getActiveObject(),rect=o.getBoundingRect(true,true);openContext(rect.left+16,rect.top+16);return;}
     if(busy)return;
     else if(cmd && key==='g'){e.preventDefault();groupObjects(e.shiftKey);}
-    else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects().filter(object=>!object.wbAssetMissing && !object.wbPinned),{canvas:c}));c.requestRenderAll();}}
+    else if(cmd && key==='a'){e.preventDefault();if(allowed()){tools.setMode('select');c.setActiveObject(new fabric.ActiveSelection(c.getObjects().filter(object=>!object.wbPinned),{canvas:c}));c.requestRenderAll();}}
     else if(cmd && key==='s'){e.preventDefault();$('saveBtn').click();}
     else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}
     else if(e.code==='Space'&&!e.target.closest?.('button')&&!e.repeat&&!tools.gesture){e.preventDefault();spaceMode=tools.mode;tools.setMode('move');}
