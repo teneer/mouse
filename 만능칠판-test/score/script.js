@@ -1,3 +1,4 @@
+import {wireTooltips} from '../js/tooltips.js?v=help-1';
 import {schoolDay,pursuitScore} from './class-activities.js?v=pursuit-manager-1';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=pursuit-manager-1';
@@ -1226,3 +1227,5 @@ setMaximizeState(window.frameElement?.dataset.scoreFull==='true');
 for (const dialog of document.querySelectorAll('dialog')) {
   dialog.addEventListener('cancel',event=>event.preventDefault());
 }
+
+wireTooltips();

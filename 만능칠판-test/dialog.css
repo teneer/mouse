@@ -116,3 +116,6 @@ dialog.dialog-sheet {--dialog-border:#c5dae3;--dialog-text:#123447;--dialog-acce
   .appearance-cards {grid-template-columns:minmax(0,1fr)}
   .dialog-header {min-height:52px}
 }
+
+.board-tooltip {position:fixed;z-index:5000;max-width:min(18rem,calc(100vw - 12px));box-sizing:border-box;padding:5px 8px;border-radius:6px;background:#173f50;color:#fff;font:13px/1.4 system-ui,sans-serif;overflow-wrap:anywhere;pointer-events:none}
+.board-tooltip[hidden] {display:none!important}

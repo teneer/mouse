@@ -875,3 +875,9 @@ body.score-modal-open #scoreFrame {background:transparent}
 #toolbar #answerCoverTool {border-radius:0}
 #toolbar #answerCoverTool[aria-pressed=true] {background:#dceeff;border-color:#5a8dee}
 #toolbar #answerCoverAll {border-left:0;border-radius:0 8px 8px 0;min-width:28px;padding-inline:5px;font-size:1rem}
+
+.help-topics {display:flex;flex-wrap:wrap;gap:6px}
+#helpModal .help-topics .dialog-action[aria-current] {background:var(--dialog-accent);color:white}
+.help-page h3 {text-align:left;margin:16px 0 8px}
+.help-page :is(ol,ul) {padding-inline-start:1.35rem}
+.help-nav {display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--dialog-border);padding-top:10px}

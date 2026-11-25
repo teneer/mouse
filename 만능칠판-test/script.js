@@ -1,3 +1,4 @@
+import {wireTooltips} from './js/tooltips.js?v=help-1';
 import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-transform-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
@@ -1184,6 +1185,7 @@ async function refreshRemote() {
   await applyLocalView();
 }
 function wireUI() {
+  wireTooltips();
   answerCoverTool=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify,isOpen:isCoverOpen,setOpen:setCoverView,onGestureEnd:()=>{
     if (cloudActive()) requestCloudRefresh();
     else refreshRemote().catch(fail);
@@ -1328,7 +1330,26 @@ function wireUI() {
   $('importBackupBtn').onclick=()=>{closePopups();$('backupInput').click();};
   $('backupInput').onchange=e=>{const file=e.target.files[0];e.target.value='';if(file)run(()=>importBackup(file),'백업을 가져오는 중입니다.');};
   $('importLegacyBtn').onclick=()=>run(importLegacy,'이전 데이터를 읽는 중입니다.');
-  $('helpBtn').onclick=()=>openModal('helpModal');
+  const help=$('helpModal');
+  const topics=[...help.querySelectorAll('[data-help-topic]')];
+  const lessons=[...help.querySelectorAll('[data-help-page]')];
+  let lesson=0;
+  function showLesson(index,focus=false) {
+    lesson=index;
+    lessons.forEach((page,i)=>{page.hidden=i!==index;});
+    topics.forEach((button,i)=>{
+      if (i===index) button.setAttribute('aria-current','step');
+      else button.removeAttribute('aria-current');
+    });
+    $('helpPrevious').disabled=index===0;
+    $('helpNext').disabled=index===lessons.length-1;
+    $('helpPageCount').textContent=(index+1)+' / '+lessons.length;
+    if (focus) lessons[index].querySelector('h3').focus();
+  }
+  topics.forEach((button,i)=>{button.onclick=()=>showLesson(i,true);});
+  $('helpPrevious').onclick=()=>showLesson(lesson-1,true);
+  $('helpNext').onclick=()=>showLesson(lesson+1,true);
+  $('helpBtn').onclick=()=>{showLesson(0);openModal('helpModal');};
   $('cancelImportBtn').onclick=()=>importAbort?.abort();
   let dragDepth=0;
   document.addEventListener('dragenter',e=>{if(Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();dragDepth++;if(!busy&&!modalOpen())$('dropOverlay').hidden=false;}});
