@@ -241,9 +241,11 @@ function restoreInteraction() {
   c.isDrawingMode=tools.mode==='pen'||tools.mode==='marker';c.selection=tools.mode==='select';c.skipTargetFind=tools.mode==='move';
   updateFileInteraction();c.requestRenderAll();
 }
-async function run(fn,label='처리 중입니다.') {
+async function run(fn,label='처리 중입니다.',{keepPageList=false}={}) {
   if(busy || tools?.gesture){notify('현재 작업을 마친 뒤 다시 시도해주세요.');return;}
-  finishText();busy=true;closePopups();
+  finishText();busy=true;
+  if (keepPageList && openedPopup==='pageList') closePageActions();
+  else closePopups();
   c.isDrawingMode=false;c.selection=false;c.skipTargetFind=true;
   try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
   finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
@@ -441,6 +443,16 @@ async function deletePageTile(id,title){
     else renderPages();
   });
 }
+async function runPageListAction(action) {
+  if (busy || tools?.gesture) return;
+  await run(action,undefined,{keepPageList:true});
+  if (openedPopup!=='pageList') return;
+  renderPageTiles();
+  positionToolbarPopup();
+  const tile=$('pageTiles').querySelector('[aria-current="true"]');
+  tile?.scrollIntoView({block:'nearest',inline:'nearest'});
+  tile?.focus({preventScroll:true});
+}
 function renderPageTiles() {
   const generation=++pageListGeneration;
   const grid=$('pageTiles');
@@ -461,7 +473,7 @@ function renderPageTiles() {
     tile.append(preview,label);
     tile.onclick=()=>{
       if (pageSelectionMode) selectPage(page.id,!selectedPages.has(page.id));
-      else run(()=>activatePage(page.id));
+      else runPageListAction(()=>activatePage(page.id));
     };
     tile.onkeydown=event=>{
       if(!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key))return;
@@ -507,7 +519,7 @@ function renderPageTiles() {
     const add=document.createElement('button');
     add.type='button';add.className='page-tile page-tile-add';add.textContent='+';
     add.setAttribute('aria-label','페이지 추가');
-    add.onclick=()=>run(()=>createPage(emptyContent(c.width,c.height)));
+    add.onclick=()=>runPageListAction(()=>createPage(emptyContent(c.width,c.height)));
     grid.append(add);
   }
   refreshPageSelection();
@@ -520,7 +532,7 @@ function renderPageTiles() {
       try{
         const src=await makeThumbnail(content,view,c.width,c.height,120,canvas=>boardFiles.settlePreview(canvas));
         if(generation!==pageListGeneration || openedPopup!=='pageList')return;
-        const img=document.createElement('img');img.src=src;img.alt='';
+        const img=document.createElement('img');img.src=src;img.alt='';img.draggable=false;
         grid.children[index]?.querySelector('.page-tile-preview')?.replaceWith(img);
       }catch(error){console.warn('페이지 미리보기를 만들 수 없습니다.',error);}
     }
@@ -1065,8 +1077,9 @@ function updateToolbarLayout() {
   }
 }
 function togglePopup(id,button) {
-  if(busy)return;
-  const was=openedPopup===id;closePopups();if(was)return;
+  const was=openedPopup===id;
+  if(busy && !was)return;
+  closePopups();if(was)return;
   const p=$(id);p.style.display=id==='pageList'?'flex':'block';openedPopup=id;button.setAttribute('aria-expanded','true');
   if(id==='pageList'){
     $('pageJumpNumber').value='';
@@ -1386,7 +1399,7 @@ function wireUI() {
       pageNumber.focus();
       return;
     }
-    run(()=>activatePage(page.id)).finally(()=>$('pageListBtn').focus({preventScroll:true}));
+    runPageListAction(()=>activatePage(page.id));
   };
   $('contextImportSet').onclick=()=>openImportSet(contextImportSet);
   $('recentImportBtn').onclick=$('recentImportProperties').onclick=()=>openImportSet(session.recentImports?.[current?.id]);
@@ -1467,6 +1480,7 @@ function wireUI() {
   $('pageSelectionDelete').onclick=()=>deleteSelectedPages().catch(fail);
   wirePageReorder($('pageTiles'),(source,target,after)=>movePage(source,target,after).catch(fail));
   $('pageTiles').addEventListener('scroll',closePageActions);
+  $('pageTiles').addEventListener('dragstart',event=>event.preventDefault());
   $('pageRenameForm').onsubmit=event=>savePageTitle(event).catch(fail);
   $('textBgEnabled').onchange=$('textBorderEnabled').onchange=updateTextPropInputs;
   $('textPropsForm').onsubmit=saveTextProps;
