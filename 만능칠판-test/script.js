@@ -5,10 +5,10 @@ import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
 import {setBoardIcon} from './js/board-icons.js?v=answer-cover-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
-import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=cover-sync-2';
+import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=import-sets-1';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
-import {SystemClipboard} from './clipboard.js?v=cover-sync-2';
+import {SystemClipboard} from './clipboard.js?v=import-sets-1';
 import {CanvasTools} from './js/canvas-tools.js?v=file-placeholders-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
@@ -17,13 +17,13 @@ import {CloudBoard} from './js/cloud.js?v=cover-sync-2';
 import {wireScoreSync} from './js/score-sync.js?v=pursuit-manager-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=cover-sync-2';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
-import {validateContent} from './js/validation.js?v=cover-sync-2';
+import {validateContent} from './js/validation.js?v=import-sets-1';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
 import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
 const $=id=>document.getElementById(id);
 let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
-let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,importLayoutResolver=null,passwordResolver=null;
+let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,passwordResolver=null;
 const history=new PageHistory(),knownVersions=new Map();
 const MAX_PAGES=10;
 function readPreference(key) {try{return JSON.parse(localStorage.getItem(key));}catch{return null;}}
@@ -444,6 +444,7 @@ function updateHistory() {
   $('redoBtn').disabled=!current||historyBusy||(cloudActive()?!sharedHistory?.redo.length:!history.canRedo(current.id));
   const object=c?.getActiveObject();
   $('deleteSelectionBtn').disabled=busy||!current;
+  refreshRecentImport();
 }
 async function stepHistory(direction) {
   if(!current || historyBusy || busy || modalOpen() || tools?.gesture || isTextEditing()) return;
@@ -495,19 +496,97 @@ function addText(text,point,editing=false) {
   c.add(object);c.setActiveObject(object);object.setCoords();c.requestRenderAll();if(!editing)changed();
   if(editing){object.enterEditing();object.selectAll();}
 }
-function chooseImportColumns(count) {
+const importLayoutPreference='wb.import-set-layout.v1';
+let editingImportSet=null,contextImportSet=null;
 
-  return new Promise(resolve=>{
-    importLayoutResolver=resolve;
-    const modal=$('importLayoutModal');
-    $('importAsBackground').checked=false;
-    $('importLayoutCount').textContent=`${count}개 항목의 배치 방법을 선택하세요.`;
-    const buttons=Array.from(modal.querySelectorAll('[data-columns]'));
-    const finish=value=>{importLayoutResolver=null;$('importLayoutModal').style.display='none';if(modalFocus&&typeof modalFocus.focus==='function')modalFocus.focus();modalFocus=null;resolve(value);};
-    buttons.forEach(b=>b.onclick=()=>finish({columns:Number(b.dataset.columns),pinned:$('importAsBackground').checked}));
-    openModal('importLayoutModal');
-    buttons.forEach(b=>{b.hidden=count===1 && Number(b.dataset.columns)!==1;b.classList.toggle('selected',Number(b.dataset.columns)===Math.min(4,count));});
+function importSetMembers(id) {
+  return id ? c.getObjects().filter(object=>object.wbImportSet===id)
+    .sort((a,b)=>a.wbImportOrder-b.wbImportOrder) : [];
+}
+function importSetColumns(value,count) {
+  return value==='auto'?Math.min(4,Math.ceil(Math.sqrt(count))):Math.min(Number(value),count);
+}
+function planImportSet(objects,value,left,top) {
+  const columns=importSetColumns(value,objects.length),gap=24;
+  const boxes=objects.map(object=>object.getBoundingRect(true,true));
+  const widths=[],heights=[];
+  for (const [i,box] of boxes.entries()) {
+    const column=columns?i%columns:0,row=columns?Math.floor(i/columns):0;
+    widths[column]=Math.max(widths[column]||0,box.width);
+    heights[row]=Math.max(heights[row]||0,box.height);
+  }
+  const x=[left],y=[top];
+  widths.forEach((width,i)=>{x[i+1]=x[i]+width+gap;});
+  heights.forEach((height,i)=>{y[i+1]=y[i]+height+gap;});
+  return boxes.map((box,i)=>{
+    const column=columns?i%columns:0,row=columns?Math.floor(i/columns):0;
+    return {box,left:x[column],top:y[row]};
   });
+}
+function layoutImportSet(objects,value,left,top) {
+  const plan=planImportSet(objects,value,left,top);
+  objects.forEach((object,i)=>{
+    const {box,left,top}=plan[i];
+    const dx=left-box.left,dy=top-box.top;
+    object.set({left:object.left+dx,top:object.top+dy});object.setCoords();
+    for (const cover of answerCovers().filter(cover=>cover.wbCoverAnchor===object.id)) {
+      cover.set({left:cover.left+dx,top:cover.top+dy});cover.setCoords();
+    }
+  });
+}
+function refreshRecentImport() {
+  const id=session.recentImports?.[current?.id];
+  const latest=importSetMembers(id);
+  $('recentImportBtn').disabled=!latest.length;
+  $('importSetActions').hidden=!latest.length || !c.getActiveObjects().some(object=>object.wbImportSet===id);
+}
+function previewImportSet() {
+  const preview=$('importSetPreview'),set=editingImportSet;
+  preview.hidden=true;
+  if (!set || $('importSetColumns').value==='keep') return;
+  const plan=planImportSet(set.objects,$('importSetColumns').value,set.left,set.top);
+  const right=Math.max(...plan.map(item=>item.left+item.box.width));
+  const bottom=Math.max(...plan.map(item=>item.top+item.box.height));
+  const frame=c.upperCanvasEl.getBoundingClientRect();
+  const toScreen=(x,y)=>fabric.util.transformPoint(new fabric.Point(x,y),c.viewportTransform);
+  const start=toScreen(set.left,set.top),end=toScreen(right,bottom);
+  Object.assign(preview.style,{left:frame.left+start.x+'px',top:frame.top+start.y+'px',
+    width:end.x-start.x+'px',height:end.y-start.y+'px'});
+  preview.hidden=false;
+}
+function openImportSet(id) {
+  const found=importSetMembers(id);
+  if (!allowed() || !found.length) return;
+  closeContext();
+  c.discardActiveObject();
+  const objects=importSetMembers(id);
+  const bounds=objects.map(object=>object.getBoundingRect(true,true));
+  editingImportSet={id,page:current.id,objects,left:Math.min(...bounds.map(box=>box.left)),top:Math.min(...bounds.map(box=>box.top))};
+  $('importSetCount').textContent=objects.length+'개 자료';
+  $('importSetColumns').value='keep';
+  $('importSetPinned').value=objects.every(object=>object.wbPinned)?'pinned':
+    objects.some(object=>object.wbPinned)?'mixed':'free';
+  openModal('importLayoutModal');
+}
+function applyImportSet(event) {
+  event.preventDefault();
+  const set=editingImportSet;
+  if (!set || current.id!==set.page || busy || !canEditBoard()) return;
+  const objects=importSetMembers(set.id),columns=$('importSetColumns').value,pin=$('importSetPinned').value;
+  if (!objects.length) {closeModal('importLayoutModal');return;}
+  if (columns!=='keep') {
+    layoutImportSet(objects,columns,set.left,set.top);
+    writePreference(importLayoutPreference,columns);
+  }
+  if (pin!=='mixed') {
+    const ids=new Set(objects.map(object=>object.id));
+    objects.forEach(object=>{object.wbPinned=pin==='pinned';});
+    if (pin==='pinned') {
+      for (const cover of answerCovers()) if (ids.has(cover.wbCoverAnchor)) delete cover.wbCoverAnchor;
+    }
+  }
+  orderPinnedObjects();updateFileInteraction();
+  closeModal('importLayoutModal');c.requestRenderAll();changed();
 }
 async function importFiles(files,point) {
   await flush();
@@ -525,11 +604,6 @@ async function importFiles(files,point) {
       onProgress:message=>{$('importProgressText').textContent=message;}
     });
     if(!placements.length)return;
-    progress.hidden=true;
-    const layout=await chooseImportColumns(placements.length);
-    if(!layout)return;
-    const {columns,pinned}=layout;
-    progress.hidden=false;
     $('importProgressText').textContent='기기에 파일을 저장하는 중…';
     for(const asset of assets){
       controller.signal.throwIfAborted();
@@ -537,24 +611,29 @@ async function importFiles(files,point) {
     }
     controller.signal.throwIfAborted();
     const center=point||fabric.util.transformPoint(new fabric.Point(c.width/2,c.height/2),fabric.util.invertTransform(c.viewportTransform));
-    const gap=24,maxWidth=Math.min(800,c.width/c.getZoom()*.75),cellWidth=Math.max(40,(maxWidth-gap*(Math.max(1,columns)-1))/Math.max(1,columns));
-    let y=center.y,rowHeight=0;
+    const stored=readPreference(importLayoutPreference);
+    const value= ['0','1','2','3','4','5','6'].includes(stored)?stored:'auto';
+    const columns=importSetColumns(value,placements.length);
+    const width=Math.min(800,c.width/c.getZoom()*.75);
+    const cellWidth=Math.max(40,(width-24*(Math.max(1,columns)-1))/Math.max(1,columns));
     tools.setMode('select');
+    const setId=uid();
     const added=placements.map((args,index)=>{
-      const col=columns?index%columns:0;
-      if(columns && index && !col){y+=rowHeight+gap;rowHeight=0;}
-      const image=new fabric.WbFile(args);
-      image.id=uid();
-      image.scale(Math.min(1,cellWidth/image.width));
-      image.set({left:columns?center.x-maxWidth/2+col*(cellWidth+gap)+(cellWidth-image.getScaledWidth())/2:center.x-image.getScaledWidth()/2,top:y,wbPinned:pinned});
-      image.setCoords();
-      rowHeight=Math.max(rowHeight,image.getScaledHeight());
-      return image;
+      const object=new fabric.WbFile(args);
+      object.set({id:uid(),wbImportSet:setId,wbImportOrder:index});
+      object.scale(Math.min(1,cellWidth/object.width));
+      object.setCoords();
+      return object;
     });
-    added.forEach(image=>c.add(image));
-    orderPinnedObjects();
+    const left=point?point.x:center.x-(added.length===1?added[0].getScaledWidth():width)/2;
+    const top=point?point.y:center.y-(added.length===1?added[0].getScaledHeight()/2:0);
+    layoutImportSet(added,value,left,top);
+    added.forEach(object=>c.add(object));
+    c.setActiveObject(added.length===1?added[0]:new fabric.ActiveSelection(added,{canvas:c}));
     c.requestRenderAll();changed();await flush();
-    notify(columns?`${added.length}개 항목을 ${columns}열로 배치했습니다.`:`${added.length}개 항목을 한곳에 배치했습니다.`);
+    (session.recentImports??={})[current.id]=setId;
+    rememberView();refreshRecentImport();
+    notify(`${added.length}개 자료를 추가했습니다.`);
   } catch(error) {
     for(const id of saved){await store.deleteAsset(id).catch(console.warn);boardFiles.invalidate(id);}
     const entry=history.pages.get(current.id);if(entry){entry.index=beforeIndex;entry.items.splice(beforeIndex+1);}
@@ -814,9 +893,17 @@ function saveTextProps(event){
 function layerToEdge(front){if(!allowed()||isTextEditing())return;const selection=c.getActiveObjects();if(!selection.length)return;const all=c.getObjects(),pinned=all.filter(o=>o.wbPinned),next=[...pinned,...orderedToEdge(all.filter(o=>!o.wbPinned),selection,front)];if(next.every((o,i)=>o===all[i]))return;next.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();changed();}
 function closeContext(){const menu=$('objectContextMenu');if(menu)menu.hidden=true;}
 function openContext(x,y,target=null,hit=target){
-  if(!allowed()||isTextEditing()||(target && !target.wbAnswerCover && tools.mode!=='select'))return;
+  if(!allowed()||isTextEditing()||(target && !target.wbAnswerCover && !target.wbImportSet && tools.mode!=='select'))return;
   closePopups();
-  if(target && !c.getActiveObjects().includes(target)){c.setActiveObject(target);c.requestRenderAll();}
+  contextImportSet=hit?.wbImportSet||target?.wbImportSet;
+  const set=importSetMembers(contextImportSet);
+  if (set.length && tools.mode==='select' && set.every(object=>!object.wbPinned)) {
+    c.discardActiveObject();
+    c.setActiveObject(set.length===1?set[0]:new fabric.ActiveSelection(set,{canvas:c}));
+    c.requestRenderAll();
+  } else if(target && !target.wbPinned && !c.getActiveObjects().includes(target)){
+    c.setActiveObject(target);c.requestRenderAll();
+  }
   const active=target?c.getActiveObject():null,menu=$('objectContextMenu');
   menu.setAttribute('aria-label',active?'개체 메뉴':'배경 메뉴');
   menu.querySelectorAll('.context-palette').forEach(palette=>{palette.hidden=!active;});
@@ -828,6 +915,7 @@ function openContext(x,y,target=null,hit=target){
   contextTextTarget=TEXT_TYPES.has(hit?.type)?hit:null;
   $('contextTextProps').hidden=!contextTextTarget;
   $('contextRenameCover').hidden=!active?.wbAnswerCover;
+  $('contextImportSet').hidden=!contextImportSet;
   menu.hidden=false;
   menu.style.left=Math.max(8,Math.min(innerWidth-menu.offsetWidth-8,x))+'px';
   menu.style.top=Math.max(8,Math.min(innerHeight-menu.offsetHeight-8,y))+'px';
@@ -900,7 +988,7 @@ function openModal(id) {closePopups();finishText();modalFocus=document.activeEle
 function closeModal(id) {
   $(id).style.display='none';
   if(id==='confirmModal' && confirmResolver){const resolve=confirmResolver;confirmResolver=null;resolve(false);}
-  if(id==='importLayoutModal' && importLayoutResolver){const resolve=importLayoutResolver;importLayoutResolver=null;resolve(null);}
+  if(id==='importLayoutModal'){editingImportSet=null;$('importSetPreview').hidden=true;}
   if(id==='passwordModal' && passwordResolver){const resolve=passwordResolver;passwordResolver=null;resolve(null);}
   if(modalFocus&&typeof modalFocus.focus==='function')modalFocus.focus();modalFocus=null;
   if(cloudActive())requestCloudRefresh();else applyLocalView().catch(fail);
@@ -1186,6 +1274,11 @@ async function refreshRemote() {
 }
 function wireUI() {
   wireTooltips();
+  $('contextImportSet').onclick=()=>openImportSet(contextImportSet);
+  $('recentImportBtn').onclick=$('recentImportProperties').onclick=()=>openImportSet(session.recentImports?.[current?.id]);
+  $('importSetColumns').onchange=previewImportSet;
+  $('importSetForm').onsubmit=applyImportSet;
+  window.addEventListener('resize',previewImportSet);
   answerCoverTool=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify,isOpen:isCoverOpen,setOpen:setCoverView,onGestureEnd:()=>{
     if (cloudActive()) requestCloudRefresh();
     else refreshRemote().catch(fail);
@@ -1273,8 +1366,14 @@ function wireUI() {
     try{
       target=answerCoverAt(c,e)||c.findTarget(e);
       hit=target?.type==='activeSelection'?c.findTarget(e,true):target;
+      if (!target) {
+        const point=c.getPointer(e);
+        target=c.getObjects().slice().reverse().find(object=>object.wbPinned && object.wbImportSet &&
+          object.containsPoint(point,undefined,true,true));
+        hit=target;
+      }
     }finally{c.skipTargetFind=skip;}
-    if(tools.mode==='select' || !target || target.wbAnswerCover)openContext(e.clientX,e.clientY,target,hit);
+    if(tools.mode==='select' || !target || target.wbAnswerCover || target.wbImportSet)openContext(e.clientX,e.clientY,target,hit);
   });
   surface.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||tools.mode!=='select')return;const target=c.findTarget(e);if(!target)return;pressStart={x:e.clientX,y:e.clientY};pressTimer=setTimeout(()=>{pressTimer=null;suppressNextClick=true;tools.up();openContext(e.clientX,e.clientY,target);},600);});
   surface.addEventListener('pointermove',e=>{if(pressStart&&Math.hypot(e.clientX-pressStart.x,e.clientY-pressStart.y)>9){clearTimeout(pressTimer);pressTimer=null;pressStart=null;}});
@@ -1358,7 +1457,8 @@ function wireUI() {
   document.addEventListener('drop',e=>{
     e.preventDefault();dragDepth=0;$('dropOverlay').hidden=true;const files=Array.from(e.dataTransfer?.files||[]);
     if(!files.length || !allowed())return;
-    run(()=>importFiles(files),'파일을 가져오는 중입니다.');
+    const point=e.target===c.upperCanvasEl?c.getPointer(e):undefined;
+    run(()=>importFiles(files,point),'파일을 가져오는 중입니다.');
   });
   let spaceMode=null;
   document.addEventListener('keydown',e=>{

@@ -1,16 +1,20 @@
-import {SERIAL_PROPS,uid} from './js/constants.js?v=magnetic-cover-1';
-import {validateContent} from './js/validation.js?v=magnetic-cover-1';
+import {SERIAL_PROPS,uid} from './js/constants.js?v=import-sets-1';
+import {validateContent} from './js/validation.js?v=import-sets-1';
 import {isInkSelection} from './js/ink-group.js';
 const utf8To64=s=>{const bytes=new TextEncoder().encode(s);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(raw);};
 const from64=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 const escapeHTML=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function freshIds(obj, inkGroups=new Map()) {
+function freshIds(obj, inkGroups=new Map(),importSets=new Map()) {
   obj.id=uid();
   if(obj.wbInkGroup){
     if(!inkGroups.has(obj.wbInkGroup))inkGroups.set(obj.wbInkGroup,uid());
     obj.wbInkGroup=inkGroups.get(obj.wbInkGroup);
   }
-  obj.objects?.forEach(child=>freshIds(child,inkGroups));
+  if(obj.wbImportSet){
+    if(!importSets.has(obj.wbImportSet)) importSets.set(obj.wbImportSet,uid());
+    obj.wbImportSet=importSets.get(obj.wbImportSet);
+  }
+  obj.objects?.forEach(child=>freshIds(child,inkGroups,importSets));
 }
 function dataURLBlob(url) {const [header,body]=url.split(',');const bytes=Uint8Array.from(atob(body),c=>c.charCodeAt(0));return new Blob([bytes],{type:header.match(/:(.*?);/)[1]});}
 export function parseBoardHTML(html) {
