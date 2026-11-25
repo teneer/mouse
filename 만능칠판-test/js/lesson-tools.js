@@ -1,4 +1,35 @@
-import {loadCanvas} from './previews.js';
+export function coverName(cover) {
+  return cover.wbCoverName || String((cover.canvas?.getObjects().filter(item=>item.wbAnswerCover).indexOf(cover)??-1)+1 || 1);
+}
+
+export function installAnswerCoverDrawing(Rect) {
+  const render=Rect.prototype._render;
+  const shouldCache=Rect.prototype.shouldCache;
+  Rect.prototype.shouldCache=function(){
+    return this.wbAnswerCover ? (this.ownCaching=false) : shouldCache.call(this);
+  };
+  Rect.prototype._render=function(ctx){
+    render.call(this,ctx);
+    if (!this.wbAnswerCover) return;
+    const label=coverName(this);
+    ctx.save();
+    ctx.font='600 14px sans-serif';
+    const left=-this.width/2, bottom=-this.height/2;
+    const width=ctx.measureText(label).width+12;
+    ctx.fillStyle='#375467';
+    ctx.fillRect(left,bottom-21,width,20);
+    ctx.fillStyle='#fff';
+    ctx.textBaseline='middle';
+    ctx.fillText(label,left+6,bottom-11);
+    ctx.restore();
+  };
+}
+
+export function answerCoverAt(canvas,event) {
+  const point=canvas.getPointer(event);
+  const top=canvas.getObjects().slice().reverse().find(obj=>obj.visible && obj.containsPoint(point,undefined,true,true));
+  return top?.wbAnswerCover ? top : null;
+}
 
 export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify}) {
   const surface=canvas.upperCanvasEl;
@@ -18,23 +49,28 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify}) {
     let cover=null;
     if (!armed) {
       if (!['select','pen','marker'].includes(mode())) return;
-      const top=canvas.getObjects().slice().reverse().find(obj=>obj.visible && obj.containsPoint(point,undefined,true,true));
-      if (!top?.wbAnswerCover) return;
-      // The interior stays writable when the answer is visible; tap its outline to cover it again.
-      if (!top.opacity || top.fill==='transparent') {
-        const local=top.toLocalPoint(new fabric.Point(point.x,point.y),'left','top');
-        const margin=8/canvas.getZoom();
-        if (Math.min(local.x,local.y,top.getScaledWidth()-local.x,top.getScaledHeight()-local.y)>margin) return;
-      }
-      cover=top;
+      cover=answerCoverAt(canvas,e);
+      if (!cover) return;
     }
     stop(e);surface.setPointerCapture(e.pointerId);
-    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,point,cover};
+    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,point,cover,left:cover?.left,top:cover?.top};
   },true);
   document.addEventListener('pointermove',e=>{
     if (gesture?.id!==e.pointerId) return;
     stop(e);
-    if (!armed) return;
+    const {cover,point,x,y}=gesture;
+    if (cover) {
+      if (!gesture.moved && Math.hypot(e.clientX-x,e.clientY-y)<5) return;
+      if (!gesture.moved) {
+        canvas.discardActiveObject();
+        canvas.setActiveObject(cover);
+        gesture.moved=true;
+      }
+      const next=canvas.getPointer(e);
+      cover.set({left:gesture.left+next.x-point.x,top:gesture.top+next.y-point.y});
+      cover.setCoords();canvas.requestRenderAll();
+      return;
+    }
     overlay.hidden=false;
     Object.assign(overlay.style,{left:Math.min(e.clientX,gesture.x)+'px',top:Math.min(e.clientY,gesture.y)+'px',
       width:Math.abs(e.clientX-gesture.x)+'px',height:Math.abs(e.clientY-gesture.y)+'px'});
@@ -42,64 +78,29 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify}) {
   document.addEventListener('pointerup',e=>{
     if (gesture?.id!==e.pointerId) return;
     stop(e);
-    const {cover,point,x,y}=gesture;
+    const {cover,point,x,y,moved}=gesture;
     reset();
     if (!allowed()) return;
     if (cover) {
-      if (Math.hypot(x-e.clientX,y-e.clientY)>8) return;
-      cover.set('fill',cover.fill==='transparent'?'#375467':'transparent');
+      if (!moved) cover.set({fill:cover.fill==='transparent'?'#375467':'transparent',strokeWidth:1});
     } else {
       if (Math.abs(e.clientX-x)<5 || Math.abs(e.clientY-y)<5) return;
       const end=canvas.getPointer(e);
-      canvas.add(new fabric.Rect({id:uid(),wbAnswerCover:true,left:Math.min(point.x,end.x),top:Math.min(point.y,end.y),
-        width:Math.abs(end.x-point.x),height:Math.abs(end.y-point.y),fill:'#375467',stroke:'#86b0c7',strokeWidth:2}));
+      const names=new Set(canvas.getObjects().filter(obj=>obj.wbAnswerCover).map(coverName));
+      let number=canvas.getObjects().filter(obj=>obj.wbAnswerCover).length+1;
+      while(names.has(String(number))) number++;
+      canvas.add(new fabric.Rect({id:uid(),wbAnswerCover:true,wbCoverName:String(number),left:Math.min(point.x,end.x),top:Math.min(point.y,end.y),
+        width:Math.abs(end.x-point.x),height:Math.abs(end.y-point.y),fill:'#375467',stroke:'#86b0c7',strokeWidth:1}));
     }
     canvas.requestRenderAll();changed();
   },true);
-  document.addEventListener('pointercancel',e=>{if (gesture?.id===e.pointerId) reset();},true);
+  document.addEventListener('pointercancel',e=>{
+    if (gesture?.id!==e.pointerId) return;
+    if (gesture.moved) {
+      gesture.cover.set({left:gesture.left,top:gesture.top});
+      gesture.cover.setCoords();canvas.requestRenderAll();
+    }
+    reset();
+  },true);
   return ()=>{armed=true;surface.classList.add('drawing-cover');notify('가릴 영역을 드래그하세요.');};
-}
-
-export function wireLessonPreview({board,settle,send}) {
-  const dialog=document.getElementById('lesson-preview'),surface=dialog.querySelector('canvas');
-  let preview,pageId,ratio,start,version=0;
-  const sendButton=dialog.querySelector('[data-send]');
-  const draw=()=>preview.requestRenderAll();
-  const zoom=factor=>{
-    const value=Math.min(10*ratio,Math.max(.1*ratio,preview.getZoom()*factor));
-    preview.zoomToPoint(new fabric.Point(preview.width/2,preview.height/2),value);draw();
-  };
-  dialog.querySelector('[data-minus]').onclick=()=>zoom(1/1.2);
-  dialog.querySelector('[data-plus]').onclick=()=>zoom(1.2);
-  dialog.querySelector('[data-close-preview]').onclick=()=>dialog.close();
-  surface.onpointerdown=e=>{surface.setPointerCapture(e.pointerId);start=[e.clientX,e.clientY];};
-  surface.onpointermove=e=>{
-    if (!start || !preview) return;
-    const scale=preview.width/surface.getBoundingClientRect().width;
-    preview.relativePan(new fabric.Point((e.clientX-start[0])*scale,(e.clientY-start[1])*scale));
-    start=[e.clientX,e.clientY];draw();
-  };
-  surface.onpointerup=surface.onpointercancel=()=>{start=null;};
-  sendButton.onclick=()=>{
-    const view=preview.viewportTransform.map(n=>n/ratio);
-    dialog.close();send(pageId,view);
-  };
-  dialog.onclose=()=>{version++;start=null;preview?.dispose();preview=null;};
-  return async (page,view)=>{
-    const current=++version;
-    pageId=page.id;sendButton.disabled=true;
-    dialog.showModal();
-    const width=Math.max(1,Math.min(840,innerWidth-50,(innerHeight*.65)*board.width/board.height));
-    ratio=width/board.width;
-    preview=new fabric.StaticCanvas(surface,{width,height:board.height*ratio,enableRetinaScaling:false});
-    const canvas=preview;
-    try {
-      await loadCanvas(canvas,page.content.canvas);
-      if (current!==version) return;
-      const frame=page.content.frame;
-      const origin=view||[1,0,0,1,board.width/2-frame.cx,board.height/2-frame.cy];
-      canvas.setViewportTransform(origin.map(n=>n*ratio));await settle(canvas);
-      if (current===version) {draw();sendButton.disabled=false;}
-    } catch(error) {if(current===version){dialog.close();throw error;}}
-  };
 }

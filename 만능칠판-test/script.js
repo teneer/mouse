@@ -1,13 +1,13 @@
-import {wireAnswerCover,wireLessonPreview} from './js/lesson-tools.js';
+import {answerCoverAt,coverName,installAnswerCoverDrawing,wireAnswerCover} from './js/lesson-tools.js?v=answer-cover-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=pursuit-manager-1';
-import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
+import {setBoardIcon} from './js/board-icons.js?v=answer-cover-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
-import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=pursuit-manager-1';
+import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=answer-cover-1';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
-import {SystemClipboard} from './clipboard.js?v=pursuit-manager-1';
+import {SystemClipboard} from './clipboard.js?v=answer-cover-1';
 import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
@@ -16,7 +16,7 @@ import {CloudBoard} from './js/cloud.js?v=pursuit-manager-1';
 import {wireScoreSync} from './js/score-sync.js?v=pursuit-manager-1';
 import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=pursuit-manager-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
-import {validateContent} from './js/validation.js?v=pursuit-manager-1';
+import {validateContent} from './js/validation.js?v=answer-cover-1';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
 import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
@@ -50,7 +50,7 @@ function updateFeedbackPosition(){
 }
 function fail(error) {console.error(error);notify(error?.message || String(error));}
 let tabViews, scoreFull=false;
-function modalOpen() {return !!document.querySelector('#lesson-preview[open]') || document.body.classList.contains('score-modal-open') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
+function modalOpen() {return document.body.classList.contains('score-modal-open') || Array.from(document.querySelectorAll('.modal')).some(m=>m.style.display==='flex');}
 function isTextEditing() {
   return !!c?.getActiveObject()?.isEditing;
 }
@@ -300,7 +300,6 @@ async function deletePageTile(id,title){
     else renderPages();
   });
 }
-let openLessonPreview;
 function renderPageTiles() {
   const generation=++pageListGeneration;
   const grid=$('pageTiles');
@@ -331,10 +330,6 @@ function renderPageTiles() {
       const button=document.createElement('button');button.type='button';button.className='action-btn';
       button.textContent=label;button.onclick=handler;button.disabled=disabled;actions.append(button);
     }
-    addAction('교사용 미리보기',()=>{
-      closePopups();
-      openLessonPreview(page.id===current.id?current:page,session.views[page.id]).catch(fail);
-    });
     addAction('이름 편집',()=>openPageRename(page,index));
     addAction('페이지 복제',()=>run(async()=>{
       await flush();
@@ -752,7 +747,7 @@ function saveTextProps(event){
 function layerToEdge(front){if(!allowed()||isTextEditing())return;const selection=c.getActiveObjects();if(!selection.length)return;const all=c.getObjects(),pinned=all.filter(o=>o.wbPinned),next=[...pinned,...orderedToEdge(all.filter(o=>!o.wbPinned),selection,front)];if(next.every((o,i)=>o===all[i]))return;next.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();changed();}
 function closeContext(){const menu=$('objectContextMenu');if(menu)menu.hidden=true;}
 function openContext(x,y,target=null,hit=target){
-  if(!allowed()||isTextEditing()||(target && tools.mode!=='select'))return;
+  if(!allowed()||isTextEditing()||(target && !target.wbAnswerCover && tools.mode!=='select'))return;
   closePopups();
   if(target && !c.getActiveObjects().includes(target)){c.setActiveObject(target);c.requestRenderAll();}
   const active=target?c.getActiveObject():null,menu=$('objectContextMenu');
@@ -765,6 +760,7 @@ function openContext(x,y,target=null,hit=target){
   $('contextFront').hidden=$('contextBack').hidden=!active;
   contextTextTarget=TEXT_TYPES.has(hit?.type)?hit:null;
   $('contextTextProps').hidden=!contextTextTarget;
+  $('contextRenameCover').hidden=!active?.wbAnswerCover;
   menu.hidden=false;
   menu.style.left=Math.max(8,Math.min(innerWidth-menu.offsetWidth-8,x))+'px';
   menu.style.top=Math.max(8,Math.min(innerHeight-menu.offsetHeight-8,y))+'px';
@@ -1110,14 +1106,24 @@ async function refreshRemote() {
 function wireUI() {
   const armCover=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify});
   $('contextAnswerCover').onclick=()=>{closeContext();armCover();};
-  openLessonPreview=wireLessonPreview({board:c,settle:canvas=>boardFiles.settlePreview(canvas),send:(id,view)=>run(async()=>{
-    const targets=await tabViews.selectedTargets();
-    if (!targets.length) {notify('화면 동기화에서 교실 탭을 선택하세요.');return;}
-    await activatePage(id);
-    clearTimeout(viewTimer);
-    c.setViewportTransform(view);c.requestRenderAll();rememberView();
-    await publishView(true,viewState()?.targets ? undefined : ()=>targets);
-  })});
+  let renameCover;
+  $('contextRenameCover').onclick=()=>{
+    const cover=c.getActiveObject();
+    if (!cover?.wbAnswerCover) return;
+    closeContext();
+    renameCover=cover;
+    $('answerCoverName').value=coverName(cover);
+    openModal('answerCoverRenameModal');
+    $('answerCoverName').select();
+  };
+  $('answerCoverRenameForm').onsubmit=event=>{
+    event.preventDefault();
+    const name=$('answerCoverName').value.trim();
+    if (!name || !c.getObjects().includes(renameCover)) return;
+    renameCover.set('wbCoverName',name);
+    closeModal('answerCoverRenameModal');
+    c.requestRenderAll();changed();
+  };
   document.querySelectorAll('[data-popup]').forEach(b=>b.onclick=()=>{
     const mode=b.dataset.toolMode;
     if(mode && allowed()){finishText();tools.setMode(mode);}
@@ -1166,10 +1172,10 @@ function wireUI() {
     let target;
         let hit;
     try{
-      target=c.findTarget(e);
+      target=answerCoverAt(c,e)||c.findTarget(e);
       hit=target?.type==='activeSelection'?c.findTarget(e,true):target;
     }finally{c.skipTargetFind=skip;}
-    if(tools.mode==='select' || !target)openContext(e.clientX,e.clientY,target,hit);
+    if(tools.mode==='select' || !target || target.wbAnswerCover)openContext(e.clientX,e.clientY,target,hit);
   });
   surface.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||tools.mode!=='select')return;const target=c.findTarget(e);if(!target)return;pressStart={x:e.clientX,y:e.clientY};pressTimer=setTimeout(()=>{pressTimer=null;suppressNextClick=true;tools.up();openContext(e.clientX,e.clientY,target);},600);});
   surface.addEventListener('pointermove',e=>{if(pressStart&&Math.hypot(e.clientX-pressStart.x,e.clientY-pressStart.y)>9){clearTimeout(pressTimer);pressTimer=null;pressStart=null;}});
@@ -1386,6 +1392,7 @@ function setupIntegratedScorePanel(){
 async function boot() {
   if(!window.fabric)throw Error('캔버스 라이브러리를 불러오지 못했습니다. 인터넷 연결 또는 CDN 차단 여부를 확인하고 새로고침해주세요.');
   installTextBoxBorder(fabric);
+  installAnswerCoverDrawing(fabric.Rect);
   for(const element of document.querySelectorAll('[data-board-icon]'))setBoardIcon(element,element.dataset.boardIcon);
   c=new fabric.Canvas('whiteboardCanvas',{width:boardViewportWidth(),height:boardViewportHeight(),preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true,enablePointerEvents:true});
   fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});

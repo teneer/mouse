@@ -6,7 +6,7 @@ const icons = {
   devices:'📲', files:'🗂️', 'fixed-objects':'📌', 'pin-object':'📍',
   group:'🔗', ungroup:'⛓️‍💥', front:'⬆️', back:'⬇️',
   book:'📖', palette:'🎨', 'text-settings':'⚙️',
-  'backup-down':'📤', 'backup-up':'📥', history:'🕘'
+  'backup-down':'📤', 'backup-up':'📥', history:'🕘', 'answer-cover':'🪟'
 };
 
 export function setBoardIcon(element,name) {

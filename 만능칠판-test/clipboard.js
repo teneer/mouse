@@ -1,5 +1,5 @@
-import {SERIAL_PROPS,uid} from './js/constants.js?v=activities-1';
-import {validateContent} from './js/validation.js?v=activities-1';
+import {SERIAL_PROPS,uid} from './js/constants.js?v=answer-cover-1';
+import {validateContent} from './js/validation.js?v=answer-cover-1';
 import {isInkSelection} from './js/ink-group.js';
 const utf8To64=s=>{const bytes=new TextEncoder().encode(s);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(raw);};
 const from64=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
