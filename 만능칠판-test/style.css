@@ -669,8 +669,9 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 #toolbar #viewSync[aria-pressed="true"] {background:#dceeff;border-color:#5a8dee;color:#164e83}
 #toolbar #viewSyncTrigger {min-width:26px;padding:0 6px;border-left:0;border-radius:0 6px 6px 0}
 #viewSyncHint {position:fixed;z-index:2000;max-width:calc(100vw - 8px);padding:5px 9px;border-radius:6px;background:#173f50;color:white;font-size:13px;pointer-events:none}
-#pageList {max-width:min(90vw, 550px)}
-#pageTiles {display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;width:min(76vw, 490px);max-height:55vh;overflow:auto}
+#pageList {width:min(calc(100vw - 16px),var(--page-list-width,350px));max-width:none}
+#pageTiles {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,96px),1fr));gap:8px;max-height:72dvh;overflow:auto;padding-bottom:4px}
+@media (max-width:520px) {#pageTiles {grid-template-columns:repeat(auto-fill,minmax(min(100%,78px),1fr))}}
 .page-tile {display:grid;gap:4px;place-items:center;background:#f4f7fa;border:1px solid #afc3d6;border-radius:8px;padding:4px;cursor:pointer}
 .page-tile[aria-current=true],.page-tile.reordering {outline:2px solid #1862ad;outline-offset:-2px}
 .page-tile img,.page-tile-preview {display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#e4eaf0;border-radius:3px}
@@ -695,8 +696,6 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 #pageNameInput {display:block;width:100%;box-sizing:border-box;margin-top:6px}
 .history-group .icon-only {font-size:1.35em}
 
-#pageList {max-width:min(92vw, 360px)}
-#pageTiles {grid-template-columns:repeat(auto-fill,minmax(72px,1fr));width:min(73vw, 320px);padding-bottom:4px}
 .page-tile-wrap .page-tile {padding-top:23px;font-size:12px}
 .page-tile-menu > button {min-width:28px;min-height:22px;line-height:22px}
 .page-tile-actions:popover-open {display:grid;position:fixed;inset:auto;margin:0;padding:4px;gap:2px;border:1px solid #cbdce3;background:#fff;border-radius:8px;box-shadow:0 4px 14px #12344724}

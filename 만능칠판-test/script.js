@@ -364,6 +364,8 @@ async function deletePageTile(id,title){
 function renderPageTiles() {
   const generation=++pageListGeneration;
   const grid=$('pageTiles');
+  const tileCount=pages.length+Number(pages.length<MAX_PAGES);
+  $('pageList').style.setProperty('--page-list-width',Math.min(1080,Math.max(350,Math.ceil(tileCount/2)*116))+'px');
   closePageActions();grid.replaceChildren();
   for(const [index,page] of pages.entries()){
     const wrap=document.createElement('div');wrap.className='page-tile-wrap';
