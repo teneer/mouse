@@ -415,7 +415,14 @@ function renderActivities() {
     if (kind==='class') document.querySelector('.main-scoreboard').classList.toggle('pursuit-behind',!!rule?.enabled && count<limit);
     else teams.forEach((team,i)=>{
       const card=scoreboard.children[i];
-      card?.classList.toggle('pursuit-behind',!!rule?.enabled && team.score<limit);
+      if (!card) return;
+      const behind=!!rule?.enabled && team.score<limit;
+      const warning=card.querySelector('.team-pursuit-warning');
+      const select=card.querySelector('.team-select-btn');
+      card.classList.toggle('pursuit-behind',behind);
+      warning.hidden=!behind;
+      if (behind) select.setAttribute('aria-describedby',warning.id);
+      else select.removeAttribute('aria-describedby');
     });
   }
 }
@@ -689,7 +696,12 @@ function renderTeams() {
     goalUI.giftGroup(gifts,team.id);
     const scoreLine = document.createElement('div');
     scoreLine.className = 'team-score-line';
-    title.append(nameSpan,gifts);
+    const warning=document.createElement('span');
+    warning.className='team-pursuit-warning';
+    warning.id=`team-pursuit-warning-${idx}`;
+    warning.hidden=true;
+    warning.innerHTML='<span aria-hidden="true">⚠</span><span class="team-pursuit-label">추격 중</span>';
+    title.append(warning,nameSpan,gifts);
     card.appendChild(title);
     scoreLine.appendChild(numberSpan);
     const controls = document.createElement('div');
