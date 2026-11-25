@@ -4,6 +4,7 @@ const tabKey=storageKey+':tab';
 // Browsers release the lock if its tab closes. Only successful playback claims the sound.
 export async function playScoreSoundOnce(eventKey,src,play) {
   if (!eventKey) return play();
+  if (document.hidden) await new Promise(resolve=>setTimeout(resolve,250));
   const historyKey='whiteboard.score-sounds:'+src;
   const claim=async()=>{
     let recent=[];
@@ -50,6 +51,11 @@ export function wireScoreAudio() {
     if (!sound || settings.muted || settings.volume===0) return;
     const element=sound.cloneNode();
     const volume=settings.volume/100*scale;
+    async function startPlayback() {
+      // Chrome can defer play() indefinitely in a background tab.
+      const timeout=setTimeout(()=>element.pause(),2000);
+      try {await element.play();} finally {clearTimeout(timeout);}
+    }
     try {
       const audio=audioContext();
       if (audio) {
@@ -66,14 +72,14 @@ export function wireScoreAudio() {
         const cleanup=()=>{source.disconnect();gain.disconnect();limiter.disconnect();};
         element.addEventListener('ended',cleanup,{once:true});
         element.addEventListener('error',cleanup,{once:true});
-        try {await playScoreSoundOnce(eventKey,sound.src,()=>element.play());} finally {
+        try {await playScoreSoundOnce(eventKey,sound.src,startPlayback);} finally {
           if (element.paused) cleanup();
         }
       } else {
         element.volume=Math.min(1,volume);
-        await playScoreSoundOnce(eventKey,sound.src,()=>element.play());
+        await playScoreSoundOnce(eventKey,sound.src,startPlayback);
       }
       unlock.hidden=true;
-    } catch (error) {if (error.name==='NotAllowedError') unlock.hidden=false;else console.warn(error);}
+    } catch (error) {if (error.name==='NotAllowedError') unlock.hidden=false;else if (error.name!=='AbortError') console.warn(error);}
   };
 }

@@ -1,7 +1,7 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=toolbar-goals-1';
-import {wireGoals} from './goals-ui.js?v=device-audio-1';
-import {wireScoreAudio} from './score-audio.js?v=device-audio-1';
+import {wireGoals} from './goals-ui.js?v=device-audio-2';
+import {wireScoreAudio} from './score-audio.js?v=device-audio-2';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
