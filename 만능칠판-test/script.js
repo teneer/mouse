@@ -25,7 +25,7 @@ const $=id=>document.getElementById(id);
 let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
 let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,passwordResolver=null;
 const history=new PageHistory(),knownVersions=new Map();
-const MAX_PAGES=10;
+const MAX_PAGES=20;
 function readPreference(key) {try{return JSON.parse(localStorage.getItem(key));}catch{return null;}}
 function writePreference(key,value) {try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
 const isColor=value=>typeof value==='string' && /^#[0-9a-f]{6}$/i.test(value);
@@ -292,7 +292,6 @@ function displayPageTitle(page,index) {
   return pageTitle(page?.title) || `페이지 ${index+1}`;
 }
 function renderPages() {
-  pages=pages.slice(0,MAX_PAGES);
   const activeIndex=pages.findIndex(page=>page.id===current?.id);
   $('previousPageBtn').disabled=activeIndex<=0;
   $('nextPageBtn').disabled=activeIndex<0 || activeIndex>=pages.length-1;
@@ -1083,7 +1082,7 @@ async function importBackup(file) {
   if(input.format!=='whiteboard-pages'||input.schema!==2||!Array.isArray(input.pages)||!Array.isArray(input.screens))throw Error('만능칠판 2.0 백업 파일이 아닙니다.');
   if(input.pages.length+input.screens.length>1000)throw Error('백업 항목은 1,000개까지 한 번에 가져올 수 있습니다.');
   const now=Date.now();
-  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:`페이지 ${Math.min(MAX_PAGES,i+1)}`,title:pageTitle(p.title)||undefined,content,version:1,order:now+i,createdAt:now,updatedAt:now};});
+  const imported=input.pages.map((p,i)=>{const content=validateContent(p.content);reidentify(content.canvas);return {id:uid(),name:`페이지 ${i+1}`,title:pageTitle(p.title)||undefined,content,version:1,order:now+i,createdAt:now,updatedAt:now};});
   const screens=[];
   for(const s of input.screens) {
     const content=validateContent(s.content);
@@ -1098,7 +1097,7 @@ async function importBackup(file) {
   await store.appendBackup(cloudActive()?[]:imported,screens,assets);
   assets.forEach(asset=>boardFiles.invalidate(asset.id));
   if(imported.length && cloudActive())await cloud.enqueue({kind:'add',pages:await Promise.all(imported.map(prepareCloudPage))});
-  sync.notify();pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
+  sync.notify();pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();pages.forEach((p,i)=>p.name=`페이지 ${i+1}`);
   if(imported.length)await setPage(pages.find(page=>page.id===imported[0].id),true,false);else renderPages();
   notify(`페이지 ${imported.length}개와 저장 화면 ${screens.length}개를 추가했습니다. 기존 데이터는 유지했습니다.`);
 }
@@ -1116,7 +1115,7 @@ async function importLegacy() {
   }
   await flush();await store.appendBackup(cloudActive()?[]:imported,screens);
   if(imported.length && cloudActive())await cloud.enqueue({kind:'add',pages:await Promise.all(imported.map(prepareCloudPage))});
-  await store.setMeta('legacyImported',true);sync.notify();pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
+  await store.setMeta('legacyImported',true);sync.notify();pages=cloudActive()?boardPages(cloud.projected()):await store.listPages();pages.forEach((p,i)=>p.name=`페이지 ${i+1}`);
   if(imported.length)await setPage(pages.find(page=>page.id===imported[0].id),true,false);else renderPages();
   notify(`이전 자동저장 ${imported.length}개와 저장 화면 ${screens.length}개를 가져왔습니다. 원본 데이터는 유지했습니다.`);
 }
@@ -1624,7 +1623,7 @@ async function boot() {
   }});
   store=new BoardStore();await store.open();
   boardFiles=new BoardFiles(store);boardFiles.installFabric();
-  await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
+  await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.forEach((p,i)=>p.name=`페이지 ${i+1}`);
   const tabIdentity=await acquireTabIdentity(SESSION_KEY+':identity');
   $('scoreFrame').dataset.tabId=tabIdentity.id;
   sync=new TabSync(tabIdentity,refreshRemote,view=>{
