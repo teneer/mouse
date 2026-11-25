@@ -445,6 +445,7 @@ function renderPageTiles() {
   const generation=++pageListGeneration;
   const grid=$('pageTiles');
   const tileCount=pages.length+Number(pages.length<MAX_PAGES);
+  $('pageListTotal').textContent=pages.length+'쪽';
   $('pageList').style.setProperty('--page-list-width',Math.min(1080,Math.max(350,Math.ceil(tileCount/2)*116))+'px');
   closePageActions();grid.replaceChildren();
   for(const [index,page] of pages.entries()){
@@ -1066,7 +1067,7 @@ function updateToolbarLayout() {
 function togglePopup(id,button) {
   if(busy)return;
   const was=openedPopup===id;closePopups();if(was)return;
-  const p=$(id);p.style.display='block';openedPopup=id;button.setAttribute('aria-expanded','true');
+  const p=$(id);p.style.display=id==='pageList'?'flex':'block';openedPopup=id;button.setAttribute('aria-expanded','true');
   if(id==='pageList'){
     $('pageJumpNumber').value='';
     $('pageJumpNumber').placeholder=pages.length>1?'1–'+pages.length:'1';
