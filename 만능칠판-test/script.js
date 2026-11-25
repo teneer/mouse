@@ -1,4 +1,4 @@
-import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-hit-1';
+import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-transform-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
@@ -254,7 +254,7 @@ async function run(fn,label='처리 중입니다.') {
   finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
 }
 async function setPage(page,reset=false,keepView=true) {
-  rememberView();const previous=current?clone(current):null;
+  rememberView();c.discardActiveObject();const previous=current?clone(current):null;
   current=clone(page);cloudBase=cloudActive()?clone(page.content):null;dirty=false;
   try {await loadCanvas(c,current.content.canvas);await checkFiles(current.content);}catch(error){
     current=previous;cloudBase=cloudActive()?previous?.content:null;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
@@ -698,7 +698,11 @@ function pinSelection() {
   const objects=c.getActiveObjects().slice();
   if(!objects.length)return;
   c.discardActiveObject();
+  const ids=new Set(objects.map(object=>object.id));
   objects.forEach(object=>{object.wbPinned=true;});
+  for (const cover of answerCovers()) {
+    if (ids.has(cover.wbCoverAnchor) || ids.has(cover.id)) delete cover.wbCoverAnchor;
+  }
   orderPinnedObjects();updateFileInteraction();c.requestRenderAll();changed();
 }
 function openBackgroundSettings() {
@@ -1072,7 +1076,7 @@ async function refreshCloud() {
     try{finishText();}finally{cancelledText=false;}
     notify('다른 기기에서 페이지를 삭제하여 편집을 취소했습니다.');
   }
-  if(busy || saving || tools.gesture || historyBusy || (dirty && !remote?.deleted) || (editing && !cloudBase) || (modalOpen() && cloudBase && !remote?.deleted)){
+  if(busy || saving || tools.gesture || answerCoverTool?.dragging || historyBusy || (dirty && !remote?.deleted) || (editing && !cloudBase) || (modalOpen() && cloudBase && !remote?.deleted)){
     requestCloudRefresh(150);return;
   }
   cloudRefresh=true;
@@ -1094,7 +1098,7 @@ async function refreshCloud() {
         const patch=pagePatch(cloudBase,merged);
         const incoming=patch?.objects.filter(([,object])=>object).map(([,object])=>object)||[];
         const objects=await new Promise(resolve=>fabric.util.enlivenObjects(incoming,resolve));
-        if(!isTextEditing() || c.getActiveObject()!==edit || busy || saving || dirty || tools.gesture){requestCloudRefresh();return;}
+        if(!isTextEditing() || c.getActiveObject()!==edit || busy || saving || dirty || tools.gesture || answerCoverTool?.dragging){requestCloudRefresh();return;}
         for(const [id] of patch?.objects||[]){
           const existing=c.getObjects().find(object=>object.id===id && !protectedObjects.has(object));
           if(existing)c.remove(existing);
@@ -1149,7 +1153,7 @@ function restoreLocalView(){
 }
 async function applyLocalView(){
   const view=localView;
-  if(!current || cloudActive() || !activeView(view,sync.id) || seenView===view || applyingView || dirty || saving || busy || modalOpen() || tools.gesture || isTextEditing())return;
+  if(!current || cloudActive() || !activeView(view,sync.id) || seenView===view || applyingView || dirty || saving || busy || modalOpen() || tools.gesture || answerCoverTool?.dragging || isTextEditing())return;
   if(!pages.some(page=>page.id===view.pageId))return;
   seenView=view;applyingView=true;
   try{
@@ -1159,19 +1163,19 @@ async function applyLocalView(){
   }finally{applyingView=false;if(view!==localView)queueMicrotask(()=>applyLocalView().catch(fail));}
 }
 async function refreshRemote() {
-  if (cloud?.options && !cloud.detaching && !cloud.pulling && !cloud.pushing && !busy && !dirty && !saving && !tools?.gesture && !isTextEditing()) {
+  if (cloud?.options && !cloud.detaching && !cloud.pulling && !cloud.pushing && !busy && !dirty && !saving && !tools?.gesture && !answerCoverTool?.dragging && !isTextEditing()) {
     const options = cloud.options;
     const connected = await store.getMeta('cloudConnection');
-    if (cloud.options === options && !connected && !cloud.detaching) {
+    if (cloud.options === options && !connected && !cloud.detaching && !answerCoverTool?.dragging) {
       cloud.clearConnection();
       await reloadLocalAfterDisconnect();
     }
   }
-  if(cloud?.options || syncing || busy || dirty || saving || tools?.gesture || isTextEditing() || modalOpen() || !current)return;
+  if(cloud?.options || syncing || busy || dirty || saving || tools?.gesture || answerCoverTool?.dragging || isTextEditing() || modalOpen() || !current)return;
   syncing=true;
   try {
     const all=await store.listPages();
-    if(busy || dirty || saving || tools.gesture || isTextEditing() || modalOpen())return;
+    if(busy || dirty || saving || tools.gesture || answerCoverTool?.dragging || isTextEditing() || modalOpen())return;
     pages=all;const remote=all.find(p=>p.id===current.id);
     if(!remote || remote.version!==current.version) {
       await run(async()=>{
@@ -1186,7 +1190,10 @@ async function refreshRemote() {
   await applyLocalView();
 }
 function wireUI() {
-  answerCoverTool=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify,isOpen:isCoverOpen,setOpen:setCoverView});
+  answerCoverTool=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify,isOpen:isCoverOpen,setOpen:setCoverView,onGestureEnd:()=>{
+    if (cloudActive()) requestCloudRefresh();
+    else refreshRemote().catch(fail);
+  }});
   $('contextAnswerCover').onclick=()=>{closeContext();answerCoverTool.activate();};
   $('answerCoverTool').onclick=()=>answerCoverTool.toggle();
   $('answerCoverSync').onchange=event=>{

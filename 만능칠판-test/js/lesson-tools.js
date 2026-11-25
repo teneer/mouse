@@ -36,7 +36,7 @@ function findCoverAnchor(canvas,bounds) {
   const scratch=document.createElement('canvas');
   const ctx=scratch.getContext('2d',{willReadFrequently:true});
   for (const object of canvas.getObjects().slice().reverse()) {
-    if (!object.id || object.wbAnswerCover || !object.visible || object.opacity===0) continue;
+    if (!object.id || object.wbAnswerCover || object.wbPinned || !object.visible || object.opacity===0) continue;
     const box=object.shadow?bounds:object.getBoundingRect(true,true);
     const left=Math.max(bounds.left,box.left),top=Math.max(bounds.top,box.top);
     const width=Math.min(bounds.left+bounds.width,box.left+box.width)-left;
@@ -66,14 +66,23 @@ function findCoverAnchor(canvas,bounds) {
   return null;
 }
 
-export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,setOpen}) {
+export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,setOpen,onGestureEnd}) {
   const surface=canvas.upperCanvasEl;
   let armed=false,gesture=null;
   const overlay=document.createElement('div');
   overlay.className='cover-rectangle';overlay.hidden=true;document.body.append(overlay);
   function reset() {gesture=null;overlay.hidden=true;}
+  function cancelGesture() {
+    if (!gesture) return;
+    const {cover,left,top,moved}=gesture;
+    if (moved) {
+      cover.set({left,top});
+      cover.setCoords();canvas.requestRenderAll();
+    }
+    reset();onGestureEnd();
+  }
   function setArmed(value) {
-    reset();
+    cancelGesture();
     armed=value;
     surface.classList.toggle('drawing-cover',value);
     document.getElementById('answerCoverTool').setAttribute('aria-pressed',String(value));
@@ -83,13 +92,14 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,s
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setArmed(false);});
   document.addEventListener('pointerdown',e=>{
     if (e.target!==surface) return;
-    if (!allowed() || e.button!==0 || !e.isPrimary) return;
+    if (!allowed() || e.button!==0 || !e.isPrimary || gesture) return;
+    if (!armed && mode()==='select' && canvas.getActiveObject()?._findTargetCorner(canvas.getPointer(e,true),e.pointerType==='touch')) return;
     const point=canvas.getPointer(e);
     let cover=null;
     if (!armed) {
       if (!['select','pen','marker'].includes(mode())) return;
       cover=answerCoverAt(canvas,e);
-      if (!cover) return;
+      if (!cover || e.shiftKey && mode()==='select') return;
     }
     stop(e);surface.setPointerCapture(e.pointerId);
     gesture={id:e.pointerId,x:e.clientX,y:e.clientY,point,cover,left:cover?.left,top:cover?.top};
@@ -119,7 +129,9 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,s
     stop(e);
     const {cover,point,x,y,moved}=gesture;
     reset();
+    queueMicrotask(onGestureEnd);
     if (!allowed()) return;
+    if (cover && !canvas.getObjects().includes(cover)) return;
     if (cover) {
       if (!moved) {setOpen([cover],!isOpen(cover));return;}
       cover.set('wbCoverAnchor',findCoverAnchor(canvas,cover.getBoundingRect(true,true))?.id);
@@ -138,14 +150,9 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,s
     canvas.requestRenderAll();changed();
   },true);
   document.addEventListener('pointercancel',e=>{
-    if (gesture?.id!==e.pointerId) return;
-    if (gesture.moved) {
-      gesture.cover.set({left:gesture.left,top:gesture.top});
-      gesture.cover.setCoords();canvas.requestRenderAll();
-    }
-    reset();
+    if (gesture?.id===e.pointerId) cancelGesture();
   },true);
-  return {activate:()=>setArmed(true),toggle:()=>setArmed(!armed),deactivate:()=>{if (armed) setArmed(false);}};
+  return {get dragging(){return !!gesture;},activate:()=>setArmed(true),toggle:()=>setArmed(!armed),deactivate:()=>{if (armed) setArmed(false);}};
 }
 
 export function keepCoversAboveAnchors(canvas) {
@@ -153,18 +160,20 @@ export function keepCoversAboveAnchors(canvas) {
   for (const cover of objects) {
     if (!cover.wbCoverAnchor) continue;
     const stack=canvas.getObjects();
-    const index=stack.findIndex(obj=>obj.id===cover.wbCoverAnchor);
+    const index=stack.findIndex(obj=>obj.id===cover.wbCoverAnchor && !obj.wbPinned);
+    if (index<0) continue;
     if (index>stack.indexOf(cover)) canvas.moveTo(cover,index);
   }
 }
 
 export function wireCoverAnchors(canvas) {
-  let movers=[];
+  const util=fabric.util;
+  let movers=[], passive=[], normalizing=false;
   function follow() {
-    for (const entry of movers) {
-      const [, , , , x,y]=entry.anchor.calcTransformMatrix();
-      for (const {cover,left,top} of entry.covers) {
-        cover.set({left:left+x-entry.x,top:top+y-entry.y});
+    for (const {anchor,inverse,covers} of movers) {
+      const delta=util.multiplyTransformMatrices(anchor.calcTransformMatrix(),inverse);
+      for (const {cover,matrix} of covers) {
+        util.applyTransformToObject(cover,util.multiplyTransformMatrices(delta,matrix));
         cover.setCoords();
       }
     }
@@ -172,16 +181,59 @@ export function wireCoverAnchors(canvas) {
   canvas.on('before:transform',({transform})=>{
     const selected=transform.target.type==='activeSelection'?transform.target.getObjects():[transform.target];
     const chosen=new Set(selected);
-    movers=selected.filter(anchor=>anchor.id && !anchor.wbAnswerCover).map(anchor=>{
-      const [, , , , x,y]=anchor.calcTransformMatrix();
-      const covers=canvas.getObjects().filter(cover=>cover.wbCoverAnchor===anchor.id && !chosen.has(cover))
-        .map(cover=>({cover,left:cover.left,top:cover.top}));
-      return {anchor,x,y,covers};
-    });
+    movers=selected.filter(anchor=>anchor.id && !anchor.wbAnswerCover && !anchor.wbPinned).map(anchor=>({
+      anchor,inverse:util.invertTransform(anchor.calcTransformMatrix()),
+      covers:canvas.getObjects().filter(cover=>cover.wbCoverAnchor===anchor.id && !chosen.has(cover))
+        .map(cover=>({cover,matrix:cover.calcTransformMatrix()}))
+    }));
   });
-  canvas.on('object:moving',follow);
-  canvas.on('object:modified',({action})=>{
-    if (action==='drag') follow();
-    movers=[];
+  for (const event of ['object:moving','object:scaling','object:rotating','object:skewing']) canvas.on(event,follow);
+  canvas.on('object:modified',()=>{follow();movers=[];});
+  canvas.on('mouse:up',()=>{movers=[];});
+
+  function setSelection(objects) {
+    normalizing=true;
+    try {
+      canvas.discardActiveObject();
+      if (objects.length) canvas.setActiveObject(objects.length===1?objects[0]:new fabric.ActiveSelection(objects,{canvas}));
+    } finally {normalizing=false;}
+    canvas.requestRenderAll();
+  }
+  function reconcileSelection(event) {
+    if (normalizing) return;
+    const active=canvas.getActiveObject();
+    const deselected=new Set((event.deselected||[]).map(object=>object.id));
+    queueMicrotask(()=>{
+      if (active!==canvas.getActiveObject()) return;
+      const selected=canvas.getActiveObjects(),ids=new Set(selected.map(object=>object.id));
+      const attached=selected.filter(cover=>cover.wbAnswerCover && ids.has(cover.wbCoverAnchor));
+      const promoted=event.e?.shiftKey ? passive.filter(cover=>deselected.has(cover.wbCoverAnchor)) : [];
+      passive=[...new Set([...passive.filter(cover=>ids.has(cover.wbCoverAnchor)),...attached])];
+      if (!attached.length && !promoted.length) return;
+      setSelection([...new Set([...selected.filter(object=>!attached.includes(object)),...promoted])]);
+    });
+  }
+  for (const event of ['selection:created','selection:updated','selection:cleared']) canvas.on(event,reconcileSelection);
+  canvas.upperCanvasEl.addEventListener('pointerdown',event=>{
+    const active=canvas.getActiveObject();
+    if (!event.shiftKey || !active || active.type==='activeSelection' || event.button!==0) return;
+    const target=passive.filter(cover=>cover.wbCoverAnchor===active.id && canvas.getObjects().includes(cover));
+    if (!target.length || !active.containsPoint(canvas.getPointer(event),undefined,true,true)) return;
+    event.preventDefault();event.stopImmediatePropagation();
+    passive=[];
+    setSelection(target);
+  },true);
+  canvas.on('after:render',({ctx})=>{
+    const ids=new Set(canvas.getActiveObjects().map(object=>object.id));
+    ctx.save();
+    ctx.strokeStyle='#3380a5';ctx.lineWidth=1;
+    for (const cover of passive) {
+      if (!ids.has(cover.wbCoverAnchor) || !canvas.getObjects().includes(cover)) continue;
+      const corners=cover.getCoords(true,true).map(point=>util.transformPoint(point,canvas.viewportTransform));
+      ctx.beginPath();
+      corners.forEach(({x,y},index)=>index?ctx.lineTo(x,y):ctx.moveTo(x,y));
+      ctx.closePath();ctx.stroke();
+    }
+    ctx.restore();
   });
 }
