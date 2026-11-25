@@ -458,7 +458,7 @@ function renderPageTiles() {
   const grid=$('pageTiles');
   const tileCount=pages.length+Number(pages.length<MAX_PAGES);
   $('pageListTotal').textContent=pages.length+'쪽';
-  $('pageList').style.setProperty('--page-list-width',Math.min(1080,Math.max(350,Math.ceil(tileCount/2)*116))+'px');
+  $('pageList').style.setProperty('--page-list-width',Math.min(1280,Math.max(450,Math.ceil(tileCount/2)*162))+'px');
   closePageActions();grid.replaceChildren();
   for(const [index,page] of pages.entries()){
     const wrap=document.createElement('div');wrap.className='page-tile-wrap';
@@ -530,7 +530,7 @@ function renderPageTiles() {
       const content=page.id===current?.id?current.content:page.content;
       const view=session.views[page.id];
       try{
-        const src=await makeThumbnail(content,view,c.width,c.height,120,canvas=>boardFiles.settlePreview(canvas));
+        const src=await makeThumbnail(content,view,c.width,c.height,240,canvas=>boardFiles.settlePreview(canvas));
         if(generation!==pageListGeneration || openedPopup!=='pageList')return;
         const img=document.createElement('img');img.src=src;img.alt='';img.draggable=false;
         grid.children[index]?.querySelector('.page-tile-preview')?.replaceWith(img);
@@ -1039,14 +1039,18 @@ function closePageActions(){
   pageActions=null;
 }
 function closePopups() {
+  const restorePageFocus=openedPopup==='pageList' && $('pageList').contains(document.activeElement);
+  $('pageListBackdrop').hidden=true;
+  document.body.classList.remove('page-list-open');
   tabViews?.finishRename();
   closePageActions();closeContext();
   document.querySelectorAll('.tip-up-settings').forEach(p=>p.style.display='none');
   document.querySelectorAll('[data-popup],#viewSyncTrigger').forEach(b=>b.setAttribute('aria-expanded','false'));
   openedPopup=null;
+  if (restorePageFocus) $('pageListBtn').focus({preventScroll:true});
 }
 function positionToolbarPopup() {
-  if(!openedPopup || openedPopup==='viewSyncMenu')return;
+  if(!openedPopup || openedPopup==='viewSyncMenu' || openedPopup==='pageList')return;
   const popup=$(openedPopup);
   const trigger=document.querySelector('[data-popup="'+openedPopup+'"][aria-expanded="true"]');
   if(!trigger)return;
@@ -1066,6 +1070,7 @@ function updateToolbarArrows() {
 function updateToolbarLayout() {
   updateToolbarArrows();
   const height=$('toolbar').getBoundingClientRect().height;
+  $('pageList').style.setProperty('--page-gallery-gutter',Math.max(20,Math.ceil(height)+8)+'px');
   const frame=$('scoreFrame'), clearance=String(Math.ceil(height));
   if(frame.dataset.toolbarHeight!==clearance)frame.dataset.toolbarHeight=clearance;
   updateFeedbackPosition();
@@ -1082,6 +1087,9 @@ function togglePopup(id,button) {
   closePopups();if(was)return;
   const p=$(id);p.style.display=id==='pageList'?'flex':'block';openedPopup=id;button.setAttribute('aria-expanded','true');
   if(id==='pageList'){
+    $('pageListBackdrop').hidden=false;
+    document.body.classList.add('page-list-open');
+    $('pageListClose').focus({preventScroll:true});
     $('pageJumpNumber').value='';
     $('pageJumpNumber').placeholder=pages.length>1?'1–'+pages.length:'1';
     clearPageJumpError();
@@ -1471,6 +1479,7 @@ function wireUI() {
   Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
   $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
   wireAppearanceSettings();wireBackgroundSettings();
+  $('pageListClose').onclick=closePopups;
   $('pageSelectToggle').onclick=()=>{
     pageSelectionMode=!pageSelectionMode;
     if (!pageSelectionMode) selectedPages.clear();
@@ -1598,6 +1607,18 @@ function wireUI() {
   });
   let spaceMode=null;
   document.addEventListener('keydown',e=>{
+    if(openedPopup==='pageList') {
+      if(e.key==='Escape') {e.preventDefault();closePopups();}
+      if(e.key==='Tab') {
+        const controls=[...$('pageList').querySelectorAll('button:not(:disabled),input:not(:disabled)')]
+          .filter(control=>control.getClientRects().length);
+        const index=controls.indexOf(document.activeElement);
+        if (index<0 || (e.shiftKey?index===0:index===controls.length-1)) {
+          e.preventDefault();controls[e.shiftKey?controls.length-1:0]?.focus();
+        }
+      }
+      return;
+    }
     if (modalOpen() && !e.target.closest?.('.modal')) return;
     if(e.key==='Escape') {if(modalOpen())return;if(importAbort)importAbort.abort();closeContext();closePopups();if(!busy)finishText();return;}
     if(modalOpen()) {

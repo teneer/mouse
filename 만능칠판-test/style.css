@@ -669,21 +669,27 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 #toolbar #viewSync[aria-pressed="true"] {background:#dceeff;border-color:#5a8dee;color:#164e83}
 #toolbar #viewSyncTrigger {min-width:26px;padding:0 6px;border-left:0;border-radius:0 6px 6px 0}
 #viewSyncHint {position:fixed;z-index:2000;max-width:calc(100vw - 8px);padding:5px 9px;border-radius:6px;background:#173f50;color:white;font-size:13px;pointer-events:none}
+#pageListBackdrop {position:fixed;inset:0;z-index:1490;background:#122e4380}
+body.page-list-open #toolbarScaleWrap {z-index:1495}
 #pageList {
-  width:min(calc(100vw - 16px),var(--page-list-width,350px));max-width:none;
+  inset:0;margin:auto;z-index:1600;
+  width:min(calc(100vw - 32px),var(--page-list-width,450px));height:max-content;
+  max-width:none;max-height:calc(100dvh - 2 * var(--page-gallery-gutter,20px));
   flex-direction:column;gap:0;padding:0;overflow:hidden;
-  background:#f2f7fb;border:1px solid #adbecf;border-radius:14px;
-  box-shadow:0 12px 36px #15374e33;
+  background:#f2f7fb;border:1px solid #adbecf;border-radius:16px;
+  box-shadow:0 18px 48px #15374e55;
 }
-.page-list-header {flex:none;padding:12px;border-bottom:1px solid #cadae6;background:#fff}
-.page-list-header h2 {display:flex;align-items:baseline;gap:8px;margin:0 0 8px;color:#153e57;font-size:1rem}
+.page-list-header {flex:none;padding:14px 16px;border-bottom:1px solid #cadae6;background:#fff}
+.page-list-title-row {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.page-list-header h2 {display:flex;align-items:baseline;gap:10px;margin:0;color:#153e57;font-size:1.12rem}
+#pageListClose {width:34px;min-height:34px;height:34px;padding:0;font-size:1.25rem;border-radius:8px}
 #pageListTotal {color:#4b6478;font-size:.8rem;font-weight:500}
-.page-list-tools {display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
-#pageTiles {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,96px),1fr));gap:8px;min-height:0;overflow:auto;padding:10px 12px 12px;overscroll-behavior:contain}
-@media (max-width:520px) {#pageTiles {grid-template-columns:repeat(auto-fill,minmax(min(100%,78px),1fr))}}
+.page-list-tools {display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+#pageTiles {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:12px;min-height:0;overflow:auto;padding:14px 16px 16px;overscroll-behavior:contain}
+@media (max-width:520px) {#pageTiles {grid-template-columns:repeat(auto-fill,minmax(min(100%,110px),1fr))}}
 .page-tile {display:grid;gap:4px;place-items:center;background:#f4f7fa;border:1px solid #afc3d6;border-radius:8px;padding:4px;cursor:pointer}
 .page-tile[aria-current=true],.page-tile.reordering {outline:2px solid #1862ad;outline-offset:-2px}
-#pageTiles .page-tile {background:#fff;transition:background-color .14s}
+#pageTiles .page-tile {background:#fff;transition:background-color .14s;padding-inline:6px;padding-bottom:7px}
 #pageTiles .page-tile:hover {background:#ecf5ff}
 #pageTiles .page-tile-add {border-style:dashed;color:#225f89}
 #pageSelectionDelete:not(:disabled) {color:#922c25}
@@ -709,7 +715,7 @@ button, #toolbar, #toolbarToggle, .tip-up-settings, #objectContextMenu {
 #pageNameInput {display:block;width:100%;box-sizing:border-box;margin-top:6px}
 .history-group .icon-only {font-size:1.35em}
 
-.page-tile-wrap .page-tile {padding-top:23px;font-size:12px}
+.page-tile-wrap .page-tile {padding-top:29px;font-size:13px}
 .page-tile-menu > button {min-width:28px;min-height:22px;line-height:22px}
 .page-tile-actions:popover-open {display:grid;position:fixed;inset:auto;margin:0;padding:4px;gap:2px;border:1px solid #cbdce3;background:#fff;border-radius:8px;box-shadow:0 4px 14px #12344724}
 .page-tile-menu .action-btn {position:static;justify-content:flex-start;height:32px;min-height:32px}
