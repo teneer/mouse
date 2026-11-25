@@ -31,6 +31,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   const prefix='whiteboard.view-tab:'+path+':';
   const namePrefix='whiteboard.tab-name:'+path+':';
   const localKey=prefix+sync.id;
+  const speakerKey='whiteboard.speaker:'+path;
   let members=[], scope, unsubscribe, generation=0;
   let channel, lastPresence, lastSent=0, expiryTimer, watching=false, present=true;
   let finishNameEdit;
@@ -167,6 +168,8 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       else finishNameEdit();
     }
     const groups=new Map(), focused=document.activeElement;
+    const presenceOwner=cloud.deviceId||'local';
+    const preferredSpeaker=localStorage.getItem(speakerKey);
     const names=scope ? cloud.projected().tabNames : null;
     const fragment=document.createDocumentFragment();
     let restoreFocus;
@@ -201,6 +204,23 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       input.setAttribute('aria-label',name+' · '+description);
       details.append(display,info);
       line.append(input,details,edit);
+      if (row.owner===presenceOwner) {
+        const speaker=document.createElement('button');
+        speaker.type='button';
+        speaker.className='view-tab-speaker';
+        speaker.dataset.speakerTab=row.id;
+        speaker.textContent='🔊';
+        speaker.title=name+'에서 소리 재생';
+        speaker.setAttribute('aria-label',speaker.title);
+        speaker.setAttribute('aria-pressed',String(preferredSpeaker===row.id));
+        speaker.onclick=()=>{
+          if (localStorage.getItem(speakerKey)===row.id) localStorage.removeItem(speakerKey);
+          else localStorage.setItem(speakerKey,row.id);
+          render();
+        };
+        line.append(speaker);
+        if (focused?.dataset.speakerTab===row.id) restoreFocus=speaker;
+      }
       group.append(line);
       if (focused?.dataset.viewTab===row.id) restoreFocus=input;
       if (focused?.dataset.renameTab===row.id) restoreFocus=edit;
@@ -259,7 +279,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       }
       watchLocalPeers();
     }
-    if (event.key?.startsWith(prefix) || event.key?.startsWith(namePrefix)) render();
+    if (event.key===speakerKey || event.key?.startsWith(prefix) || event.key?.startsWith(namePrefix)) render();
   });
   async function liveIds() {
     announce();

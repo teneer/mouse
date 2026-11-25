@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=settings-center-1">
+    <link rel="stylesheet" href="style.css?v=class-tools-1">
     <link rel="stylesheet" href="../dialog.css?v=goal-status-1">
     <link rel="stylesheet" href="celebration.css?v=celebration-4">
 </head>
@@ -97,6 +97,7 @@
 
         <form id="batch-score" hidden>
             <button type="button" id="select-all-teams">전체선택</button>
+            <div id="quick-undo" hidden><span id="quick-undo-label" role="status"></span><button type="button">취소</button></div>
             <button type="button" id="undo-score" disabled>되돌리기</button>
             <div class="batch-amount">
                 <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
@@ -243,6 +244,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=device-audio-2"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
+    <script type="module" src="script.js?v=class-tools-1"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
 </body>
 </html>

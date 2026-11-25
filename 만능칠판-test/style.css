@@ -861,3 +861,7 @@ body.score-modal-open #scoreFrame {background:transparent}
 #toolbarScrollNext {right:0}
 #toolbarWrapper .toolbar-scroll-arrow[hidden] {display:none}
 #viewSyncCount {font-variant-numeric:tabular-nums}
+
+#viewSyncMenu .view-tab-row:has(.view-tab-speaker) {grid-template-columns:auto minmax(0,1fr) auto auto}
+.view-tab-speaker {min-height:32px;border:1px solid #b9d1de;border-radius:6px;background:white;cursor:pointer}
+.view-tab-speaker[aria-pressed="true"] {background:#c9e8ff;border-color:#3376aa}

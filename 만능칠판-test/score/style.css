@@ -921,3 +921,8 @@ body.score-modal-open .container {visibility:hidden}
   border:0;background:transparent;color:#216a91;font:inherit;
   font-size:clamp(8px,min(9cqw,19cqh),16px);line-height:1;white-space:nowrap;cursor:pointer;
 }
+
+#quick-undo {position:absolute;bottom:100%;right:0;z-index:3;display:flex;align-items:center;gap:6px;max-width:100%;padding:4px 7px;background:var(--card-bg);color:var(--text-color);border:1px solid var(--panel-line);border-radius:8px}
+#quick-undo[hidden] {display:none}
+#quick-undo-label {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#quick-undo button {flex:none}

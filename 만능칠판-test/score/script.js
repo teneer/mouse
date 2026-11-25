@@ -1,7 +1,7 @@
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=toolbar-goals-1';
 import {wireGoals} from './goals-ui.js?v=device-audio-2';
-import {wireScoreAudio} from './score-audio.js?v=device-audio-2';
+import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
@@ -14,7 +14,7 @@ const sounds = {
   confirm: new Audio('Sound/Confirm.MP3'),
   success: new Audio('Sound/Success small.MP3')
 };
-const playSound = wireScoreAudio();
+const playSound = wireScoreAudio(sounds);
 
 let count = 0;
 let displayedClassScore = 0;
@@ -127,6 +127,10 @@ function previewTabScore({key,baseVersion,effect}) {
 function applySharedScore(model,live) {
   const previous = sharedScore;
   sharedScore = model;
+  if (model?.undo && previous && model.version!==previous.version && ownScoreEvents.has(model.version) && model.effect) {
+    const names=(model.undo.targets||[]).map(id=>model.state.teams.find(team=>team.id===id)?.name||'모둠');
+    showQuickUndo(names,model.undo.amount);
+  }
   bodyControls.inert = !model;
   const conflicts=model?fieldConflictOptions(model):[];
   sharedBanner.hidden = !!model && !conflicts.length && !model.notice;
@@ -495,6 +499,21 @@ function recordScoreChange(key = null) {
   }
   lastScoreChange = { key, time: now, count, scores: teams.map(team => team.score) };
 }
+const quickUndo=document.getElementById('quick-undo');
+let quickUndoTimer,quickUndoVersion;
+function showQuickUndo(names,amount) {
+  if (!amount) return;
+  const target=names.length ? names.join(' · ') : '학급';
+  document.getElementById('quick-undo-label').textContent=target+' '+(names.length>1?'각 ':'')+(amount>0?'+':'')+amount;
+  quickUndoVersion=sharedMode?sharedScore.version:lastAppliedVersion;
+  quickUndo.hidden=false;
+  clearTimeout(quickUndoTimer);
+  quickUndoTimer=setTimeout(()=>quickUndo.hidden=true,5000);
+}
+quickUndo.querySelector('button').onclick=()=>{
+  if (quickUndoVersion===(sharedMode?sharedScore?.version:lastAppliedVersion)) undoScore();
+  quickUndo.hidden=true;
+};
 function undoScore() {
   if (sharedMode) {
     scoreGroup = null;
@@ -524,6 +543,7 @@ function changeClassScore(amount) {
   presentScoreEffect(effect,key);
   renderBatchControls();
   saveToStorage(effect,undefined,key);
+  if (!sharedMode) showQuickUndo([],count-lastScoreChange.count);
 }
 function increment() { changeClassScore(step); }
 function decrement() { changeClassScore(-step); }
@@ -653,6 +673,7 @@ function renderBatchControls() {
     card.classList.toggle('team-selected', selected);
     card.querySelector('.team-select-btn').setAttribute('aria-pressed', String(selected));
   });
+  if (quickUndoVersion!==(sharedMode?sharedScore?.version:lastAppliedVersion) || !(sharedMode?sharedScore?.undo:lastScoreChange)) quickUndo.hidden=true;
   const canUndo = sharedMode ? !!sharedScore?.undo : !!lastScoreChange;
   batchForm.hidden = teams.length === 0 && !canUndo;
   selectAllButton.textContent = selectedTeams.size ? '전체해제' : '전체선택';
@@ -707,6 +728,7 @@ function changeTeamScores(indices, amount, undoKey = null) {
   const effect = {kind:'team',idx:indices[0],amount:amount*indices.length,classDiff,oldCount,oldTotal,newTotal,rate:linkEnabled?linkPoints:0};
   const key=crypto.randomUUID();
   saveToStorage({...effect,inputAmount:amount,targets:indices.map(index=>teams[index].id)},undefined,key);
+  if (!sharedMode) showQuickUndo(indices.map(i=>teams[i].name),teams[indices[0]].score-lastScoreChange.scores[indices[0]]);
   playSound(amount > 0 ? sounds.teamIncrease : sounds.teamDecrease,1,key);
   presentScoreEffect(effect,key);
 }

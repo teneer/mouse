@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=toolbar-hints-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=class-tools-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
@@ -234,10 +234,10 @@ function renderPages() {
   $('previousPageBtn').disabled=activeIndex<=0;
   $('nextPageBtn').disabled=activeIndex<0 || activeIndex>=pages.length-1;
   const index=Math.max(0,activeIndex);
-  $('pageListLabel').textContent=`${index+1}쪽`;
+  $('pageListLabel').textContent=`${index+1} / ${pages.length}`;
   const title=displayPageTitle(pages[index],index);
   $('pageListBtn').title=title;
-  $('pageListBtn').setAttribute('aria-label',`페이지 목록 · ${index+1}쪽 · ${title}`);
+  $('pageListBtn').setAttribute('aria-label',`페이지 목록 · 전체 ${pages.length}쪽 중 ${index+1}쪽 · ${title}`);
 }
 async function movePage(source,target) {
   const ids=pages.map(page=>page.id);
@@ -821,7 +821,10 @@ function togglePopup(id,button) {
   if(busy)return;
   const was=openedPopup===id;closePopups();if(was)return;
   const p=$(id);p.style.display='block';openedPopup=id;button.setAttribute('aria-expanded','true');
-  if(id==='pageList')renderPageTiles();
+  if(id==='pageList'){
+    renderPageTiles();
+    requestAnimationFrame(()=>$('pageTiles').querySelector('[aria-current="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'}));
+  }
   positionToolbarPopup();
 }
 function openModal(id) {closePopups();finishText();modalFocus=document.activeElement;$(id).style.display='flex';$(id).querySelector('input,button')?.focus();}
@@ -1380,6 +1383,7 @@ async function boot() {
   boardFiles=new BoardFiles(store);boardFiles.installFabric();
   await store.ensurePage(emptyContent(c.width,c.height));pages=await store.listPages();pages.slice(0,MAX_PAGES).forEach((p,i)=>p.name=`페이지 ${i+1}`);
   const tabIdentity=await acquireTabIdentity(SESSION_KEY+':identity');
+  $('scoreFrame').dataset.tabId=tabIdentity.id;
   sync=new TabSync(tabIdentity,refreshRemote,view=>{
     if(!validViewState(view))return;
     localView=view;
