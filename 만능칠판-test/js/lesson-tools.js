@@ -10,17 +10,14 @@ export function installAnswerCoverDrawing(Rect) {
   };
   Rect.prototype._render=function(ctx){
     render.call(this,ctx);
-    if (!this.wbAnswerCover) return;
-    const label=coverName(this);
+    if (!this.wbAnswerCover || this.fill==='transparent') return;
+    const size=Math.min(18,this.height*.65,this.width*.55);
     ctx.save();
-    ctx.font='600 14px sans-serif';
-    const left=-this.width/2, bottom=-this.height/2;
-    const width=ctx.measureText(label).width+12;
-    ctx.fillStyle='#375467';
-    ctx.fillRect(left,bottom-21,width,20);
+    ctx.font='600 '+size+'px sans-serif';
     ctx.fillStyle='#fff';
+    ctx.textAlign='center';
     ctx.textBaseline='middle';
-    ctx.fillText(label,left+6,bottom-11);
+    ctx.fillText(coverName(this),0,0,this.width*.85);
     ctx.restore();
   };
 }
