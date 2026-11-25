@@ -851,3 +851,13 @@ body.score-modal-open #scoreFrame {background:transparent}
 .conflict-guide summary {color:#18536e}
 .conflict-guide h3 {margin:.7rem 0 .25rem}
 .conflict-guide ul {margin:.25rem 0 .6rem;padding-inline-start:1.2rem;line-height:1.55}
+
+#toolbarWrapper .toolbar-scroll-arrow {
+  position:absolute;bottom:8px;z-index:2;width:24px;height:36px;padding:0;
+  border:1px solid #9db5c8;border-radius:6px;background:#f5faff;color:#164e70;
+  font-size:22px;line-height:1;cursor:pointer;
+}
+#toolbarScrollPrev {left:0}
+#toolbarScrollNext {right:0}
+#toolbarWrapper .toolbar-scroll-arrow[hidden] {display:none}
+#viewSyncCount {font-variant-numeric:tabular-nums}

@@ -19,7 +19,7 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   function positionMenu() {
     if (root.style.display!=='block') return;
     const margin=8;
-    const edge=toolbar.getBoundingClientRect().top-margin;
+    const edge=Math.min(toolbar.getBoundingClientRect().top,hint.hidden?Infinity:hint.getBoundingClientRect().top)-margin;
     const trigger=opener.getBoundingClientRect();
     root.style.top='auto';
     root.style.bottom=(window.innerHeight-edge)+'px';
@@ -152,10 +152,13 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
   function render() {
     control.setAttribute('aria-pressed',String(!!readState()?.enabled));
     clearTimeout(expiryTimer);
-    if (root.style.display!=='block') return;
     const rows=available(), targets=viewTargets(readState()?.targets,rows.map(row=>row.id));
     const expires=rows.filter(row=>row.id!==sync.id).map(row=>row.time+maxAge);
     if (expires.length) expiryTimer=setTimeout(render,Math.max(0,Math.min(...expires)-Date.now())+5);
+    const count=document.getElementById('viewSyncCount');
+    const label='· '+targets.length+'개';
+    if (count.textContent!==label) count.textContent=label;
+    if (root.style.display!=='block') return;
     if (finishNameEdit) {
       const editing=list.querySelector('.view-tab-name-input')?.closest('.view-tab-row');
       if (editing && !rows.some(row=>row.id===editing.querySelector('[data-view-tab]').dataset.viewTab)) finishNameEdit(true);
@@ -302,7 +305,9 @@ export function wireViewTabs({sync,cloud,currentView,pages,togglePopup,closePopu
       const state=readState();
       const targets=viewTargets(state?.targets,ids);
       if (!targets.length) {
+        if (root.style.display!=='block') show();
         showHint();
+        positionMenu();
         if (!state?.enabled) return;
       } else hideHint();
       await publish(!state?.enabled,state?.enabled?undefined:old=>viewTargets(old,ids));

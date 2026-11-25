@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 7</title><link href="style.css?v=view-split-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=celebration-4" rel="stylesheet"/></head>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 7</title><link href="style.css?v=toolbar-hints-1" rel="stylesheet"/><link href="dialog.css?v=goal-status-1" rel="stylesheet"/><link href="score/celebration.css?v=celebration-4" rel="stylesheet"/></head>
 <body>
 <div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
 <aside id="scorePanel" class="score-panel" aria-label="학급 점수판" aria-hidden="true" inert>
@@ -12,7 +12,7 @@
 <div id="viewSyncHint" role="status" hidden>동기화할 탭을 선택하세요.</div>
 <div class="tip-up-settings" id="viewSyncMenu" aria-label="화면 동기화 대상"><div class="cloud-buttons"><button type="button" data-view-all>전체선택</button><button type="button" data-view-none>전체해제</button></div><div data-view-tabs></div></div>
 <div id="feedbackStack"><div aria-live="polite" id="saveStatus" role="status">불러오는 중입니다.</div><div aria-live="polite" hidden="" id="toast" role="status"></div></div>
-<div id="toolbarScaleWrap"><div id="toolbarWrapper"><div id="toolbarToggle"><button aria-expanded="true" id="toolbarHideBtn" aria-label="툴바 접기" title="툴바 숨기기/보이기" data-board-icon="down"></button></div><div aria-label="칠판 도구" id="toolbar">
+<div id="toolbarScaleWrap"><div id="toolbarWrapper"><div id="toolbarToggle"><button aria-expanded="true" id="toolbarHideBtn" aria-label="툴바 접기" title="툴바 숨기기/보이기" data-board-icon="down"></button></div><button type="button" class="toolbar-scroll-arrow" id="toolbarScrollPrev" aria-label="왼쪽 도구 보기" aria-controls="toolbar" hidden>‹</button><button type="button" class="toolbar-scroll-arrow" id="toolbarScrollNext" aria-label="오른쪽 도구 보기" aria-controls="toolbar" hidden>›</button><div aria-label="칠판 도구" id="toolbar">
 <div class="toolbar-group history-group"><button aria-label="실행 취소" class="action-btn icon-only" id="undoBtn" title="실행 취소 (Ctrl+Z)" data-board-icon="undo"></button><button aria-label="다시 실행" class="action-btn icon-only" id="redoBtn" title="다시 실행 (Ctrl+Shift+Z)" data-board-icon="redo"></button></div>
 <div class="toolbar-group"><button class="mode-btn toggle-btn" id="selectMoveToggleBtn" data-board-icon="select"><span id="selectMoveLabel">선택</span></button></div>
 <div class="toolbar-group">
@@ -41,7 +41,7 @@
     <button aria-label="축소" class="action-btn" id="zoomOutBtn" type="button">−</button>
   </div>
 </div>
-<div class="toolbar-group view-sync"><button type="button" id="viewSync" class="action-btn" aria-pressed="false"><span data-board-icon="sync">화면 동기화</span></button><button type="button" id="viewSyncTrigger" class="action-btn" aria-label="동기화할 탭 선택" title="동기화할 탭 선택" aria-expanded="false" aria-controls="viewSyncMenu">▴</button></div>
+<div class="toolbar-group view-sync"><button type="button" id="viewSync" class="action-btn" aria-pressed="false"><span data-board-icon="sync">화면 동기화</span><span id="viewSyncCount">· 0개</span></button><button type="button" id="viewSyncTrigger" class="action-btn" aria-label="동기화할 탭 선택" title="동기화할 탭 선택" aria-expanded="false" aria-controls="viewSyncMenu">▴</button></div>
 <div class="toolbar-group"><button id="scorePanelToggle" class="action-btn" type="button" aria-controls="scorePanel" aria-expanded="false" title="학급 점수판 표시/숨기기" data-board-icon="score"><span id="scorePanelLabel">점수판 열기</span></button></div>
 <div class="toolbar-group"><output id="cloudSyncStatus" role="status">로컬 모드</output></div>
 <div class="toolbar-group"><button aria-expanded="false" class="action-btn" data-popup="moreSettings" id="moreBtn">더 보기 ▲</button></div>
@@ -207,7 +207,7 @@
 </div>
 <input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
 <div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=celebration-4" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=toolbar-hints-1" type="module"></script>
 <noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
 <div class="context-palette" role="group" aria-label="색상">
   <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>

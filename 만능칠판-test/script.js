@@ -1,6 +1,6 @@
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
-import {activeView,wireViewTabs} from './js/view-tabs.js?v=view-split-1';
+import {activeView,wireViewTabs} from './js/view-tabs.js?v=toolbar-hints-1';
 import {setBoardIcon} from './js/board-icons.js?v=emoji-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=whiteboard-7';
@@ -799,7 +799,13 @@ function positionToolbarPopup() {
   popup.style.top='auto';
   popup.style.bottom=(innerHeight-edge)+'px';
 }
+function updateToolbarArrows() {
+  const bar=$('toolbar');
+  $('toolbarScrollPrev').hidden=bar.hidden || bar.scrollLeft<=1;
+  $('toolbarScrollNext').hidden=bar.hidden || bar.scrollWidth-bar.clientWidth-bar.scrollLeft<=1;
+}
 function updateToolbarLayout() {
+  updateToolbarArrows();
   const height=$('toolbar').getBoundingClientRect().height;
   const frame=$('scoreFrame'), clearance=String(Math.ceil(height));
   if(frame.dataset.toolbarHeight!==clearance)frame.dataset.toolbarHeight=clearance;
@@ -1099,9 +1105,17 @@ function wireUI() {
     togglePopup(b.dataset.popup,b);
   });
   document.addEventListener('pointerdown',e=>{if(shouldClosePopups(e.target))closePopups();});
-  $('toolbar').addEventListener('scroll',()=>{if(openedPopup)closePopups();});
+  const bar=$('toolbar');
+  bar.addEventListener('scroll',()=>{
+    updateToolbarArrows();
+    if(openedPopup)closePopups();
+  });
+  for (const [id,direction] of [['toolbarScrollPrev',-1],['toolbarScrollNext',1]]) {
+    $(id).onclick=()=>bar.scrollBy({left:direction*bar.clientWidth*.75,behavior:'instant'});
+  }
   const toolbarLayout=new ResizeObserver(updateToolbarLayout);
-  toolbarLayout.observe($('toolbar'));
+  toolbarLayout.observe(bar);
+  for (const group of bar.children) toolbarLayout.observe(group);
   updateToolbarLayout();
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
   $('confirmModalOkBtn').onclick=()=>resolveConfirm(true);$('confirmModalCancelBtn').onclick=()=>resolveConfirm(false);
