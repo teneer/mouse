@@ -53,9 +53,6 @@
 @keyframes goal-toast-enter {
   from {transform:var(--toast-position) translateY(.35rem);opacity:.45}
 }
-@media (prefers-reduced-motion:reduce) {
-  .goal-celebration-card {animation:none}
-}
 
 .goal-toast-content:has(.goal-toast-section + .goal-toast-section) {
   display:grid;gap:.5rem;max-height:65dvh;overflow:auto;
