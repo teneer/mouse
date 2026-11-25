@@ -1,4 +1,4 @@
-import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-sync-2';
+import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-hit-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';

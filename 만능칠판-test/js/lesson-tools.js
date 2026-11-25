@@ -33,16 +33,37 @@ export function answerCoverAt(canvas,event) {
 }
 
 function findCoverAnchor(canvas,bounds) {
-  let anchor,best=0;
+  const scratch=document.createElement('canvas');
+  const ctx=scratch.getContext('2d',{willReadFrequently:true});
   for (const object of canvas.getObjects().slice().reverse()) {
-    if (!object.id || object.wbAnswerCover || !object.visible) continue;
-    const box=object.getBoundingRect(true,true);
-    const width=Math.min(bounds.left+bounds.width,box.left+box.width)-Math.max(bounds.left,box.left);
-    const height=Math.min(bounds.top+bounds.height,box.top+box.height)-Math.max(bounds.top,box.top);
-    const area=Math.max(0,width)*Math.max(0,height);
-    if (area>best) {best=area;anchor=object;}
+    if (!object.id || object.wbAnswerCover || !object.visible || object.opacity===0) continue;
+    const box=object.shadow?bounds:object.getBoundingRect(true,true);
+    const left=Math.max(bounds.left,box.left),top=Math.max(bounds.top,box.top);
+    const width=Math.min(bounds.left+bounds.width,box.left+box.width)-left;
+    const height=Math.min(bounds.top+bounds.height,box.top+box.height)-top;
+    if (width<=0 || height<=0) continue;
+
+    // Render one object at a time so transparent areas do not hide the layers below.
+    const scale=Math.min(2,2048/Math.max(width,height));
+    scratch.width=Math.max(1,Math.ceil(width*scale));
+    scratch.height=Math.max(1,Math.ceil(height*scale));
+    ctx.setTransform(scale,0,0,scale,-left*scale,-top*scale);
+    ctx.beginPath();ctx.rect(left,top,width,height);ctx.clip();
+    const selectionBackground=object.selectionBackgroundColor;
+    try {
+      object.selectionBackgroundColor='';
+      object.render(ctx);
+    } finally {object.selectionBackgroundColor=selectionBackground;}
+    try {
+      const {data}=ctx.getImageData(0,0,scratch.width,scratch.height);
+      for (let alpha=3;alpha<data.length;alpha+=4) {
+        if (data[alpha]>0) return object;
+      }
+    } catch (error) {
+      if (error.name!=='SecurityError') throw error;
+    }
   }
-  return anchor;
+  return null;
 }
 
 export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,setOpen}) {
