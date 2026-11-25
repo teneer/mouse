@@ -1,8 +1,8 @@
 import {startFieldConflicts} from './score-conflicts.js';
-import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=activities-1';
-import {uid} from './constants.js?v=activities-1';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=activities-1';
-import {applyScoreOperation} from './shared-score.js?v=activities-1';
+import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=pursuit-manager-1';
+import {uid} from './constants.js?v=pursuit-manager-1';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=pursuit-manager-1';
+import {applyScoreOperation} from './shared-score.js?v=pursuit-manager-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
 const sdk = 'https://www.gstatic.com/firebasejs/11.10.0';

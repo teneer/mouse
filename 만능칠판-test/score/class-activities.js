@@ -11,10 +11,3 @@ export function pursuitScore(rule,day=schoolDay()) {
   }
   return Math.min(10000,rule.score+periods*rule.step);
 }
-export function nextPresenter(previous,teams,random=Math.random) {
-  const seen=(previous?.seen||[]).filter(id=>teams.some(team=>team.id===id));
-  const remaining=teams.filter(team=>!seen.includes(team.id));
-  if (!remaining.length) return null;
-  const id=remaining[Math.floor(random()*remaining.length)].id;
-  return {id,seen:[...seen,id]};
-}

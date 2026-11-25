@@ -1,6 +1,6 @@
-import {schoolDay,pursuitScore,nextPresenter} from './class-activities.js';
+import {schoolDay,pursuitScore} from './class-activities.js?v=pursuit-manager-1';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
-import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=activities-1';
+import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=pursuit-manager-1';
 import {wireGoals} from './goals-ui.js?v=device-audio-2';
 import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
 import {conversionFrame,conversionStarFlight,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-1';
@@ -415,59 +415,61 @@ function renderActivities() {
     else teams.forEach((team,i)=>{
       const card=scoreboard.children[i];
       card?.classList.toggle('pursuit-behind',!!rule?.enabled && team.score<limit);
-      card?.classList.toggle('presenting',goalSystem.presenter?.id===team.id);
     });
   }
-  const draw=document.getElementById('draw-presenter');
-  draw.disabled=!teams.length;
-  const presenter=teams.find(team=>team.id===goalSystem.presenter?.id);
-  draw.textContent=presenter ? (teams.every(t=>goalSystem.presenter.seen.includes(t.id))?'다시 시작':'다음 모둠') : '발표 순서';
-  draw.title=presenter?'발표 중: '+presenter.name:'발표할 모둠 뽑기';
 }
-async function drawPresenter() {
-  syncFromStorage();
-  const previous=goalSystem.presenter;
-  const value=nextPresenter(previous,teams) || {id:null,seen:[]};
-  await submitGoal({kind:'score-activity',slot:'presenter',base:previous?.revision??null,value});
-}
-document.getElementById('draw-presenter').onclick=drawPresenter;
 const pursuitEditor=document.getElementById('pursuit-editor');
-const pursuitForm=document.getElementById('pursuit-form');
-const fields=pursuitForm.elements;
-let pursuitSlot,pursuitBase;
-function pursuitFields() {
+const pursuitForms=[...pursuitEditor.querySelectorAll('form')];
+function selectPursuit(kind) {
+  for (const form of pursuitForms) {
+    form.hidden=form.dataset.kind!==kind;
+    document.getElementById('pick-'+form.dataset.kind).setAttribute('aria-pressed',String(!form.hidden));
+  }
+}
+function showPursuitFields(fields) {
   fields.step.parentElement.hidden=fields.mode.value==='manual';
   fields.weekday.parentElement.hidden=fields.mode.value!=='weekly';
 }
-fields.mode.onchange=pursuitFields;
 function editPursuit(kind) {
   setSettingsOpen(false);
-  pursuitSlot=kind+'Pursuit';
-  const rule=goalSystem[pursuitSlot];
-  pursuitBase=rule?.revision??null;
-  fields.enabled.checked=rule?.enabled??true;
-  fields.score.value=pursuitScore(rule);
-  fields.message.value=rule?.message??'';
-  fields.mode.value=rule?.mode??'manual';
-  fields.weekday.value=rule?.weekday??1;
-  fields.step.value=rule?.step??1;
-  document.getElementById('pursuit-title').textContent=(kind==='class'?'학급':'모둠')+' 추격자 설정';
-  document.getElementById('pursuit-error').textContent='';
-  pursuitFields();scoreModalState(true);pursuitEditor.showModal();
+  for (const form of pursuitForms) {
+    const fields=form.elements,rule=goalSystem[form.dataset.kind+'Pursuit'];
+    form.dataset.base=rule?.revision??'';
+    fields.enabled.checked=rule?.enabled??false;
+    fields.score.value=pursuitScore(rule);
+    fields.message.value=rule?.message??'';
+    fields.mode.value=rule?.mode??'manual';
+    fields.weekday.value=rule?.weekday??1;
+    fields.step.value=rule?.step??1;
+    fields.status.value='';
+    showPursuitFields(fields);
+  }
+  selectPursuit(kind);
+  scoreModalState(true);pursuitEditor.showModal();
 }
-for (const kind of ['class','team']) {
+for (const form of pursuitForms) {
+  const kind=form.dataset.kind,fields=form.elements;
+  document.getElementById('pick-'+kind).onclick=()=>selectPursuit(kind);
   document.getElementById(kind+'-pursuit').onclick=()=>editPursuit(kind);
-  document.querySelector('[data-edit-pursuit="'+kind+'"]').onclick=()=>editPursuit(kind);
+  fields.mode.onchange=()=>showPursuitFields(fields);
+  form.oninput=()=>{fields.status.value='';};
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    const slot=kind+'Pursuit';
+    const value={enabled:fields.enabled.checked,score:fields.score.valueAsNumber,message:fields.message.value.trim(),
+      mode:fields.mode.value,weekday:Number(fields.weekday.value),step:fields.step.valueAsNumber,day:schoolDay()};
+    fields.save.disabled=true;
+    try {
+      if (await submitGoal({kind:'score-activity',slot,base:form.dataset.base||null,value})) {
+        form.dataset.base=goalSystem[slot]?.revision??'';
+        fields.status.value='저장했습니다.';
+      } else fields.status.value='다른 화면에서 변경했습니다. 닫고 다시 열어 주세요.';
+    } finally {fields.save.disabled=false;}
+  };
 }
+document.getElementById('manage-pursuit').onclick=()=>editPursuit('class');
 document.getElementById('pursuit-close').onclick=()=>pursuitEditor.close();
 pursuitEditor.onclose=()=>scoreModalState(false);
-pursuitForm.onsubmit=async event=>{
-  event.preventDefault();
-  const value={enabled:fields.enabled.checked,score:fields.score.valueAsNumber,message:fields.message.value.trim(),
-    mode:fields.mode.value,weekday:Number(fields.weekday.value),step:fields.step.valueAsNumber,day:schoolDay()};
-  if (await submitGoal({kind:'score-activity',slot:pursuitSlot,base:pursuitBase,value})) pursuitEditor.close();
-  else document.getElementById('pursuit-error').textContent='다른 화면에서 변경했습니다. 닫고 다시 열어 주세요.';
-};
 function schedulePursuitDay() {
   renderActivities();
   setTimeout(schedulePursuitDay,86400000-(Date.now()+9*3600000)%86400000+100);

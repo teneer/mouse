@@ -868,9 +868,7 @@ body.score-modal-open #scoreFrame {background:transparent}
 
 .cover-rectangle {position:fixed;pointer-events:none;z-index:2500;background:#37546799;border:2px solid #86b0c7}
 .drawing-cover {cursor:crosshair!important}
-#lesson-preview {max-width:95vw;max-height:94dvh;border:1px solid #a7bec9;border-radius:10px;padding:12px;background:#f6fafb}
-#lesson-preview::backdrop {background:#14263866}
-#lesson-preview header,#lesson-preview footer {display:flex;align-items:center;gap:8px;padding:5px}
-#lesson-preview header {justify-content:space-between;font-weight:700}
-#lesson-preview footer {justify-content:flex-end}
-#lesson-preview canvas {display:block;touch-action:none;cursor:grab}
+#lesson-preview {max-width:95vw;max-height:94dvh;border:1px solid var(--dialog-border);border-radius:16px;padding:var(--dialog-padding,16px);background:white;color:var(--dialog-text);box-shadow:0 16px 48px rgb(18 52 71 / 20%)}
+#lesson-preview::backdrop {background:rgb(17 42 54 / 36%)}
+#lesson-preview .dialog-footer {margin-top:12px}
+#lesson-preview canvas {display:block;max-width:100%;height:auto;touch-action:none;cursor:grab}

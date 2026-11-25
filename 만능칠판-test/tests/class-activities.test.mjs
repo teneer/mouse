@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {schoolDay,pursuitScore,nextPresenter} from '../score/class-activities.js';
+import {schoolDay,pursuitScore} from '../score/class-activities.js';
 import {changeGoals,freshGoals} from '../score/goal-model.js';
 
 test('daily pursuit crosses Korean midnight once and catches up after reopening',()=>{
@@ -31,13 +31,4 @@ test('team and class rules have separate revisions and stale edits are rejected'
   assert.equal(changeGoals(state,{...edit,key:'stale'}),false);
   assert.equal(changeGoals(state,{...edit,slot:'teamPursuit',key:'b'}),true);
   assert.equal(state.goalSystem.classPursuit.message,'오늘 청소');
-});
-
-test('presentation draw uses current teams once per round',()=>{
-  const teams=[{id:'a'},{id:'b'}];
-  const first=nextPresenter(null,teams,()=>0);
-  const second=nextPresenter(first,teams,()=>0);
-  assert.equal(second.id,'b');
-  assert.equal(nextPresenter(second,teams),null);
-  assert.equal(nextPresenter(second,[{id:'b'},{id:'c'}],()=>0).id,'c');
 });

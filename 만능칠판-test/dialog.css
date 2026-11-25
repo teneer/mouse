@@ -12,6 +12,7 @@ body {
 }
 :is(button, summary, label:has(input[type="checkbox"]), input[type="checkbox"]) {cursor:pointer}
 button:disabled {cursor:default}
+dialog.dialog-sheet {--dialog-border:#c5dae3;--dialog-text:#123447;--dialog-accent:#125771}
 :is(.modal, .modal-background, .fullscreen-view) {
   --dialog-border:#c5dae3;
   --dialog-text:#123447;
