@@ -873,3 +873,14 @@ body.score-modal-open #scoreFrame {background:transparent}
 #pageJumpNumber {width:4.2em;min-height:32px;padding:3px 6px;border:1px solid #b9cddb;border-radius:6px}
 #pageJumpForm button {min-height:32px;height:auto;padding:3px 9px}
 #pageJumpError {width:100%;color:#9c302a;font-size:.82rem}
+
+.page-selection-tools,#pageSelectionActions {display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.page-selection-tools {margin-bottom:8px}
+.page-selection-tools button {min-height:30px;height:auto;padding:3px 8px}
+#pageSelectToggle[aria-pressed=true] {background:#dceeff;border-color:#5a8dee}
+#pageSelectionCount {font-size:.8rem;color:#315269}
+.page-tile-wrap input[data-page-check] {position:absolute;top:5px;left:5px;margin:0;width:17px;height:17px;z-index:1;accent-color:#1d66a0}
+.page-tile-wrap.page-checked .page-tile {background:#dceeff;box-shadow:inset 0 0 0 1px #4b94c7}
+.page-tile-wrap:is(.page-drop-before,.page-drop-after)::after {content:'';position:absolute;inset-block:0;width:3px;background:#176cb1;pointer-events:none;z-index:2}
+.page-drop-before::after {left:-4px}
+.page-drop-after::after {right:-4px}

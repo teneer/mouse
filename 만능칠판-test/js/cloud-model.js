@@ -84,6 +84,22 @@ export function applyOperation(board, operation, revision) {
     reorderPages(boardPages(board),operation.order).forEach((page,index)=>{page.order=index;});
     return;
   }
+  if (kind==='delete-pages' || kind==='rename-pages') {
+    const entries=new Map(operation.entries);
+    const active=boardPages(board),selected=active.filter(page=>entries.has(page.id));
+    if (!selected.length || selected.length!==entries.size) return;
+    if (kind==='delete-pages') {
+      if (selected.length===active.length || selected.some(page=>page.version!==entries.get(page.id))) return;
+      for (const page of selected) {
+        page.deleted=true;page.content=null;page.version=revision;
+        delete board.history[page.id];
+      }
+    } else {
+      const titles=selected.map(page=>pageTitle(entries.get(page.id)));
+      if (titles.every(title=>title!==null)) selected.forEach((page,index)=>{page.title=titles[index];});
+    }
+    return;
+  }
   const page = board.pages[pageId];
   if (!page || page.deleted) return;
   if (kind === 'rename') {

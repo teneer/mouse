@@ -83,6 +83,27 @@ export class BoardStore {
       tx.onabort=tx.onerror=()=>reject(tx.error);
     });
   }
+  updatePageSelection(values,remove=false) {
+    return new Promise((resolve,reject)=>{
+      const tx=this.db.transaction('pages','readwrite'),store=tx.objectStore('pages');
+      const request=store.getAll();
+      let failure;
+      request.onsuccess=()=>{
+        const active=request.result.filter(page=>!page.deleted);
+        const selected=active.filter(page=>values.has(page.id));
+        if (selected.length!==values.size || (remove && (selected.length===active.length ||
+            selected.some(page=>values.get(page.id)!==page.version)))) {
+          failure=Error('페이지 목록이 바뀌었습니다. 다시 선택해 주세요.');
+          tx.abort();return;
+        }
+        for (const page of selected) store.put(remove
+          ? {...page,deleted:true,content:null,version:page.version+1,updatedAt:Date.now()}
+          : {...page,title:values.get(page.id)});
+      };
+      tx.oncomplete=()=>resolve();
+      tx.onabort=tx.onerror=()=>reject(failure||tx.error);
+    });
+  }
   reorderPages(ids) {
     return new Promise((resolve,reject)=>{
       const tx=this.db.transaction('pages','readwrite'), pages=tx.objectStore('pages');

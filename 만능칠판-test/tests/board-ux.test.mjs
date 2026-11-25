@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {fitScoreFont, conversionFrame, conversionStarFlight, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
 import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
-import {movePageId} from '../js/board-navigation.js';
+import {movePageId,movePageSelection} from '../js/board-navigation.js';
 import {normalizeFavoriteSize, scaleFavoriteSize} from '../js/board-options.js';
 import {validateContent} from '../js/validation.js';
 
@@ -115,4 +115,25 @@ test('deduction stars leave the class score, rise and fade; earned stars still a
   assert.deepEqual(gained.from,{x:100,y:120});
   assert.match(gained.frames.at(-1).transform,/translate\(0px, -50px\)/);
   assert.equal(gained.frames.at(-1).opacity,1);
+});
+
+
+test('dragging nonadjacent selected pages keeps their original order',()=>{
+  const ids=['a','b','c','d','e'];
+  const selected=new Set(['c','a']);
+  assert.deepEqual(movePageSelection(ids,selected,'d',true),['b','d','a','c','e']);
+  assert.deepEqual(movePageSelection(ids,selected,'e',false),['b','d','a','c','e']);
+  assert.equal(movePageSelection(ids,selected,'c',true),ids);
+});
+
+test('shared page batches rename and delete together and protect the last page',()=>{
+  const board=newBoard();
+  applyOperation(board,{kind:'seed',pages:['a','b','c'].map((id,order)=>({id,order,content:{canvas:{objects:[]}}}))},1);
+  applyOperation(board,{kind:'rename-pages',entries:[['b','수업 (1)'],['c','수업 (2)']]},2);
+  assert.deepEqual(boardPages(board).map(page=>page.title),[undefined,'수업 (1)','수업 (2)']);
+  applyOperation(board,{kind:'delete-pages',entries:[['b',1],['c',99]]},3);
+  assert.equal(boardPages(board).length,3);
+  applyOperation(board,{kind:'delete-pages',entries:[['b',1],['c',1]]},4);
+  applyOperation(board,{kind:'delete-pages',entries:[['a',1]]},5);
+  assert.deepEqual(boardPages(board).map(page=>page.id),['a']);
 });

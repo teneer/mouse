@@ -6,21 +6,21 @@ import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
 import {setBoardIcon} from './js/board-icons.js?v=answer-cover-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
 import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=import-sets-1';
-import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
+import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=page-selection-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js?v=import-sets-1';
 import {CanvasTools} from './js/canvas-tools.js?v=file-placeholders-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=cover-sync-2';
+import {CloudBoard} from './js/cloud.js?v=page-selection-1';
 import {wireScoreSync} from './js/score-sync.js?v=pursuit-manager-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=cover-sync-2';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=page-selection-1';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
 import {validateContent} from './js/validation.js?v=import-sets-1';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
-import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
+import {wireToolbarDrag,wirePageReorder,movePageId,movePageSelection} from './js/board-navigation.js?v=page-selection-1';
 const $=id=>document.getElementById(id);
 let c,store,tools,sync,clipboard,current=null,pages=[],busy=true,dirty=false,saving=null,generation=0,historyBusy=false;
 let autosaveTimer,toastTimer,importAbort,syncing=false,session={views:{}},modalFocus=null,confirmResolver=null,passwordResolver=null;
@@ -301,9 +301,68 @@ function renderPages() {
   $('pageListBtn').title=title;
   $('pageListBtn').setAttribute('aria-label',`페이지 목록 · 전체 ${pages.length}쪽 중 ${index+1}쪽 · ${title}`);
 }
-async function movePage(source,target) {
+const selectedPages=new Set();
+let pageSelectionMode=false,renameSelection=null;
+function refreshPageSelection() {
+  for (const id of selectedPages) if (!pages.some(page=>page.id===id)) selectedPages.delete(id);
+  $('pageSelectToggle').setAttribute('aria-pressed',String(pageSelectionMode));
+  $('pageSelectToggle').textContent=pageSelectionMode?'선택 종료':'선택';
+  $('pageSelectionActions').hidden=!pageSelectionMode;
+  $('pageSelectionCount').textContent=selectedPages.size+'쪽 선택';
+  $('pageSelectionRename').disabled=!selectedPages.size;
+  $('pageSelectionDelete').disabled=!selectedPages.size || selectedPages.size===pages.length;
+  $('pageSelectionDelete').title=selectedPages.size===pages.length?'한 쪽 이상 남겨야 합니다.':'선택한 페이지를 삭제합니다.';
+  for (const input of $('pageTiles').querySelectorAll('[data-page-check]')) {
+    input.hidden=!pageSelectionMode;
+    input.checked=selectedPages.has(input.dataset.pageCheck);
+    input.parentElement.classList.toggle('page-checked',input.checked);
+  }
+}
+function selectPage(id,checked) {
+  if (checked) selectedPages.add(id);
+  else selectedPages.delete(id);
+  refreshPageSelection();
+}
+function openSelectionRename() {
+  const ids=pages.filter(page=>selectedPages.has(page.id)).map(page=>page.id);
+  if (!ids.length) return;
+  renameSelection=ids;
+  renamePageId=null;
+  $('pageRenameTitle').textContent='선택한 페이지 이름 편집';
+  $('pageRenameHint').textContent=ids.length>1?'현재 페이지 순서대로 이름 뒤에 (1), (2) 등을 붙입니다.':'선택한 페이지의 이름을 바꿉니다.';
+  $('pageRenameHint').hidden=false;
+  $('pageNameInput').value='';
+  openModal('pageRenameModal');
+  $('pageNameInput').focus();
+}
+async function deleteSelectedPages() {
+  const ids=pages.filter(page=>selectedPages.has(page.id)).map(page=>page.id);
+  if (!ids.length || ids.length===pages.length || !allowed()) return;
+  if (!await askConfirm(`선택한 ${ids.length}쪽을 삭제할까요?`,{title:'선택한 페이지 삭제',confirmText:'삭제'})) return;
+  await run(async()=>{
+    await flush();
+    const shared=cloudActive(),active=shared?boardPages(cloud.projected()):await store.listPages();
+    const chosen=active.filter(page=>ids.includes(page.id));
+    if (chosen.length!==ids.length || chosen.length===active.length) throw Error('페이지 목록이 바뀌었습니다. 다시 선택해 주세요.');
+    const entries=chosen.map(page=>[page.id,page.version]);
+    if (shared) await cloud.enqueue({kind:'delete-pages',entries});
+    else {await store.updatePageSelection(new Map(entries),true);sync.notify();}
+    pages=shared?boardPages(cloud.projected()):await store.listPages();
+    if (pages.some(page=>ids.includes(page.id))) throw Error('페이지 목록이 바뀌었습니다. 다시 선택해 주세요.');
+    for (const id of ids) {
+      history.remove(id);delete session.views[id];selectedPages.delete(id);
+    }
+    if (ids.includes(current.id)) {
+      const index=active.findIndex(page=>page.id===current.id);
+      await setPage(pages[Math.min(index,pages.length-1)]);rememberView(true);
+    } else renderPages();
+  });
+}
+async function movePage(source,target,after) {
   const ids=pages.map(page=>page.id);
-  const order=movePageId(ids,source,target);
+  const selected=pageSelectionMode && selectedPages.has(source)?selectedPages:new Set([source]);
+  const order=after===undefined && selected.size===1?movePageId(ids,source,target):
+    movePageSelection(ids,selected,target,after??ids.indexOf(source)<ids.indexOf(target));
   if(order===ids)return;
   await flush();
   if(cloudActive()) {await cloud.enqueue({kind:'reorder',order});pages=boardPages(cloud.projected());}
@@ -313,7 +372,9 @@ async function movePage(source,target) {
   if(openedPopup==='pageList')renderPageTiles();
 }
 function openPageRename(page,index) {
-  renamePageId=page.id;
+  renamePageId=page.id;renameSelection=null;
+  $('pageRenameTitle').textContent='페이지 이름 편집';
+  $('pageRenameHint').hidden=true;
   $('pageNameInput').value=displayPageTitle(page,index);
   openModal('pageRenameModal');
   $('pageNameInput').focus();
@@ -322,13 +383,32 @@ function openPageRename(page,index) {
 async function savePageTitle(event) {
   event.preventDefault();
   const id=renamePageId, title=pageTitle($('pageNameInput').value);
-  if(!id || $('pageRenameModal').style.display!=='flex')return;
+  const selection=renameSelection;
+  if ((!id && !selection) || $('pageRenameModal').style.display!=='flex') return;
+  if (selection && !title) {
+    $('pageRenameHint').textContent='공통 이름을 입력하세요.';
+    $('pageNameInput').focus();
+    return;
+  }
   const submit=event.submitter || event.currentTarget.querySelector('[type=submit]');
   if(submit.disabled)return;
   submit.disabled=true;
   try{
     await flush();
-    if(cloudActive()){
+    if (selection) {
+      const entries=selection.map((pageId,index)=>{
+        const suffix=selection.length>1?' ('+(index+1)+')':'';
+        return [pageId,title.slice(0,80-suffix.length)+suffix];
+      });
+      if (cloudActive()) {
+        await cloud.enqueue({kind:'rename-pages',entries});
+        pages=boardPages(cloud.projected());
+        if (entries.some(([pageId,name])=>pages.find(page=>page.id===pageId)?.title!==name)) throw Error('페이지 목록이 바뀌었습니다. 다시 선택해 주세요.');
+      } else {
+        await store.updatePageSelection(new Map(entries));
+        pages=await store.listPages();sync.notify();
+      }
+    } else if(cloudActive()){
       const page=cloud.projected().pages[id];
       if(!page || page.deleted)throw Error('이미 삭제된 페이지입니다.');
       await cloud.enqueue({kind:'rename',pageId:id,title});
@@ -378,7 +458,10 @@ function renderPageTiles() {
     tile.title=title;
     tile.setAttribute('aria-label',`${index+1}쪽 · ${title}`);
     tile.append(preview,label);
-    tile.onclick=()=>run(()=>activatePage(page.id));
+    tile.onclick=()=>{
+      if (pageSelectionMode) selectPage(page.id,!selectedPages.has(page.id));
+      else run(()=>activatePage(page.id));
+    };
     tile.onkeydown=event=>{
       if(!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key))return;
       const target=pages[index+(event.key==='ArrowLeft'?-1:1)];
@@ -413,7 +496,11 @@ function renderPageTiles() {
       actions.style.top=(rect.bottom+actions.offsetHeight+8<=innerHeight ? rect.bottom : Math.max(8,rect.top-actions.offsetHeight))+'px';
       pageActions={trigger,actions};
     };
-    menu.append(trigger,actions);wrap.append(tile,menu);grid.append(wrap);
+    const check=document.createElement('input');
+    check.type='checkbox';check.dataset.pageCheck=page.id;
+    check.setAttribute('aria-label',`${index+1}쪽 선택 · ${title}`);
+    check.onchange=()=>selectPage(page.id,check.checked);
+    menu.append(trigger,actions);wrap.append(tile,check,menu);grid.append(wrap);
   }
   if(pages.length<MAX_PAGES){
     const add=document.createElement('button');
@@ -422,6 +509,7 @@ function renderPageTiles() {
     add.onclick=()=>run(()=>createPage(emptyContent(c.width,c.height)));
     grid.append(add);
   }
+  refreshPageSelection();
   const snapshot=pages.slice();
   void (async()=>{
     for(const [index,page] of snapshot.entries()){
@@ -1369,7 +1457,14 @@ function wireUI() {
   Object.entries(modeMap).forEach(([id,mode])=>$(id).onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode===mode?'select':mode);});
   $('selectMoveToggleBtn').onclick=()=>{if(!allowed())return;finishText();tools.setMode(tools.mode==='select'?'move':'select');};
   wireAppearanceSettings();wireBackgroundSettings();
-  wirePageReorder($('pageTiles'),(source,target)=>movePage(source,target).catch(fail));
+  $('pageSelectToggle').onclick=()=>{
+    pageSelectionMode=!pageSelectionMode;
+    if (!pageSelectionMode) selectedPages.clear();
+    refreshPageSelection();
+  };
+  $('pageSelectionRename').onclick=openSelectionRename;
+  $('pageSelectionDelete').onclick=()=>deleteSelectedPages().catch(fail);
+  wirePageReorder($('pageTiles'),(source,target,after)=>movePage(source,target,after).catch(fail));
   $('pageTiles').addEventListener('scroll',closePageActions);
   $('pageRenameForm').onsubmit=event=>savePageTitle(event).catch(fail);
   $('textBgEnabled').onchange=$('textBorderEnabled').onchange=updateTextPropInputs;
