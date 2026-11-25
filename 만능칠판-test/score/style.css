@@ -932,7 +932,19 @@ body.score-modal-open .container {visibility:hidden}
 .pursuit-track {display:flex;width:max-content;white-space:nowrap;font-weight:750;animation:pursuit-scroll 10s linear infinite}
 .pursuit-track span {box-sizing:border-box;padding-inline:1em;min-width:100cqw}
 @keyframes pursuit-scroll {to {transform:translateX(-50%)}}
-.pursuit-behind.team-card,.pursuit-behind.main-scoreboard {background:#ffe2e0;box-shadow:inset 0 0 0 2px #ba332e}
+.pursuit-behind.team-card,
+.pursuit-behind.main-scoreboard {
+  background:#ffe2e0;
+  animation:pursuit-danger 1.1s ease-in-out infinite;
+}
+.pursuit-behind #number,
+.pursuit-behind .team-number {
+  color:#a61e27 !important;
+}
+@keyframes pursuit-danger {
+  0%,100% {box-shadow:inset 0 0 0 2px #bd6262,inset 0 0 6px #c92d3026}
+  48% {box-shadow:inset 0 0 0 3px #bc212b,inset 0 0 24px #c92d3066}
+}
 #pursuit-editor form {gap:12px}
 #pursuit-editor label {display:flex;align-items:center;justify-content:space-between;gap:8px}
 #pursuit-editor label:has(input[type=checkbox]) {justify-content:flex-start}
