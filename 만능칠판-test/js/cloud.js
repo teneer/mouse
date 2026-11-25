@@ -1,7 +1,7 @@
 import {startFieldConflicts} from './score-conflicts.js';
 import {completeReachedAutomaticGoals} from '../score/goal-model.js?v=pursuit-manager-1';
-import {uid} from './constants.js?v=magnetic-cover-1';
-import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=magnetic-cover-1';
+import {uid} from './constants.js?v=cover-sync-2';
+import {applyOperation, boardPages, newBoard, validView, validViewState} from './cloud-model.js?v=cover-sync-2';
 import {applyScoreOperation} from './shared-score.js?v=pursuit-manager-1';
 import {parseFirebaseConfig} from './cloud-config.js';
 
@@ -23,6 +23,7 @@ export class CloudBoard {
     this.inviteError = null;
     this.revoked = false;
     this.latestView = null;
+    this.coverSync = {};
     this.boardReady = false;
     this.online = false;
     this.retryDelay = 1000;
@@ -233,9 +234,15 @@ export class CloudBoard {
       this.events.status();
     }, this.events.error));
     this.subscriptions.push(fs.onSnapshot(this.ref('control','view'), {includeMetadataChanges:true}, snapshot => {
-      if (isReady(snapshot) && (validViewState(snapshot.data()) || validView(snapshot.data()))) {
-        this.latestView = snapshot.data();
-        this.events.view(this.latestView);
+      if (!isReady(snapshot) || !snapshot.exists()) return;
+      const {coverSync={},...view}=snapshot.data();
+      this.coverSync=coverSync;
+      this.events.coverView?.();
+      const previous=this.latestView;
+      const comparable=view.sourceTab && previous ? {...previous,device:view.device} : previous;
+      if ((validViewState(view) || validView(view)) && JSON.stringify(view)!==JSON.stringify(comparable)) {
+        this.latestView=view;
+        this.events.view(view);
       }
     }, this.events.error));
     this.subscriptions.push(fs.onSnapshot(this.ref('control', 'deviceInvite'), {includeMetadataChanges:true}, snapshot => {
@@ -284,6 +291,7 @@ export class CloudBoard {
     this.inviteError = null;
     this.revoked = false;
     this.latestView = null;
+    this.coverSync = {};
     this.state = newBoard();
     this.pending.clear();
     this.events.status();
@@ -456,14 +464,25 @@ export class CloudBoard {
         (!before?.enabled || before.epoch!==state.epoch || !targets.includes(state.sourceTab))) return false;
       const enabled=toggle ?? (before?.enabled===true);
       const view=changeTargets && !targets.includes(state.sourceTab) && before?.pageId ? before : state;
-      tx.set(ref,{...view,enabled,targets,epoch:changeTargets||toggle!==undefined?state.epoch:before.epoch,
+      tx.set(ref,{...view,coverSync:before?.coverSync||{},enabled,targets,epoch:changeTargets||toggle!==undefined?state.epoch:before.epoch,
         device:this.deviceId,at:this.fs.serverTimestamp()});
       return true;
     });
   }
 
+  async sendCoverSync(pageId,packet) {
+    if (!this.online || !this.boardReady) throw Error('가리개 동기화는 기기가 온라인일 때 변경할 수 있습니다.');
+    const ref=this.ref('control','view');
+    return this.fs.runTransaction(this.db,async tx=>{
+      const before=(await tx.get(ref)).data();
+      const coverSync=before?.coverSync||{};
+      const next={...packet,time:Math.max(packet.time,(coverSync[pageId]?.time||0)+1)};
+      tx.set(ref,{coverSync:{...coverSync,[pageId]:next},device:this.deviceId},{merge:true});
+    });
+  }
+
   async sendView(view) {
     if (!this.boardReady || !this.online || !validView(view)) return;
-    await this.fs.setDoc(this.ref('control','view'), {...view, device:this.deviceId, at:this.fs.serverTimestamp()});
+    await this.fs.setDoc(this.ref('control','view'), {...view, device:this.deviceId, at:this.fs.serverTimestamp()},{merge:true});
   }
 }

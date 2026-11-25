@@ -1,22 +1,22 @@
-import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=magnetic-cover-1';
+import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-sync-2';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
 import {setBoardIcon} from './js/board-icons.js?v=answer-cover-1';
 import {fixedObjectLabel,installTextBoxBorder,normalizeTextBoxStyle} from './js/text-box.js';
-import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=magnetic-cover-1';
+import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES} from './js/constants.js?v=cover-sync-2';
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=goal-queue-1';
 import {PageHistory} from './history.js';
-import {SystemClipboard} from './clipboard.js?v=magnetic-cover-1';
+import {SystemClipboard} from './clipboard.js?v=cover-sync-2';
 import {CanvasTools} from './js/canvas-tools.js?v=ink-session-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
-import {CloudBoard} from './js/cloud.js?v=magnetic-cover-1';
+import {CloudBoard} from './js/cloud.js?v=cover-sync-2';
 import {wireScoreSync} from './js/score-sync.js?v=pursuit-manager-1';
-import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=magnetic-cover-1';
+import {boardPages, pagePatch, pageTitle, validViewState} from './js/cloud-model.js?v=cover-sync-2';
 import {wireCloudUI} from './js/cloud-ui.js?v=toolbar-status-1';
-import {validateContent} from './js/validation.js?v=magnetic-cover-1';
+import {validateContent} from './js/validation.js?v=cover-sync-2';
 import {makeStatusController,shouldClosePopups} from './js/feedback.js?v=view-tabs-1';
 import {BACKGROUND_COLORS,BACKGROUND_PATTERNS,normalizePattern,setCanvasPattern} from './js/board-background.js';
 import {wireToolbarDrag,wirePageReorder,movePageId} from './js/board-navigation.js?v=toolbar-scroll-1';
@@ -75,12 +75,26 @@ function rememberView(publish=false) {
 let answerCoverTool;
 const answerCovers=()=>c.getObjects().filter(object=>object.wbAnswerCover);
 const isCoverOpen=cover=>cover.wbCoverOpen ?? cover.fill==='transparent';
+const coverSyncPrefix='whiteboard.cover-sync:'+new URL('.',location.href).pathname+':';
+const pendingCoverPages=new Map();
+let coverWrites=Promise.resolve();
+const coverSyncKey=id=>coverSyncPrefix+(cloud?.options?.boardId||'local')+':'+id;
+function sharedCoverPage() {
+  if (!current) return null;
+  const key=coverSyncKey(current.id);
+  if (cloudActive()) return pendingCoverPages.get(key)??cloud.coverSync[current.id];
+  try {return JSON.parse(localStorage.getItem(key));} catch {return null;}
+}
 function refreshCoverControls() {
   const covers=answerCovers();
-  const allOpen=covers.length>0 && covers.every(isCoverOpen);
+  const anyOpen=covers.some(isCoverOpen);
   const button=$('answerCoverAll');
+  const label=anyOpen?'모두 닫기':'모두 열기';
   button.disabled=!covers.length;
-  button.textContent=allOpen?'모두 닫기':'모두 열기';
+  button.textContent=anyOpen?'◉':'◌';
+  button.title=label;
+  button.setAttribute('aria-label',label);
+  $('answerCoverSync').checked=!!sharedCoverPage()?.enabled;
 }
 function applyCoverView(states) {
   for (const cover of answerCovers()) {
@@ -88,18 +102,44 @@ function applyCoverView(states) {
   }
   refreshCoverControls();
 }
-function setCoverView(covers,open) {
-  const states=(session.coverViews??={})[current.id]??={};
-  for (const cover of covers) {
-    cover.wbCoverOpen=open;
-    states[cover.id]=open;
+function receiveCoverSync() {
+  if (!current) return;
+  const shared=sharedCoverPage();
+  if (shared?.enabled) {
+    (session.coverViews??={})[current.id]=shared.states;
+    applyCoverView(shared.states);
+    c.requestRenderAll();rememberView();
+  } else refreshCoverControls();
+}
+function publishCoverSync(enabled,states) {
+  const pageId=current.id;
+  const time=Math.max(Date.now(),(sharedCoverPage()?.time||0)+1);
+  const packet={enabled,states,time};
+  if (cloudActive()) {
+    const key=coverSyncKey(pageId), board=cloud.options;
+    pendingCoverPages.set(key,packet);
+    coverWrites=coverWrites.then(async()=>{
+      if (cloud.options===board) await cloud.sendCoverSync(pageId,packet);
+    }).catch(fail).finally(()=>{
+      if (pendingCoverPages.get(key)===packet) pendingCoverPages.delete(key);
+      if (current?.id===pageId) receiveCoverSync();
+    });
+    refreshCoverControls();
+  } else {
+    localStorage.setItem(coverSyncKey(pageId),JSON.stringify(packet));
+    receiveCoverSync();
   }
-  refreshCoverControls();c.requestRenderAll();rememberView(true);
+}
+function setCoverView(covers,open) {
+  const states=Object.fromEntries(answerCovers().map(cover=>[cover.id,isCoverOpen(cover)]));
+  for (const cover of covers) states[cover.id]=open;
+  (session.coverViews??={})[current.id]=states;
+  applyCoverView(states);c.requestRenderAll();rememberView();
+  if (sharedCoverPage()?.enabled) publishCoverSync(true,states);
 }
 function currentView(){
   const [zoom,,,,left,top]=c.viewportTransform;
   const view={pageId:current.id,zoom,x:(c.width/2-left)/zoom,y:(c.height/2-top)/zoom};
-  view.covers=Object.fromEntries(answerCovers().map(cover=>[cover.id,isCoverOpen(cover)]));
   const frame=$('scoreFrame');
   if(frame){
     view.scoreOpen=scoreOpen;
@@ -220,7 +260,7 @@ async function setPage(page,reset=false,keepView=true) {
     current=previous;cloudBase=cloudActive()?previous?.content:null;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
   }
   tools.setMode('select');
-  keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);
+  keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);receiveCoverSync();
   const view=keepView?session.views[current.id]:null;
   if(Array.isArray(view)&&view.length===6&&view.every(Number.isFinite)&&view[0]>=0.1&&view[0]<=10) {
     c.setViewportTransform(view.slice());rememberView();
@@ -423,7 +463,7 @@ async function stepHistory(direction) {
   try {
     await loadCanvas(c,content.canvas);await checkFiles(content);
     current.content=content;
-    keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);
+    keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);receiveCoverSync();
     tools.setMode('select');
     dirty=true; generation++;
     // Save the resulting state, but do not create another history entry.
@@ -1075,7 +1115,7 @@ async function refreshCloud() {
           tools.setMode(mode);
           const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbAssetMissing && !object.wbPinned);
           if(mode==='select' && objects.length)c.setActiveObject(objects.length===1?objects[0]:new fabric.ActiveSelection(objects,{canvas:c}));
-          keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);
+          keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);receiveCoverSync();
           c.requestRenderAll();
         });
       }
@@ -1098,10 +1138,6 @@ async function refreshCloud() {
 
 function applyViewport(view){
   receiveScoreView(view);
-  if (view.covers) {
-    (session.coverViews??={})[current.id]=view.covers;
-    applyCoverView(view.covers);
-  }
   c.setViewportTransform([view.zoom,0,0,view.zoom,c.width/2-view.x*view.zoom,c.height/2-view.y*view.zoom]);
   c.requestRenderAll();rememberView();
 }
@@ -1153,9 +1189,18 @@ function wireUI() {
   answerCoverTool=wireAnswerCover(c,{allowed,changed,uid,mode:()=>tools.mode,notify,isOpen:isCoverOpen,setOpen:setCoverView});
   $('contextAnswerCover').onclick=()=>{closeContext();answerCoverTool.activate();};
   $('answerCoverTool').onclick=()=>answerCoverTool.toggle();
+  $('answerCoverSync').onchange=event=>{
+    if (!current) return;
+    const enabled=event.target.checked;
+    const states=Object.fromEntries(answerCovers().map(cover=>[cover.id,isCoverOpen(cover)]));
+    publishCoverSync(enabled,states);
+  };
+  window.addEventListener('storage',event=>{
+    if (current && event.key===coverSyncKey(current.id)) receiveCoverSync();
+  });
   $('answerCoverAll').onclick=()=>{
     const covers=answerCovers();
-    if (allowed() && covers.length) setCoverView(covers,!covers.every(isCoverOpen));
+    if (allowed() && covers.length) setCoverView(covers,!covers.some(isCoverOpen));
   };
   let renameCover;
   $('contextRenameCover').onclick=()=>{
@@ -1486,7 +1531,7 @@ async function boot() {
   reloadLocalAfterDisconnect = useLocal;
   cloud=new CloudBoard(store,{
     board:()=>{requestCloudRefresh();scoreSync?.refresh();tabViews?.refresh();},
-    view:()=>{requestCloudRefresh();tabViews?.render();},error:fail,
+    view:()=>{requestCloudRefresh();tabViews?.render();},coverView:receiveCoverSync,error:fail,
     status:()=>{cloudUI?.status();scoreSync?.refresh();tabViews?.refresh();},approved:()=>cloudUI?.approved(),waiting:code=>cloudUI?.waiting(code)
   });
   scoreSync=wireScoreSync($('scoreFrame'),cloud,store,notify);

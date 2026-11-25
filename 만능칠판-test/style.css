@@ -870,6 +870,8 @@ body.score-modal-open #scoreFrame {background:transparent}
 .drawing-cover {cursor:crosshair!important}
 
 .answer-cover-tool {display:inline-flex;flex:none}
-#toolbar #answerCoverTool {border-radius:8px 0 0 8px}
+#toolbar .answer-cover-sync {display:grid;place-items:center;padding:0 5px;border:1px solid #aebdce;border-right:0;border-radius:8px 0 0 8px;background:#f5faff}
+#toolbar .answer-cover-sync input {accent-color:#266fa5}
+#toolbar #answerCoverTool {border-radius:0}
 #toolbar #answerCoverTool[aria-pressed=true] {background:#dceeff;border-color:#5a8dee}
-#toolbar #answerCoverAll {border-left:0;border-radius:0 8px 8px 0;padding-inline:6px;font-size:.8rem}
+#toolbar #answerCoverAll {border-left:0;border-radius:0 8px 8px 0;min-width:28px;padding-inline:5px;font-size:1rem}

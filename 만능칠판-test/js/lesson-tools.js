@@ -32,6 +32,19 @@ export function answerCoverAt(canvas,event) {
   return top?.wbAnswerCover ? top : null;
 }
 
+function findCoverAnchor(canvas,bounds) {
+  let anchor,best=0;
+  for (const object of canvas.getObjects().slice().reverse()) {
+    if (!object.id || object.wbAnswerCover || !object.visible) continue;
+    const box=object.getBoundingRect(true,true);
+    const width=Math.min(bounds.left+bounds.width,box.left+box.width)-Math.max(bounds.left,box.left);
+    const height=Math.min(bounds.top+bounds.height,box.top+box.height)-Math.max(bounds.top,box.top);
+    const area=Math.max(0,width)*Math.max(0,height);
+    if (area>best) {best=area;anchor=object;}
+  }
+  return anchor;
+}
+
 export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,setOpen}) {
   const surface=canvas.upperCanvasEl;
   let armed=false,gesture=null;
@@ -88,6 +101,7 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,s
     if (!allowed()) return;
     if (cover) {
       if (!moved) {setOpen([cover],!isOpen(cover));return;}
+      cover.set('wbCoverAnchor',findCoverAnchor(canvas,cover.getBoundingRect(true,true))?.id);
     } else {
       if (Math.abs(e.clientX-x)<5 || Math.abs(e.clientY-y)<5) return;
       const end=canvas.getPointer(e);
@@ -96,14 +110,7 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,s
       while(names.has(String(number))) number++;
       const left=Math.min(point.x,end.x), top=Math.min(point.y,end.y);
       const width=Math.abs(end.x-point.x), height=Math.abs(end.y-point.y);
-      let anchor,best=0;
-      for (const object of canvas.getObjects().slice().reverse()) {
-        if (object.wbAnswerCover || !object.visible) continue;
-        const box=object.getBoundingRect(true,true);
-        const area=Math.max(0,Math.min(left+width,box.left+box.width)-Math.max(left,box.left)) *
-          Math.max(0,Math.min(top+height,box.top+box.height)-Math.max(top,box.top));
-        if (area>best) {best=area;anchor=object;}
-      }
+      const anchor=findCoverAnchor(canvas,{left,top,width,height});
       canvas.add(new fabric.Rect({id:uid(),wbAnswerCover:true,wbCoverName:String(number),wbCoverAnchor:anchor?.id,
         left,top,width,height,fill:'#375467',stroke:'#86b0c7',strokeWidth:1}));
     }
