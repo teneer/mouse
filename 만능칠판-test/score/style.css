@@ -908,17 +908,22 @@ body.score-modal-open #score-surface {
 .goal-table th:nth-child(4),.goal-table th:nth-child(5),.goal-table th:nth-child(7) {width:7.4rem}
 .goal-table th:nth-child(6) {width:4.7rem}
 .goal-table th label {display:inline-flex;gap:.2rem;align-items:center}
-.goal-table td[data-label="선물 메시지"] {text-align:left}
-.goal-table td input:not([type=checkbox]) {width:100%;min-width:0}
+.goal-table th:nth-child(2),.goal-table td[data-label="목표 점수"],.goal-table .goal-row-score {text-align:right}
+.goal-table :is(th:nth-child(3),th:nth-child(4),th:nth-child(5)),
+.goal-table :is(td[data-label="메시지"],td[data-label="적용 모둠"],td[data-label="달성 상태"]) {text-align:left}
+#goal-management-view .goal-table td input:not([type=checkbox]) {width:100%;min-width:0;border-color:transparent;background:transparent}
+#goal-management-view .goal-table td input:not([type=checkbox]):is(:hover,:focus-visible) {border-color:var(--panel-line)}
 .goal-table td button {max-width:100%;padding-inline:.45rem;font-size:.83rem}
 .goal-table tr:has(.goal-row-check:checked) {background:#f0f8fc}
 .goal-table tr[data-archived] {background:var(--light-bg);color:var(--muted-text)}
-.goal-table tr[data-archived] td[data-label="선물 메시지"]::after {
+.goal-table tr[data-archived] td[data-label="메시지"]::after {
   content:"완료 기록 보존";display:block;margin-top:.2rem;font-size:.73rem;color:var(--muted-text);
 }
 :is(.goal-table,#goal-action-dialog) input[type=checkbox] {appearance:auto;width:1rem;height:1rem;margin:0;accent-color:var(--primary-color)}
-#goal-management-view .goal-state[data-state=reached],#goal-action-dialog [data-state=reached] {background:#fff2c1;border-color:#dcc574}
-#goal-management-view .goal-state[data-state=done],#goal-action-dialog [data-state=done] {background:#e5f3e5;border-color:#bdd7bd}
+#goal-management-view .goal-state[data-state=reached],
+#goal-action-dialog [data-state=reached] .goal-target-label {color:#805511}
+#goal-management-view .goal-state[data-state=done],
+#goal-action-dialog [data-state=done] .goal-target-label {color:#28624b}
 #goal-management-view .goal-repeat-active {color:var(--primary-dark);background:#dceff5}
 #goal-empty {margin:.8rem;color:var(--muted-text)}
 #goal-action-dialog {
@@ -929,25 +934,47 @@ body.score-modal-open #score-surface {
 }
 #goal-action-dialog::backdrop {background:#112a365c}
 #goal-action-dialog .dialog-header h3 {padding:0;min-width:0;font-size:1rem}
+#goal-action-dialog[data-kind=status] {width:min(670px,calc(100% - 24px))}
+#goal-action-dialog[data-kind=status] #goal-action-form > .dialog-footer {display:none}
+#goal-action-dialog[data-kind=status] #goal-action-title {display:flex;flex-wrap:wrap;gap:2px .6rem;overflow-wrap:anywhere}
+.goal-target-threshold {color:var(--primary-color);white-space:nowrap}
 #goal-action-error {color:#9d3027;margin:.4rem 0}
 #goal-action-error:empty {display:none}
 #goal-action-fields label {display:flex;align-items:center;gap:.5rem;min-width:0}
 #goal-action-fields label input:where(:not([type=checkbox])) {flex:1;min-width:0}
-.goal-repeat-fields {display:grid;gap:.55rem}
+.goal-repeat-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
 .goal-repeat-fields > label {justify-content:space-between}
-.goal-repeat-preview {margin:0;color:var(--muted-text);font-size:.85rem}
+#goal-action-fields .goal-repeat-fields > label:nth-child(-n+3) {display:grid;gap:.35rem;font-size:.85rem}
+.goal-repeat-fields > :nth-child(n+4) {grid-column:1/-1}
+.goal-repeat-preview {grid-row:2;margin:0;padding:.45rem .6rem;border-radius:5px;background:var(--light-bg);color:var(--muted-text);font-size:.85rem}
 .goal-team-picker {min-width:0;border:1px solid var(--panel-line);border-radius:8px;padding:.45rem .6rem}
-.goal-team-options,.goal-target-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11.5rem),1fr));gap:.4rem}
+.goal-team-options {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11.5rem),1fr));gap:.4rem}
 .goal-team-options {padding-top:.4rem}
 .goal-target-status {display:grid;gap:.55rem}
 .goal-target-status p {margin:0;color:var(--muted-text)}
-.goal-target-card {
-  display:flex;align-items:center;gap:.4rem;min-width:0;
-  padding:.35rem;border:1px solid var(--panel-line);border-radius:8px;background:var(--light-bg);
+.goal-target-list {
+  --columns:6;--gap:8px;
+  display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap);margin-inline:auto;width:100%;
+  max-width:calc(var(--columns) * 98px + (var(--columns) - 1) * var(--gap));
 }
-.goal-target-card strong {flex:1;min-width:0;overflow-wrap:anywhere;font-size:.85rem}
-.goal-target-card button {white-space:nowrap}
-.goal-target-actions {display:flex;gap:.35rem;flex-wrap:wrap;justify-content:flex-end}
+#goal-action-dialog .goal-target-card {
+  display:grid;align-content:space-between;gap:.4rem;min-width:0;min-height:76px;
+  flex:0 0 min(98px,calc((100% - (var(--columns) - 1) * var(--gap)) / var(--columns)));
+  padding:.45rem;border:1px solid var(--panel-line);border-radius:6px;background:var(--light-bg);
+}
+#goal-action-dialog .goal-target-card[data-state=excluded] {border-style:dashed;color:var(--muted-text);background:var(--card-bg)}
+#goal-action-dialog .goal-target-card[aria-pressed=true] {border-color:var(--primary-color);background:var(--summary-bg)}
+.goal-target-label {font-size:.78rem;font-weight:650;text-align:left;color:var(--muted-text)}
+.goal-target-facts {display:flex;align-items:baseline;justify-content:space-between;gap:.2rem;min-width:0;font-variant-numeric:tabular-nums}
+.goal-target-facts strong {min-width:0;overflow-wrap:anywhere;text-align:left;font-size:.84rem}
+.goal-target-facts > span {font-size:.75rem;color:var(--muted-text);white-space:nowrap}
+.goal-target-actions {
+  position:sticky;bottom:-14px;display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  padding:.4rem 0;border-top:1px solid var(--panel-line);background:var(--card-bg);
+}
+.goal-target-actions > span {font-size:.8rem;color:var(--muted-text)}
+.goal-target-actions > div {display:flex;gap:.35rem;flex-wrap:wrap}
+.goal-target-actions button:disabled {opacity:.55;cursor:default}
 #management-modal > .dialog-sheet {width:min(740px,100%);max-height:94dvh}
 .score-header-actions {display:flex;align-items:center;gap:min(6px,2cqw)}
 .score-screen-icon {
@@ -985,8 +1012,10 @@ body.score-modal-open #score-surface {
   }
   .goal-table td {display:grid;align-content:start;justify-items:start;border:0;text-align:left}
   .goal-table td:before {content:attr(data-label);font-size:.72rem;color:var(--muted-text)}
-  .goal-table td[data-label="선물 메시지"] {grid-column:1/-1}
+  .goal-table td[data-label="메시지"] {grid-column:1/-1}
 }
+@media (max-width:540px) {.goal-target-list {--columns:3}}
+@media (max-width:360px) {.goal-target-list {--columns:2}}
 .team-goal-gifts button {
   display:inline-flex;align-items:flex-end;gap:.15em;min-height:min(22px,30cqh);padding:1px 2px;
   border:0;background:transparent;color:#216a91;font:inherit;

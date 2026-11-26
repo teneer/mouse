@@ -1,4 +1,4 @@
-import {mountGoalTable} from './goal-table.js?v=goal-table-1';
+import {mountGoalTable} from './goal-table.js?v=goal-cards-1';
 import {celebrationSections,createGoalCelebrationQueue,mountGoalCelebration} from './goal-celebration.js?v=device-audio-1';
 
 const $ = id => document.getElementById(id);

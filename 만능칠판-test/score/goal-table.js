@@ -32,10 +32,10 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
   const scoped=()=>draft.filter(goal=>goal.type===scope);
   const chosen=()=>scoped().filter(goal=>selected.has(goal.id) && !goal.archived);
   const savedGoal=goal=>savedGoals.get(goal.id);
-  const canChangeStatus=goal=>{
+  const canChangeStatus=(goal,teamId)=>{
     const saved=savedGoal(goal);
     return !!saved && !goal.archived && !goal.automatic && !saved.automatic
-      && saved.score===goal.score && sameTeams(saved.teamIds,goal.teamIds);
+      && saved.score===goal.score && (goal.type==='class' || goalAppliesToTeam(saved,teamId));
   };
   const draftChanged=goal=>{
     const saved=savedGoal(goal);
@@ -85,13 +85,18 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
       target:record??{id:JSON.stringify([goal.id,team.id]),goalId:goal.id,teamId:team.id,reached:null}};
   }
   const recordsFor=goal=>savedRecords.get(goal.id)??[];
-  function goalTargets(goal,history,round) {
+  function goalTargets(goal,history,round,includeExcluded=false) {
     if(goal.archived)return history.filter(record=>record.status==='done' && record.milestone===round).map(record=>({
-      team:{id:record.teamId,name:record.teamId===null?'학급':record.teamName??'모둠'},state:'done',target:record
+      team:{id:record.teamId,name:record.teamId===null?'학급':record.teamName??'모둠',
+        score:record.teamId===null?classScore():teamList().find(team=>team.id===record.teamId)?.score??record.achievedScore},
+      state:'done',target:record,applies:true
     }));
-    const teams=goal.type==='class'?[{id:null,name:'학급',score:classScore()}]:teamList().filter(team=>goalAppliesToTeam(goal,team.id));
-    const visible=round===undefined?teams:teams.filter(team=>history.some(record=>record.teamId===team.id && record.milestone===round));
-    return visible.map(team=>stateFor(goal,team,history,round));
+    const teams=goal.type==='class'?[{id:null,name:'학급',score:classScore()}]:teamList();
+    return teams.flatMap(team=>{
+      const applies=goal.type==='class'||goalAppliesToTeam(goal,team.id);
+      if (!includeExcluded && (!applies || round!==undefined && !history.some(record=>record.teamId===team.id && record.milestone===round)))return [];
+      return [{...stateFor(goal,team,history,round),applies}];
+    });
   }
   function refreshStatus(goal,row) {
     const control=row.querySelector('.goal-state');
@@ -122,7 +127,7 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     row.toggleAttribute('data-archived',!!goal.archived);
     row.innerHTML='<td data-label="선택"><input class="goal-row-check" type="checkbox" aria-label="목표 행 선택"></td>'+
       '<td data-label="목표 점수"><input class="goal-row-score" inputmode="numeric" aria-label="목표 점수"></td>'+
-      '<td data-label="선물 메시지"><input class="goal-row-message" maxlength="240" aria-label="선물 메시지"></td>'+
+      '<td data-label="메시지"><input class="goal-row-message" maxlength="240" aria-label="메시지"></td>'+
       (goal.type==='team'?'<td data-label="적용 모둠" class="goal-team-column"></td>':'')+
       '<td data-label="달성 상태"></td><td data-label="자동완료"><input class="goal-row-auto" type="checkbox" aria-label="자동완료"></td>'+
       '<td data-label="반복"></td><td data-label="삭제"></td>';
@@ -141,7 +146,7 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     automatic.checked=!!goal.automatic;automatic.disabled=!!goal.archived;
     automatic.onchange=()=>{goal.automatic=automatic.checked;refreshStatus(goal,row);};
     if(goal.type==='team') {
-      const teamButton=button('',()=>editTeams([goal]));
+      const teamButton=button('',()=>showStatus(goal));
       teamButton.disabled=!!goal.archived;
       row.querySelector('.goal-team-column').append(teamButton);
     }
@@ -170,7 +175,8 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     if(dialog.open)dialog.close();
     statusView=null;action=null;
   }
-  function openAction(title,content,submitAction) {
+  function openAction(title,content,submitAction,kind='default') {
+    dialog.dataset.kind=kind;
     $('goal-action-title').textContent=title;
     fields.replaceChildren(content);
     actionError.textContent='';
@@ -202,10 +208,6 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     return {fieldset,value};
   }
   function setTeams(goals,ids) {
-    if(ids?.length===0) {
-      actionError.textContent='적용할 모둠을 한 개 이상 선택해 주세요.';
-      return false;
-    }
     for(const goal of goals) {
       if(ids)goal.teamIds=[...ids];
       else delete goal.teamIds;
@@ -219,7 +221,7 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
   function editMessage(goals) {
     const input=create('input');input.maxLength=240;
     input.value=goals.length===1?goals[0].message:'';
-    openAction('선물 메시지 변경',label('선물 메시지',input),()=>{
+    openAction('메시지 변경',label('메시지',input),()=>{
       for(const goal of goals)goal.message=input.value;
       refreshScope();return true;
     });
@@ -247,7 +249,8 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     });
     const message=create('input');message.maxLength=240;message.value=goal.message;
     const automatic=create('input');automatic.type='checkbox';automatic.checked=!!goal.automatic;
-    block.append(label('선물 메시지',message),label('자동완료',automatic));
+    const messageLabel=label('메시지',message);messageLabel.className='goal-repeat-message';
+    block.append(messageLabel,label('자동완료',automatic));
     const picker=goal.type==='team'?teamPicker(goal.teamIds):null;
     if(picker)block.append(picker.fieldset);
     const preview=create('p');preview.className='goal-repeat-preview';block.append(preview);
@@ -259,10 +262,10 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     function updatePreview() {
       const config=settings();
       if(!config){preview.textContent='목표 점수 범위 안에서 시작 점수, 간격, 회차를 입력해 주세요.';return;}
-      const end=config.start+config.interval*(config.count-1);
+      const sample=Array.from({length:Math.min(6,config.count)},(_,i)=>(config.start+config.interval*i)+'점').join(' · ');
       let id=0;
       const plan=makeGoalRounds(draft,goal,config,system.records,()=>'$preview-'+ ++id);
-      preview.textContent=config.start+'점부터 '+end+'점까지 '+config.count+'개 생성'
+      preview.textContent=sample+(config.count>6?' · …':'')+' ('+config.count+'개)'
         +(plan.removed?' · 기존 미완료 '+plan.removed+'개 삭제':'')
         +(plan.archived?' · 완료 회차 '+plan.archived+'개 기록 보존':'');
     }
@@ -270,8 +273,8 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     updatePreview();
     openAction('반복 목표 설정',block,()=>{
       const config=settings();
-      if(!config || config.teamIds?.length===0) {
-        actionError.textContent=config?'적용할 모둠을 한 개 이상 선택해 주세요.':'점수 범위와 회차를 확인해 주세요.';return false;
+      if(!config) {
+        actionError.textContent='점수 범위와 회차를 확인해 주세요.';return false;
       }
       const plan=makeGoalRounds(draft,goal,config,system.records,()=>crypto.randomUUID());
       selected.delete(goal.id);
@@ -279,7 +282,7 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
       refreshScope();
       rows.get(plan.selected.id)?.scrollIntoView({block:'nearest'});
       return true;
-    });
+    },'repeat');
   }
 
   async function changeTargets(targets,complete) {
@@ -293,54 +296,103 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     refreshStatuses();
   }
   function showStatus(goal,milestone) {
-    statusView={goal,milestone};
+    statusView={goal,milestone,selection:new Set()};
     const content=create('div');content.className='goal-target-status';
-    openAction('달성 상태 · '+(goal.score??'새 목표')+(goal.score===null?'':'점'),content);
+    openAction('달성 상태',content,null,'status');
     paintStatus(content);
   }
+  function updateTargetScope(goal,targets,include) {
+    const teams=teamList();
+    const ids=new Set(teams.filter(team=>goalAppliesToTeam(goal,team.id)).map(team=>team.id));
+    for(const {team} of targets) {
+      if(include)ids.add(team.id);else ids.delete(team.id);
+    }
+    if(ids.size===teams.length)delete goal.teamIds;
+    else goal.teamIds=teams.filter(team=>ids.has(team.id)).map(team=>team.id);
+    refreshStatuses();
+  }
+  function statusTitle(goal,milestone) {
+    const title=$('goal-action-title');
+    const threshold=milestone??goal.score;
+    const score=create('strong',Number.isFinite(threshold)?threshold+'점':'목표 점수');
+    score.className='goal-target-threshold';
+    const message=create('strong',goal.message.trim());
+    title.replaceChildren(score,message);
+  }
   function paintStatus(content) {
-    const {goal}=statusView;
+    const {goal,selection}=statusView;
     const history=recordsFor(goal);
-    const enabled=canChangeStatus(goal);
-    const active=document.activeElement?.dataset.targetKey;
-    const checked=new Set([...content.querySelectorAll('input:checked')].map(input=>input.value));
+    const focus=document.activeElement?.dataset.statusFocus;
     content.replaceChildren();
-    if (draftChanged(goal) && !goal.archived)content.append(create('p','목표를 저장한 뒤 상태를 변경할 수 있습니다.'));
-    else if(goal.automatic && !goal.archived)content.append(create('p','자동완료 사용 중'));
+    if (goal.automatic && !goal.archived)content.append(create('p','자동완료 사용 중'));
+    if (draftChanged(goal) && !goal.archived)content.append(create('p','목표 변경은 목표 저장 후 적용됩니다.'));
     if(goal.interval || history.some(record=>record.milestone!==undefined)) {
       const rounds=[...new Set(history.map(record=>record.milestone))].sort((a,b)=>(b??Infinity)-(a??Infinity));
-      if(!rounds.length){content.append(create('p','아직 달성한 회차가 없습니다.'));return;}
-      if(!rounds.includes(statusView.milestone))statusView.milestone=rounds[0];
-      const picker=create('select');picker.setAttribute('aria-label','달성 회차');
-      for(const round of rounds)picker.add(new Option(round===undefined?'한 번 달성':round+'점 회차',String(round)));
-      picker.value=String(statusView.milestone);
-      picker.onchange=()=>{statusView.milestone=rounds.find(round=>String(round)===picker.value);paintStatus(content);content.querySelector('select').focus();};
-      content.append(label('달성 회차',picker));
+      if(rounds.length) {
+        if(!rounds.includes(statusView.milestone))statusView.milestone=rounds[0];
+        const picker=create('select');picker.setAttribute('aria-label','달성 회차');
+        for(const round of rounds)picker.add(new Option(round===undefined?'한 번 달성':round+'점 회차',String(round)));
+        picker.value=String(statusView.milestone);
+        picker.onchange=()=>{
+          statusView.milestone=rounds.find(round=>String(round)===picker.value);
+          paintStatus(content);content.querySelector('select').focus();
+        };
+        content.append(label('달성 회차',picker));
+      } else content.append(create('p','아직 달성한 회차가 없습니다.'));
     }
-    const targets=goalTargets(goal,history,statusView.milestone);
-    if(!targets.length){content.append(create('p','적용된 대상이 없습니다.'));return;}
+    statusTitle(goal,statusView.milestone);
+    const targets=goalTargets(goal,history,statusView.milestone,true);
+    if(!targets.length)content.append(create('p',goal.type==='team'?'등록된 모둠이 없습니다.':'완료 기록이 없습니다.'));
     const list=create('div');list.className='goal-target-list';content.append(list);
-    const pending=[];
-    for(const target of targets) {
-      const {team,state}=target, card=create('div');card.className='goal-target-card';
-      const threshold=statusView.milestone??goal.score;
-      const eligible=enabled && team.score>=threshold && state!=='unreached';
-      if(eligible && state==='reached' && goal.type==='team') {
-        const check=create('input');check.type='checkbox';check.value=target.target.id;
-        check.checked=checked.has(check.value);check.setAttribute('aria-label',team.name+' 선택');
-        card.append(check);pending.push({check,target});
+    const cases=targets.map(target=>{
+      const {team,applies,state}=target, key=String(team.id);
+      const card=button('',()=>{
+        if(selection.has(key))selection.delete(key);else selection.add(key);
+        updateActions();
+      });
+      card.classList.add('goal-target-card');
+      card.dataset.state=applies?state:'excluded';card.dataset.statusFocus='card:'+key;
+      card.disabled=!!goal.archived;
+      const status=create('span',applies?labels[state]:'미적용');status.className='goal-target-label';
+      const facts=create('span');facts.className='goal-target-facts';
+      facts.append(create('strong',team.name),create('span',Number.isFinite(team.score)?team.score+'점':'—'));
+      card.append(status,facts);list.append(card);
+      return {target,key,card};
+    });
+    const footer=create('div');footer.className='goal-target-actions';
+    const count=create('span');count.setAttribute('aria-live','polite');
+    const controls=create('div');
+    const reach=button('도달'),complete=button('완료'),scope=goal.type==='team'?button('적용'):null;
+    reach.dataset.statusFocus='reach';complete.dataset.statusFocus='complete';
+    controls.append(reach,complete);
+    if(scope){scope.dataset.statusFocus='scope';controls.append(scope);}
+    footer.append(count,controls);content.append(footer);
+
+    function updateActions() {
+      const checked=cases.filter(({key})=>selection.has(key));
+      for(const {key,card} of cases)card.setAttribute('aria-pressed',String(selection.has(key)));
+      count.textContent=checked.length?checked.length+'개 선택':'선택 없음';
+      const eligible=checked.map(({target})=>target).filter(({applies,team,state,target})=>
+        applies && canChangeStatus(goal,team.id) && state!=='unreached' &&
+        team.score>=(statusView.milestone??goal.score) &&
+        (!goal.interval && statusView.milestone===undefined || target.reached!==null));
+      const reachable=eligible.filter(({state})=>state==='done'), completable=eligible.filter(({state})=>state==='reached');
+      reach.disabled=!reachable.length;complete.disabled=!completable.length;
+      reach.onclick=()=>changeTargets(reachable,false);
+      complete.onclick=()=>changeTargets(completable,true);
+      const shouldApply=checked.some(({target})=>!target.applies);
+      if(scope) {
+        scope.disabled=!checked.length || !!goal.archived;
+        scope.textContent=shouldApply||scope.disabled?'적용':'제외';
+        scope.onclick=()=>updateTargetScope(goal,checked.map(({target})=>target),shouldApply);
       }
-      card.append(create('strong',team.name));
-      const control=button(labels[state],()=>changeTargets([target],state==='reached'));
-      control.disabled=!eligible;control.dataset.state=state;control.dataset.targetKey=target.target.id;
-      card.append(control);list.append(card);
-      if(control.dataset.targetKey===active && !control.disabled)control.focus();
+      const priority=shouldApply?scope:!complete.disabled?complete:!reach.disabled?reach:scope?.disabled?null:scope;
+      for(const control of controls.children)control.classList.toggle('dialog-primary',control===priority && !control.disabled);
     }
-    if(pending.length) {
-      const actions=create('div');actions.className='goal-target-actions';
-      actions.append(button('도달 모둠 전체선택',()=>{for(const {check} of pending)check.checked=true;}),
-        button('선택 완료',()=>changeTargets(pending.filter(({check})=>check.checked).map(({target})=>target),true)));
-      content.append(actions);
+    updateActions();
+    if(focus) {
+      const target=[...content.querySelectorAll('[data-status-focus]')].find(control=>control.dataset.statusFocus===focus);
+      if(target && !target.disabled)target.focus({preventScroll:true});
     }
   }
 

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-table-1">
+    <link rel="stylesheet" href="style.css?v=goal-cards-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -204,7 +204,7 @@
         <section class="score-settings-section" aria-labelledby="manage-settings-title">
             <h4 id="manage-settings-title">관리</h4>
             <div class="score-settings-actions">
-                <button type="button" id="manage-pursuit">추격자</button><button type="button" id="open-goal-modal-btn">목표·선물 관리</button>
+                <button type="button" id="manage-pursuit">추격자</button><button type="button" id="open-goal-modal-btn">목표 관리</button>
                 <button type="button" id="open-management-modal-btn">점수판 관리</button>
             </div>
         </section>
@@ -257,7 +257,7 @@
 
     <div id="goal-management-view" class="fullscreen-view" role="dialog" aria-modal="true" aria-labelledby="goal-manage-title">
       <div class="dialog-sheet">
-        <header class="dialog-header"><h2 id="goal-manage-title">목표·선물 관리</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
+        <header class="dialog-header"><h2 id="goal-manage-title">목표 관리</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
         <div id="goal-settings">
           <div class="goal-table-toolbar">
             <div class="goal-switch" role="group" aria-label="목표 대상">
@@ -280,7 +280,7 @@
                 <tr>
                   <th scope="col"><label><input type="checkbox" id="goal-select-all"> 선택</label></th>
                   <th scope="col">목표 점수</th>
-                  <th scope="col">선물 메시지</th>
+                  <th scope="col">메시지</th>
                   <th scope="col" class="goal-team-column">적용 모둠</th>
                   <th scope="col">달성 상태</th>
                   <th scope="col">자동완료</th>
@@ -325,6 +325,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=goal-table-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
+    <script type="module" src="script.js?v=goal-cards-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
 </body>
 </html>
