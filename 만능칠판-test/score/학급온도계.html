@@ -5,12 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=score-slots-1">
+    <link rel="stylesheet" href="style.css?v=score-dialogs-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
 </head>
 
 <body>
+    <div id="score-surface">
     <div id="shared-score-banner" hidden>
         <span id="shared-score-message" role="status"></span>
         <button id="score-conflicts" type="button" hidden>점수 충돌 확인</button>
@@ -112,23 +113,34 @@
 
     </div>
 
+    </div>
+
     <dialog id="pursuit-editor" class="settings-panel dialog-sheet" aria-labelledby="pursuit-title">
       <header class="dialog-header"><h3 id="pursuit-title">추격자 설정</h3><button type="button" id="pursuit-close" class="dialog-close" aria-label="닫기">×</button></header>
-      <div class="pursuit-picker" role="group" aria-label="관리 대상"><button class="dialog-action" type="button" id="pick-class">학급</button><button class="dialog-action" type="button" id="pick-team">모둠</button></div>
-<form data-kind="class" class="score-settings-section">      <label><input type="checkbox" name="enabled"> 추격 사용</label>
-      <label>현재 추격 점수 <input name="score" type="number" min="-10000" max="10000" required></label>
-      <label>패널티 메시지 <input name="message" maxlength="180" placeholder="예: 오늘 청소"></label>
-      <label>추격 주기 <select name="mode"><option value="manual">수동</option><option value="daily">매일</option><option value="weekly">매주</option></select></label>
-      <label>추격 요일 <select name="weekday"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option><option value="0">일요일</option></select></label>
-      <label>회차당 상승 점수 <input type="number" name="step" min="1" max="10000" required></label>
-<footer class="dialog-footer"><output name="status" role="status"></output><button class="dialog-action dialog-primary" name="save" type="submit">학급 저장</button></footer></form>
-<form data-kind="team" class="score-settings-section" hidden>      <label><input type="checkbox" name="enabled"> 추격 사용</label>
-      <label>현재 추격 점수 <input name="score" type="number" min="-10000" max="10000" required></label>
-      <label>패널티 메시지 <input name="message" maxlength="180" placeholder="예: 오늘 청소"></label>
-      <label>추격 주기 <select name="mode"><option value="manual">수동</option><option value="daily">매일</option><option value="weekly">매주</option></select></label>
-      <label>추격 요일 <select name="weekday"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option><option value="0">일요일</option></select></label>
-      <label>회차당 상승 점수 <input type="number" name="step" min="1" max="10000" required></label>
-<footer class="dialog-footer"><output name="status" role="status"></output><button class="dialog-action dialog-primary" name="save" type="submit">모둠 저장</button></footer></form>
+      <div class="pursuit-settings">
+        <div class="pursuit-picker" role="tablist" aria-label="추격자 설정 대상">
+          <button class="dialog-action" type="button" role="tab" id="pick-class" aria-selected="true" aria-controls="class-pursuit-settings">학급</button>
+          <button class="dialog-action" type="button" role="tab" id="pick-team" aria-selected="false" aria-controls="team-pursuit-settings" tabindex="-1">모둠</button>
+        </div>
+        <form data-kind="class" id="class-pursuit-settings" class="score-settings-section" role="tabpanel" aria-labelledby="pick-class">
+          <label><input type="checkbox" name="enabled"> 추격 사용</label>
+          <label>현재 추격 점수 <input name="score" type="number" min="-10000" max="10000" required></label>
+          <label>패널티 메시지 <input name="message" maxlength="180" placeholder="예: 오늘 청소"></label>
+          <label>추격 주기 <select name="mode"><option value="manual">수동</option><option value="daily">매일</option><option value="weekly">매주</option></select></label>
+          <label>추격 요일 <select name="weekday"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option><option value="0">일요일</option></select></label>
+          <label>회차당 상승 점수 <input type="number" name="step" min="1" max="10000" required></label>
+          <footer class="dialog-footer"><output name="status" role="status"></output><button class="dialog-action dialog-primary" name="save" type="submit">학급 저장</button></footer>
+        </form>
+        <form data-kind="team" id="team-pursuit-settings" class="score-settings-section" role="tabpanel" aria-labelledby="pick-team" hidden>
+          <label><input type="checkbox" name="enabled"> 추격 사용</label>
+          <label>현재 추격 점수 <input name="score" type="number" min="-10000" max="10000" required></label>
+          <label>패널티 메시지 <input name="message" maxlength="180" placeholder="예: 오늘 청소"></label>
+          <label>추격 주기 <select name="mode"><option value="manual">수동</option><option value="daily">매일</option><option value="weekly">매주</option></select></label>
+          <label>추격 요일 <select name="weekday"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option><option value="0">일요일</option></select></label>
+          <label>회차당 상승 점수 <input type="number" name="step" min="1" max="10000" required></label>
+          <footer class="dialog-footer"><output name="status" role="status"></output><button class="dialog-action dialog-primary" name="save" type="submit">모둠 저장</button></footer>
+        </form>
+      </div>
     </dialog>
     <dialog id="settings-panel" class="settings-panel" aria-labelledby="score-settings-title" inert>
         <header class="dialog-header"><h3 id="score-settings-title">점수판 설정</h3><button id="close-score-settings" class="dialog-close" type="button" aria-label="닫기">×</button></header>
@@ -262,6 +274,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=score-slots-1"></script><script type="module" src="panel-ui.js?v=score-slots-1"></script>
+    <script type="module" src="script.js?v=score-dialogs-1"></script><script type="module" src="panel-ui.js?v=score-slots-1"></script>
 </body>
 </html>

@@ -1692,6 +1692,14 @@ function setupIntegratedScorePanel(){
     if(saved.side==='left')scoreSide='left';
   }catch{}
   const save=()=>{try{localStorage.setItem(PANEL_STORAGE_KEY,JSON.stringify({open:scoreOpen,share:scoreShare,side:scoreSide}));}catch{}};
+  const updateScoreSurface=()=>{
+    if(!document.body.classList.contains('score-modal-open'))return;
+    const {left,width}=panel.getBoundingClientRect();
+    const style=frame.contentDocument?.documentElement.style;
+    style?.setProperty('--score-surface-left',left+'px');
+    style?.setProperty('--score-surface-width',width+'px');
+  };
+  new ResizeObserver(updateScoreSurface).observe(panel);
   const update=()=>{
     document.body.dataset.scoreSide=scoreSide;
     frame.dataset.scoreSide=scoreSide;
@@ -1706,6 +1714,7 @@ function setupIntegratedScorePanel(){
     $('scorePanelLabel').textContent=scoreOpen?'점수판 닫기':'점수판 열기';
     splitter.tabIndex=scoreOpen?0:-1;
     splitter.setAttribute('aria-valuenow',String(Math.round(scoreShare)));
+    updateScoreSurface();
     // 패널 토글/드래그는 캔버스의 좌표계를 변경하지 않는다.
   };
   receiveScoreView=view=>{
@@ -1732,8 +1741,12 @@ function setupIntegratedScorePanel(){
   frame.addEventListener('score-management-modal',event=>{
     if(event.detail){closePopups();closeContext();finishText();}
     document.body.classList.toggle('score-modal-open',event.detail);
+    updateScoreSurface();
     for (const element of [$('canvas-container'),$('toolbarScaleWrap'),splitter]) element.inert=event.detail;
     if (!event.detail) {
+      const style=frame.contentDocument?.documentElement.style;
+      style?.removeProperty('--score-surface-left');
+      style?.removeProperty('--score-surface-width');
       if(cloudActive())requestCloudRefresh();else applyLocalView().catch(fail);
     }
   });

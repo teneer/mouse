@@ -8,7 +8,7 @@ const button = (label,action,classes='dialog-action') => {
   return item;
 };
 
-export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confirmSave}) {
+export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confirmSave,modalState}) {
   const view = $('goal-management-view'), popup = $('goal-celebration');
   const localPopup=mountGoalCelebration(popup);
   const saveButton=$('close-goal-view-btn');
@@ -52,10 +52,6 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       if (!item.contains(event.target)) item.removeAttribute('data-confirm-cancel');
     }
   },true);
-  const modalState = open => {
-    document.body.classList.toggle('score-modal-open',open);
-    window.frameElement?.dispatchEvent(new CustomEvent('score-management-modal',{detail:open}));
-  };
   const emitPopup = detail => window.frameElement?.dispatchEvent(new CustomEvent('score-celebration',{detail}));
   function refreshSkip() {
     const action = active && celebrations.hasPending(records) ? skipRemaining : null;

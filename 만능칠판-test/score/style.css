@@ -81,7 +81,7 @@ h1 { margin-top: 36px; text-shadow: 1px 1px 2px var(--shadow-color); }
 .team-card:nth-child(10n+9){--card-accent:#431c5d;background-color:rgba(67,28,93,0.1);}
 .team-card:nth-child(10n+10){--card-accent:#eb1736;background-color:rgba(235,23,54,0.1);}
 @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-@media (max-width: 700px) { .scoreboard { max-width: 400px; justify-content: center; gap: 18px; } .team-card { min-width: 120px; max-width: 150px; padding: 18px 10px 14px 10px; } }
+@container score-surface (max-width: 700px) { .scoreboard { max-width: 400px; justify-content: center; gap: 18px; } .team-card { min-width: 120px; max-width: 150px; padding: 18px 10px 14px 10px; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .modal-background { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 2000; justify-content: center; align-items: center; animation: fadeIn 0.3s; }
 .modal-box { background: var(--card-bg); border-radius: 16px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); width: 500px; box-sizing: border-box; max-height: 85vh; display: flex; flex-direction: column; }
@@ -274,6 +274,10 @@ body.goal-active #goal-panel {
 }
 html, body {width:100%;max-width:100%;overflow-x:hidden}
 body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;background:var(--light-bg)}
+#score-surface {
+  display:flex;flex:1;flex-direction:column;width:100%;min-height:0;
+  container:score-surface / inline-size;
+}
 .container {
   display:flex;
   flex:1;
@@ -293,7 +297,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   width:100%;
   max-width:none;
   margin:0;
-  padding:clamp(6px, 1.4dvh, 14px) clamp(3px, 4vw, 24px) clamp(8px, 1.8dvh, 16px);
+  padding:clamp(6px, 1.4dvh, 14px) clamp(3px, 4cqw, 24px) clamp(8px, 1.8dvh, 16px);
   border:0;
   border-bottom:1px solid var(--panel-line);
   border-radius:0;
@@ -314,7 +318,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 .class-heading h1, .team-heading h2 {
   margin:0;
   color:var(--text-color);
-  font-size:clamp(13px, 5vw, 17px);
+  font-size:clamp(13px, calc(var(--score-surface-width, 100vw) * .05), 17px);
   font-weight:700;
   text-align:left;
   text-shadow:none;
@@ -375,7 +379,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 @keyframes goal-message-scroll {from {transform:translateX(0)} to {transform:translateX(-50%)}}
 .goal-motion-toggle {
   flex:none;
-  width:clamp(24px,7vw,32px);height:30px;padding:0;
+  width:clamp(24px,calc(var(--score-surface-width, 100vw) * .07),32px);height:30px;padding:0;
   border:0;border-radius:6px;background:var(--control-bg);color:var(--primary-dark);cursor:pointer;
 }
 .goal-motion-toggle:hover {background:var(--summary-bg)}
@@ -427,7 +431,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   width:100%;
   align-items:stretch;
   gap:10px;
-  padding:10px clamp(4px, 3vw, 18px) 6px;
+  padding:10px clamp(4px, 3cqw, 18px) 6px;
 }
 #selected-team-count {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted-text);font-size:12px;text-align:right}
 #team-viewport {
@@ -537,7 +541,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   position:relative;
   z-index:5;
   margin:0;
-  padding:10px clamp(4px, 3vw, 18px);
+  padding:10px clamp(4px, 3cqw, 18px);
   border-top:1px solid var(--panel-line);
   background:var(--card-bg);
 }
@@ -590,9 +594,9 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   box-sizing:border-box;
   width:min(460px,calc(100% - 24px));
   max-height:calc(100dvh - 24px);
-  padding:clamp(5px, 4vw, 12px);
+  padding:var(--dialog-padding);
   gap:9px;
-  overflow:auto;
+  overflow:hidden auto;
   overflow-wrap:anywhere;
   background:var(--card-bg);
   border:1px solid var(--panel-line);
@@ -714,7 +718,7 @@ button, .main-scoreboard, .team-card, #batch-score {
 }
 .team-remove:hover {background:#a933271f}
 #batch-score #batch-reset {width:18px;min-height:0;padding:0;background:#fff;font-size:15px}
-@media(max-width:304px) {
+@container score-surface (max-width:304px) {
   #batch-score {
     grid-template-columns:minmax(0, 3fr) minmax(0, 2fr);
     grid-template-areas:"select undo" "amount apply";
@@ -722,11 +726,11 @@ button, .main-scoreboard, .team-card, #batch-score {
   #batch-score #select-all-teams, #batch-score #undo-score {width:min(84px,100%)}
   #undo-score {justify-self:end}
 }
-@media(max-width:150px) {
+@container score-surface (max-width:150px) {
   #batch-score {padding-inline:3px;gap:3px}
-  #batch-score button {font-size:clamp(9px, 10vw, 12px);padding-inline:0}
-  #batch-score #batch-reset {width:min(14px, 15vw)}
-  #batch-score .batch-stepper button {width:min(20px, 17vw)}
+  #batch-score button {font-size:clamp(9px, 10cqw, 12px);padding-inline:0}
+  #batch-score #batch-reset {width:min(14px, 15cqw)}
+  #batch-score .batch-stepper button {width:min(20px, 17cqw)}
 }
 #score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
 
@@ -753,7 +757,7 @@ button, .main-scoreboard, .team-card, #batch-score {
 .class-score-delta.gain {color:var(--secondary-color)}
 .class-score-delta.loss {color:var(--accent-color)}
 
-.settings-panel {--dialog-padding:clamp(5px, 4vw, 12px);--dialog-header:#e6f1f4;--dialog-border:#cbdce3;--dialog-text:#123447}
+dialog.settings-panel {--dialog-padding:clamp(5px, 4vw, 12px);--dialog-header:#e6f1f4;--dialog-border:#cbdce3;--dialog-text:#123447}
 .settings-panel .dialog-header {margin-bottom:0}
 .settings-panel .dialog-close,.score-delete-dialog .dialog-close {
   position:absolute;right:var(--dialog-padding);top:50%;transform:translateY(-50%);
@@ -803,7 +807,11 @@ button, .main-scoreboard, .team-card, #batch-score {
 #score-unlock-audio {align-self:flex-end}
 
 body.score-modal-open {background:transparent}
-body.score-modal-open .container {visibility:hidden}
+body.score-modal-open #score-surface {
+  position:fixed;inset:0 auto 0 var(--score-surface-left, 0px);
+  width:var(--score-surface-width, 100%);background:var(--light-bg);
+  overflow:hidden;pointer-events:none;
+}
 #goal-management-view,#management-modal {background:#142a4180;align-items:center;justify-content:center;padding:12px}
 #goal-management-view > .dialog-sheet {display:flex;flex-direction:column;background:#f7fbfd;width:min(1040px,100%);max-height:94dvh;overflow:hidden}
 #goal-management-view .goal-container {grid-template-columns:minmax(0,1fr);gap:1rem}
@@ -983,10 +991,24 @@ body.score-modal-open .container {visibility:hidden}
   0%,100% {box-shadow:inset 0 0 0 2px #bd6262,inset 0 0 6px #c92d3026}
   48% {box-shadow:inset 0 0 0 3px #bc212b,inset 0 0 24px #c92d3066}
 }
-#pursuit-editor form {gap:12px}
+#pursuit-editor {grid-template-columns:minmax(0,1fr)}
+#pursuit-editor form {
+  gap:10px;padding:12px;background:var(--card-bg);
+  border:1px solid var(--dialog-border);border-radius:0 8px 8px 8px;
+}
+#pursuit-editor .dialog-footer {margin-top:4px}
 #pursuit-editor label {display:flex;align-items:center;justify-content:space-between;gap:8px}
 #pursuit-editor label:has(input[type=checkbox]) {justify-content:flex-start}
 #pursuit-editor input:not([type=checkbox]),#pursuit-editor select {width:58%;min-width:0}
-.pursuit-picker {display:flex;gap:5px}
-.pursuit-picker [aria-pressed=true] {background:var(--dialog-accent);color:white}
+.pursuit-picker {display:flex;gap:4px}
+#pursuit-editor .pursuit-picker .dialog-action {
+  position:relative;min-width:76px;margin-bottom:-1px;
+  border:1px solid var(--dialog-border);border-top:3px solid transparent;border-radius:8px 8px 0 0;
+  background:var(--dialog-header);color:var(--muted-text);
+}
+#pursuit-editor .pursuit-picker .dialog-action[aria-selected=true] {
+  z-index:1;border-top-color:var(--dialog-accent);border-bottom-color:var(--card-bg);
+  background:var(--card-bg);color:var(--dialog-text);font-weight:700;
+}
+#pursuit-editor .pursuit-picker .dialog-action:focus-visible {z-index:2}
 #pursuit-editor output {margin-right:auto;align-self:center;font-size:.85rem}

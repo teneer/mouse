@@ -2,7 +2,7 @@ import {wireTooltips} from '../js/tooltips.js?v=score-slots-1';
 import {schoolDay,pursuitScore} from './class-activities.js?v=pursuit-manager-1';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=pursuit-manager-1';
-import {wireGoals} from './goals-ui.js?v=device-audio-2';
+import {wireGoals} from './goals-ui.js?v=score-dialogs-1';
 import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
 import {conversionFrame,conversionStarFlight,conversionStarPosition,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-2';
 
@@ -73,6 +73,7 @@ const conflictsDialog = document.getElementById('score-conflict-dialog');
 const bodyControls = document.querySelector('.container');
 const goalUI = wireGoals({
   submit:submitGoal,teamList:()=>teams,classScore:()=>count,celebrate:(type,key)=>playSound(sounds.success,type==='team'?0.5:1,key),confirmSave:()=>playSound(sounds.confirm),
+  modalState:scoreOverlayState,
   teamAccent(id) {
     const index=teams.findIndex(team=>team.id===id), card=scoreboard.children[index];
     return card ? getComputedStyle(card).getPropertyValue('--card-accent').trim() : null;
@@ -430,8 +431,11 @@ const pursuitEditor=document.getElementById('pursuit-editor');
 const pursuitForms=[...pursuitEditor.querySelectorAll('form')];
 function selectPursuit(kind) {
   for (const form of pursuitForms) {
-    form.hidden=form.dataset.kind!==kind;
-    document.getElementById('pick-'+form.dataset.kind).setAttribute('aria-pressed',String(!form.hidden));
+    const selected=form.dataset.kind===kind;
+    const tab=document.getElementById('pick-'+form.dataset.kind);
+    form.hidden=!selected;
+    tab.setAttribute('aria-selected',String(selected));
+    tab.tabIndex=selected?0:-1;
   }
 }
 function showPursuitFields(fields) {
@@ -457,7 +461,16 @@ function editPursuit(kind) {
 }
 for (const form of pursuitForms) {
   const kind=form.dataset.kind,fields=form.elements;
-  document.getElementById('pick-'+kind).onclick=()=>selectPursuit(kind);
+  const tab=document.getElementById('pick-'+kind);
+  tab.onclick=()=>selectPursuit(kind);
+  tab.onkeydown=event=>{
+    const targets={ArrowLeft:kind==='class'?'team':'class',ArrowRight:kind==='class'?'team':'class',Home:'class',End:'team'};
+    const target=targets[event.key];
+    if(!target)return;
+    event.preventDefault();
+    selectPursuit(target);
+    document.getElementById('pick-'+target).focus();
+  };
   document.getElementById(kind+'-pursuit').onclick=()=>editPursuit(kind);
   fields.mode.onchange=()=>showPursuitFields(fields);
   form.oninput=()=>{fields.status.value='';};
@@ -1031,7 +1044,7 @@ function openManagementModal() {
     list.appendChild(item);
   });
   managementModal.style.display = 'flex';
-  scoreModalState(true);
+  scoreOverlayState(true);
   document.getElementById('manage-main-score').focus();
 }
 function closeAndSaveManagement() {
@@ -1069,9 +1082,13 @@ function scoreModalState(open) {
   document.body.classList.toggle('score-modal-open',open);
   window.frameElement?.dispatchEvent(new CustomEvent('score-management-modal',{detail:open}));
 }
+function scoreOverlayState(open) {
+  document.getElementById('score-surface').inert=open;
+  scoreModalState(open);
+}
 function closeManagementModal() {
   managementModal.style.display = 'none';
-  scoreModalState(false);
+  scoreOverlayState(false);
 }
 document.getElementById('team-management-list').addEventListener('click', e => {
   if (e.target.classList.contains('delete-team-btn')) e.target.closest('.team-manage-item').remove();

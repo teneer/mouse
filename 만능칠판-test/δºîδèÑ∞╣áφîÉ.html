@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 7</title><link href="style.css?v=page-gallery-1" rel="stylesheet"/><link href="dialog.css?v=help-1" rel="stylesheet"/><link href="score/celebration.css?v=motion-1" rel="stylesheet"/></head>
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1.0" name="viewport"/><meta content="light" name="color-scheme"/><title>만능칠판 7</title><link href="style.css?v=score-dialogs-1" rel="stylesheet"/><link href="dialog.css?v=help-1" rel="stylesheet"/><link href="score/celebration.css?v=motion-1" rel="stylesheet"/></head>
 <body>
 <div id="canvas-container"><canvas aria-label="만능칠판 작업 영역" id="whiteboardCanvas"></canvas></div>
 
 <aside id="scorePanel" class="score-panel" aria-label="학급 점수판" aria-hidden="true" inert>
-  <iframe id="scoreFrame" title="학급 점수판" src="./score/학급온도계.html?v=score-slots-1&amp;layout=panel-side-1"></iframe>
+  <iframe id="scoreFrame" title="학급 점수판" src="./score/학급온도계.html?v=score-dialogs-1&amp;layout=panel-side-1"></iframe>
 </aside>
 <div id="scoreSplitter" role="separator" aria-label="전자칠판과 점수판 경계 조절" aria-orientation="vertical" aria-valuemin="20" aria-valuemax="90" aria-valuenow="70" tabindex="-1"><span class="split-grip"></span></div>
 
@@ -209,7 +209,7 @@
 </div>
 <input accept=".png,.jpg,.jpeg,.gif,.pdf" hidden="" id="fileInput" multiple="" type="file"/><input accept=".json,application/json" hidden="" id="backupInput" type="file"/>
 <div hidden="" id="dropOverlay">PNG · JPG · GIF · PDF 파일을 여기에 놓으세요.</div><div aria-hidden="true" hidden="" id="busyOverlay"></div><div hidden="" id="fatalError" role="alert"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=board-touch-1" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script><script src="script.js?v=score-dialogs-1" type="module"></script>
 <div id="answerCoverRenameModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="answerCoverRenameTitle"><div class="modal-content"><header class="dialog-header"><h2 id="answerCoverRenameTitle">가리개 이름 변경</h2><button type="button" class="dialog-close" aria-label="닫기" data-close="answerCoverRenameModal">×</button></header><form id="answerCoverRenameForm"><label for="answerCoverName">이름</label> <input id="answerCoverName" type="text" required maxlength="40"><div class="modal-actions"><button type="submit" class="action-btn">저장</button></div></form></div></div><noscript>만능칠판을 사용하려면 JavaScript를 활성화해주세요.</noscript><div aria-label="객체 메뉴" hidden="" id="objectContextMenu" role="menu">
 <div class="context-palette" role="group" aria-label="색상">
   <span aria-hidden="true">색상</span><div class="quick-colors" id="contextColors"></div>
