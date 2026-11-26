@@ -1,4 +1,4 @@
-import {applyOperation,boardPages,newBoard} from './js/cloud-model.js?v=goal-queue-1';
+import {applyOperation,boardPages,newBoard} from './js/cloud-model.js?v=goal-table-1';
 import {reorderPages} from './js/board-navigation.js';
 import {uid, clone} from './js/constants.js';
 import {resolvePageWrite} from './js/conflicts.js';

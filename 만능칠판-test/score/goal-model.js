@@ -19,8 +19,13 @@ export function parseGoalScore(value) {
   return score>=-MAX_GOAL_SCORE && score<=MAX_GOAL_SCORE ? score : null;
 }
 
+export function goalAppliesToTeam(goal,teamId) {
+  return goal.type==='team' && (!Array.isArray(goal.teamIds) || goal.teamIds.includes(teamId));
+}
+
 function targets(state, goal) {
-  return goal.type === 'class' ? [{id:null,score:state.count}] : state.teams;
+  if (goal.archived) return [];
+  return goal.type === 'class' ? [{id:null,score:state.count}] : state.teams.filter(team=>goalAppliesToTeam(goal,team.id));
 }
 const recordId = (goal, teamId, milestone) => JSON.stringify(
   milestone === undefined ? [goal.id,teamId] : [goal.id,teamId,milestone]
@@ -29,6 +34,31 @@ const recordId = (goal, teamId, milestone) => JSON.stringify(
 export function parseGoalInterval(value) {
   const interval = parseGoalScore(value);
   return interval > 0 ? interval : null;
+}
+
+export function makeGoalRounds(goals,source,settings,records,makeId) {
+  const {start,interval,count}=settings;
+  const group=source.repeat?.id??makeId();
+  const members=source.repeat?goals.filter(goal=>goal.repeat?.id===group):[source];
+  const indexed=new Map(members.map(goal=>[goal.repeat?.index??0,goal]));
+  const completed=new Set(records.filter(record=>record.status==='done').map(record=>record.goalId));
+  const retained=new Set();
+  const generated=Array.from({length:count},(_,index)=>{
+    const score=start+interval*index;
+    const previous=indexed.get(index);
+    const reuse=previous && !previous.interval && (!completed.has(previous.id) || previous.score===score);
+    if (reuse)retained.add(previous.id);
+    const {message,automatic,teamIds}=settings;
+    return {id:reuse?previous.id:makeId(),type:source.type,score,message,automatic,futureAutomatic:true,
+      ...(source.type==='team' && Array.isArray(teamIds)?{teamIds:[...teamIds]}:{}),
+      repeat:{id:group,index,start,interval,count}};
+  });
+  const removed=members.filter(goal=>!retained.has(goal.id));
+  const archived=removed.filter(goal=>completed.has(goal.id)).map(({repeat,...goal})=>({...goal,archived:true,futureAutomatic:true}));
+  const memberIds=new Set(members.map(goal=>goal.id));
+  return {goals:[...goals.filter(goal=>!memberIds.has(goal.id)),...generated,...archived],
+    selected:generated.find(goal=>goal.repeat.index===source.repeat?.index)??generated[0],
+    removed:removed.length-archived.length,archived:archived.length};
 }
 
 function intervalOf(goal) {
@@ -46,7 +76,7 @@ function nextGoal(system, count, type, teamId) {
     .map(record => record.id));
   let next = null;
   for (const goal of system.goals) {
-    if (goal.type !== type) continue;
+    if (goal.archived || goal.type !== type || type==='team' && !goalAppliesToTeam(goal,teamId)) continue;
     const interval = intervalOf(goal);
     let score = goal.score;
     if (interval) {
@@ -81,7 +111,7 @@ export function completeReachedAutomaticGoals(state, event) {
   if (!system) return;
   const seen=new Set(system.records.map(record=>record.id));
   for (const goal of system.goals) {
-    if (!goal.automatic || intervalOf(goal)) continue;
+    if (!goal.automatic || goal.futureAutomatic || goal.archived || intervalOf(goal)) continue;
     for (const team of targets(state,goal)) {
       const id=recordId(goal,team.id);
       if (team.score<goal.score || seen.has(id)) continue;
@@ -98,10 +128,14 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
   const previousScores = new Map(before.teams.map(team=>[team.id,team.score]));
   previousScores.set(null,before.count);
   const records = new Map(system.records.map(record=>[record.id,record]));
+  const goals = new Map(system.goals.map(goal=>[goal.id,goal]));
   const liveTeams = new Map(state.teams.map(team=>[team.id,team.score]));
   liveTeams.set(null,state.count);
   for (const record of records.values()) {
-    if (record.status === 'pending' && (!liveTeams.has(record.teamId) || liveTeams.get(record.teamId)<record.score)) {
+    const goal=goals.get(record.goalId);
+    if (record.status === 'pending' && (!goal || goal.archived ||
+      record.teamId!==null && !goalAppliesToTeam(goal,record.teamId) ||
+      !liveTeams.has(record.teamId) || liveTeams.get(record.teamId)<record.score)) {
       record.status = 'withdrawn';
     }
   }
@@ -111,7 +145,7 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
       const previous = includeExisting ? -Infinity : previousScores.get(team.id) ?? -Infinity;
       if (!interval) {
         const record = records.get(recordId(goal,team.id));
-        const threshold = record?.score ?? goal.score;
+        const threshold = goal.futureAutomatic ? goal.score : record?.score ?? goal.score;
         if (team.score >= threshold && previous < threshold) grant(goal,team);
         continue;
       }
@@ -127,6 +161,10 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
     const record = records.get(id);
     if (record && record.status !== 'withdrawn') return;
     const entry = record || newRecord(goal,team,milestone);
+    if (goal.futureAutomatic) {
+      entry.score=milestone??goal.score;
+      entry.message=goal.message;
+    }
     entry.achievedScore = team.score;
     entry.automatic = goal.automatic;
     entry.status = entry.automatic ? 'done' : 'pending';
@@ -134,6 +172,38 @@ export function reconcileGoals(state, before, event, includeExisting = false) {
     entry.time = event.authoredAt;
     entry.silent = includeExisting;
     if (!record) {system.records.push(entry);records.set(id,entry);}
+  }
+}
+
+function updateConfiguredRecords(state,operation) {
+  const system=state.goalSystem;
+  const goals=new Map(system.goals.map(goal=>[goal.id,goal]));
+  const teams=new Map(state.teams.map(team=>[team.id,team]));
+  teams.set(null,{id:null,score:state.count});
+  const existing=new Map(system.records.map(record=>[record.id,record]));
+  for (const record of existing.values()) {
+    const goal=goals.get(record.goalId);
+    if (!goal?.futureAutomatic || record.status==='done') continue;
+    const team=teams.get(record.teamId), threshold=record.milestone??goal.score;
+    if (goal.archived || !team || record.teamId!==null && !goalAppliesToTeam(goal,record.teamId) || team.score<threshold) {
+      record.status='withdrawn';
+    } else if (record.status==='pending') {
+      record.score=threshold;
+      record.message=goal.message;
+    }
+  }
+  // A goal already at its threshold enters the queue silently. Only a score crossing auto-completes it.
+  for (const goal of system.goals) {
+    if (!goal.futureAutomatic || intervalOf(goal)) continue;
+    for (const team of targets(state,goal)) {
+      if (team.score<goal.score) continue;
+      const id=recordId(goal,team.id), record=existing.get(id);
+      if (record && record.status!=='withdrawn') continue;
+      const entry={...newRecord(goal,team),automatic:false,status:'pending',silent:true,
+        reached:operation.key,time:operation.authoredAt??null};
+      if (record) Object.assign(record,entry);
+      else system.records.push(entry);
+    }
   }
 }
 
@@ -158,10 +228,11 @@ export function changeGoals(state, operation) {
     system.revision = operation.key;
     if (operation.includeExisting) {
       const selected = system.goals;
-      system.goals = selected.filter(goal=>!oldIds.has(goal.id));
+      system.goals = selected.filter(goal=>!oldIds.has(goal.id) && !goal.futureAutomatic);
       reconcileGoals(state,state,operation,true);
       system.goals = selected;
     }
+    updateConfiguredRecords(state,operation);
     completeReachedAutomaticGoals(state,operation);
     return true;
   }
@@ -171,12 +242,13 @@ export function changeGoals(state, operation) {
   for (const record of system.records) {
     if (selection.get(record.id)!==record.reached) continue;
     const goal=system.goals.find(item=>item.id===record.goalId);
+    if (goal?.archived || goal?.futureAutomatic && goal.automatic) continue;
     const team=goal && targets(state,goal).find(item=>item.id===record.teamId);
     const threshold = record.milestone ?? goal?.score;
     if (operation.complete && record.status!=='done' && team && team.score>=threshold) {
       if (record.status==='withdrawn') Object.assign(record,{score:threshold,achievedScore:team.score,silent:true});
       record.status='done';updated=true;
-    } else if (!operation.complete && record.status==='done') {
+    } else if (!operation.complete && record.status==='done' && (!goal?.futureAutomatic || team && team.score>=threshold)) {
       const score = record.teamId===null ? state.count : state.teams.find(team=>team.id===record.teamId)?.score;
       if (goal) record.score=threshold;
       record.status = score>=record.score ? 'pending' : 'withdrawn';
@@ -187,7 +259,7 @@ export function changeGoals(state, operation) {
     if (target.reached!==null || system.records.some(record=>record.id===target.id)) continue;
     const goal=system.goals.find(item=>item.id===target.goalId);
     const team=goal && targets(state,goal).find(item=>item.id===target.teamId);
-    if (!team || intervalOf(goal) || team.score<goal.score || target.id!==recordId(goal,team.id)) continue;
+    if (!team || goal.futureAutomatic && goal.automatic || intervalOf(goal) || team.score<goal.score || target.id!==recordId(goal,team.id)) continue;
     system.records.push({...newRecord(goal,team),status:'done',silent:true,reached:operation.key,time:operation.authoredAt??null});
     updated=true;
   }

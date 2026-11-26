@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyScoreOperation} from '../js/shared-score.js';
-import {nextClassGoal,nextTeamGoal} from '../score/goal-model.js';
+import {makeGoalRounds,nextClassGoal,nextTeamGoal} from '../score/goal-model.js';
 
 function scenario() {
   const board={}, send=(kind, key, fields)=>applyScoreOperation(board,{kind,key,authoredAt:1,...fields});
@@ -203,4 +203,51 @@ test('next class goal counts every matching goal and uses the first message',()=
   assert.equal(next.score,100);
   assert.equal(next.message,'영화데이');
   assert.equal(next.additional,2);
+});
+
+test('turning on future automatic completion preserves waiting and completed targets',()=>{
+  const {score,send}=scenario();
+  const goal={...goals[1],futureAutomatic:true};
+  send('score-goals','create',{base:null,goals:[goal]});
+  send('score-delta','a-reaches',{group:'a-reaches',amount:1,targets:['a']});
+  send('score-goals','enable-auto',{base:'create',goals:[{...goal,automatic:true}]});
+  assert.equal(score().records[0].status,'pending');
+  send('score-records','blocked',{complete:true,records:[score().records[0]]});
+  assert.equal(score().records[0].status,'pending');
+  send('score-delta','b-reaches',{group:'b-reaches',amount:3,targets:['b']});
+  assert.deepEqual(score().records.map(record=>[record.teamId,record.status]),[['a','pending'],['b','done']]);
+  send('score-goals','disable-auto',{base:'enable-auto',goals:[goal]});
+  assert.equal(score().records[1].status,'done');
+  send('score-records','manual',{complete:true,records:[score().records[0]]});
+  assert.equal(score().records[0].status,'done');
+});
+
+test('only selected teams earn a target, while changing eligibility preserves completed records',()=>{
+  const {score,send}=scenario();
+  const goal={...goals[1],futureAutomatic:true,teamIds:['a']};
+  send('score-goals','restricted',{base:null,goals:[goal]});
+  assert.equal(nextTeamGoal(score(),{id:'b',score:0}),null);
+  send('score-delta','b-crosses',{group:'b-crosses',amount:3,targets:['b']});
+  assert.equal(score().records.length,0);
+  send('score-delta','a-crosses',{group:'a-crosses',amount:1,targets:['a']});
+  send('score-records','complete-a',{complete:true,records:[score().records[0]]});
+  send('score-goals','include-b',{base:'restricted',goals:[{...goal,teamIds:['b'],automatic:true}]});
+  assert.deepEqual(score().records.map(record=>[record.teamId,record.status]),[['a','done'],['b','pending']]);
+});
+
+test('editing a finite repeat group preserves a completed round and generates the configured count',()=>{
+  let id=0;
+  const uid=()=>String(++id);
+  const source={id:'original',type:'team',score:20,message:'이전'};
+  const setup={start:20,interval:10,count:3,message:'선물',automatic:false,teamIds:['a']};
+  const seeded=makeGoalRounds([source],source,setup,[],uid);
+  assert.deepEqual(seeded.goals.map(goal=>goal.score),[20,30,40]);
+  assert.equal(seeded.goals[0].id,source.id);
+  const completed=seeded.goals[1];
+  const edited=makeGoalRounds(seeded.goals,seeded.goals[2],{...setup,start:25,count:2},
+    [{goalId:completed.id,status:'done'}],uid);
+  assert.deepEqual(edited.goals.filter(goal=>!goal.archived).map(goal=>goal.score),[25,35]);
+  assert.equal(edited.goals.find(goal=>goal.id===completed.id)?.score,30);
+  assert.equal(edited.goals.find(goal=>goal.id===completed.id)?.archived,true);
+  assert.equal(edited.removed,1);
 });

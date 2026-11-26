@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=score-goal-manager-1">
+    <link rel="stylesheet" href="style.css?v=goal-table-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -259,29 +259,52 @@
       <div class="dialog-sheet">
         <header class="dialog-header"><h2 id="goal-manage-title">목표·선물 관리</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
         <div id="goal-settings">
-          <aside class="goal-navigation" aria-label="목표 목록">
+          <div class="goal-table-toolbar">
             <div class="goal-switch" role="group" aria-label="목표 대상">
               <button type="button" class="dialog-action" data-goal-scope="class" aria-pressed="true">학급</button>
               <button type="button" class="dialog-action" data-goal-scope="team" aria-pressed="false">모둠</button>
             </div>
-            <div id="goal-nav-list"></div>
             <button type="button" class="dialog-action" id="goal-add-selected">＋ 목표 추가</button>
-          </aside>
-          <div class="goal-detail" data-mode="settings">
-            <div class="goal-switch goal-detail-switch" role="group" aria-label="목표 관리 화면">
-              <button type="button" class="dialog-action" data-goal-mode="settings" aria-pressed="true">목표 설정</button>
-              <button type="button" class="dialog-action" data-goal-mode="rewards" aria-pressed="false">선물 지급</button>
-            </div>
-            <p id="goal-empty">목표를 추가하면 설정과 지급 현황이 여기에 표시됩니다.</p>
-            <div id="class-goals-list"></div>
-            <div id="team-goals-list"></div>
+          </div>
+          <div id="goal-bulk" role="group" aria-label="선택한 목표 일괄 작업" hidden>
+            <strong id="goal-bulk-count"></strong>
+            <button type="button" class="dialog-action" data-goal-bulk="message">메시지 변경</button>
+            <button type="button" class="dialog-action" data-goal-bulk="teams">적용 모둠 변경</button>
+            <button type="button" class="dialog-action" data-goal-bulk="auto-on">자동완료 켜기</button>
+            <button type="button" class="dialog-action" data-goal-bulk="auto-off">자동완료 끄기</button>
+            <button type="button" class="dialog-action dialog-danger" data-goal-bulk="delete">삭제</button>
+          </div>
+          <div class="goal-table-scroll">
+            <table class="goal-table">
+              <thead>
+                <tr>
+                  <th scope="col"><label><input type="checkbox" id="goal-select-all"> 선택</label></th>
+                  <th scope="col">목표 점수</th>
+                  <th scope="col">선물 메시지</th>
+                  <th scope="col" class="goal-team-column">적용 모둠</th>
+                  <th scope="col">달성 상태</th>
+                  <th scope="col">자동완료</th>
+                  <th scope="col">반복</th>
+                  <th scope="col">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="goal-table-body"></tbody>
+            </table>
+            <p id="goal-empty">등록된 목표가 없습니다.</p>
           </div>
         </div>
         <div class="goal-manager-footer">
           <p id="goal-edit-error" role="status"></p>
-          <label><input type="checkbox" id="goal-include-existing"> 이미 도달한 대상의 기록도 만들기</label>
           <div class="dialog-footer"><button class="dialog-action" id="cancel-goal-edit">닫기</button><button class="dialog-action dialog-primary" id="close-goal-view-btn">목표 저장</button></div>
         </div>
+        <dialog id="goal-action-dialog" class="dialog-sheet" aria-labelledby="goal-action-title">
+          <form id="goal-action-form">
+            <header class="dialog-header"><h3 id="goal-action-title"></h3><button type="button" id="goal-action-close" class="dialog-close" aria-label="닫기">×</button></header>
+            <div id="goal-action-fields"></div>
+            <p id="goal-action-error" role="status"></p>
+            <div class="dialog-footer"><button type="button" id="goal-action-cancel" class="dialog-action">닫기</button><button type="submit" id="goal-action-apply" class="dialog-action dialog-primary">확인</button></div>
+          </form>
+        </dialog>
       </div>
     </div>
 
@@ -302,6 +325,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=score-goal-manager-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
+    <script type="module" src="script.js?v=goal-table-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
 </body>
 </html>
