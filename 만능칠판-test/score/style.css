@@ -571,6 +571,7 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 .team-steps button:hover {background:color-mix(in srgb, var(--card-bg) 52%, transparent)}
 [hidden] {display:none !important}
 #batch-score {
+  --batch-rows:1;
   --batch-min:46px;
   --batch-default:63px;
   container:batch-score / size;
@@ -770,6 +771,7 @@ button, .main-scoreboard, .team-card, #batch-score {
 #batch-score #batch-reset {width:calc(.42 * var(--control-height));padding:0;background:#fff}
 @container score-surface (max-width:304px) {
   #batch-score {
+    --batch-rows:2;
     --batch-min:76px;
     --batch-default:100px;
   }
@@ -778,6 +780,7 @@ button, .main-scoreboard, .team-card, #batch-score {
     grid-template-columns:var(--input-width) var(--button-width);
     grid-template-areas:"select undo" "amount apply";
   }
+  .batch-controls #select-all-teams {justify-self:start}
 }
 #score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
 

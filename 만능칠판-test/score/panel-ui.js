@@ -40,11 +40,21 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
     try { localStorage.setItem(key, String(value)); } catch {}
   }
 
-const savedRegionShare = Number(readSetting(regionShareKey));
+  const savedRegionShare = Number(readSetting(regionShareKey));
   let regionShare = savedRegionShare > 0 && savedRegionShare < 1 ? savedRegionShare : null;
-  let batchHeight = Number(readSetting(batchHeightKey)) || null;
+  let savedBatch;
+  try {savedBatch=JSON.parse(readSetting(batchHeightKey));} catch {}
+  let batchHeight = Number(savedBatch?.height ?? savedBatch) || null;
+  let batchRows = savedBatch?.rows ?? null;
   let regionBounds, batchBounds;
   const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
+  function clearBatchHeight() {
+    batchHeight=null;
+    try {localStorage.removeItem(batchHeightKey);} catch {}
+  }
+  function saveBatchHeight() {
+    if(batchHeight!==null)writeSetting(batchHeightKey,JSON.stringify({height:batchHeight,rows:batchRows}));
+  }
 
   function minimumTeamHeight(ratio) {
     const bottomStyle=getComputedStyle(bottomRow);
@@ -81,6 +91,13 @@ const savedRegionShare = Number(readSetting(regionShareKey));
     const desiredClass=regionShare===null?clamp(reference*.3,166,215):reference*regionShare;
     let available=panelHeight;
     if(!batch.hidden) {
+      const rows=Number(batchStyle.getPropertyValue('--batch-rows'));
+      if(batchRows!==rows) {
+        const firstLayout=batchRows===null;
+        if(!firstLayout)clearBatchHeight();
+        batchRows=rows;
+        if(firstLayout)saveBatchHeight();
+      }
       const minBatch=parseFloat(batchStyle.getPropertyValue('--batch-min'));
       const maxBatch=Math.max(minBatch,Math.min(180,Math.floor(panelHeight-teamMin-Math.max(min,desiredClass))));
       const height=Math.round(clamp(batchHeight??batchDefault,minBatch,maxBatch));
@@ -140,13 +157,12 @@ const savedRegionShare = Number(readSetting(regionShareKey));
   }
   wireHeightSplitter(splitter,1,()=>regionBounds,height=>{regionShare=height/regionBounds.reference;},
     ()=>{if(regionShare!==null)writeSetting(regionShareKey,regionShare);});
-  wireHeightSplitter(batchSplitter,-1,()=>batchBounds,height=>{batchHeight=height;},
-    ()=>{if(batchHeight!==null)writeSetting(batchHeightKey,batchHeight);});
+  wireHeightSplitter(batchSplitter,-1,()=>batchBounds,height=>{batchHeight=height;},saveBatchHeight);
   document.getElementById('score-reset-regions').onclick=()=>{
-    regionShare=batchHeight=null;
+    regionShare=null;
+    clearBatchHeight();
     try {
       localStorage.removeItem(regionShareKey);
-      localStorage.removeItem(batchHeightKey);
     } catch {}
     scheduleLayout();
   };
