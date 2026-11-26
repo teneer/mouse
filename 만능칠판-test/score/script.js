@@ -411,13 +411,13 @@ function renderActivities() {
       }
     }
     if (kind==='class') {
-      const behind=!!rule?.enabled && count<limit;
+      const behind=!!rule?.enabled && count<=limit;
       document.querySelector('.main-scoreboard').classList.toggle('pursuit-behind',behind);
       renderNextGoal(nextClassGoalBanner,behind?null:nextClassGoal(goalSystem,count),behind?rule:null);
     } else teams.forEach((team,i)=>{
       const card=scoreboard.children[i];
       if (!card) return;
-      const behind=!!rule?.enabled && team.score<limit;
+      const behind=!!rule?.enabled && team.score<=limit;
       const warning=card.querySelector('.team-pursuit-warning');
       const select=card.querySelector('.team-select-btn');
       card.classList.toggle('pursuit-behind',behind);
