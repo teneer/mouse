@@ -456,10 +456,10 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   border-color:#7895a8;background:#e6f1f4d9;color:#174866;
 }
 .score-height-splitter {
-  display:grid;flex:0 0 14px;place-items:center;z-index:11;
+  display:grid;flex:0 0 8px;place-items:center;z-index:11;
   background:var(--control-bg);cursor:row-resize;touch-action:none;user-select:none;
 }
-.score-height-splitter::before {content:"";width:36px;height:3px;border-radius:3px;background:#7393a3}
+.score-height-splitter::before {content:"";width:36px;height:2px;border-radius:2px;background:#7393a3}
 .score-height-splitter:is(:hover,:focus-visible,.dragging) {background:#cde3eb}
 .score-height-splitter:focus-visible {outline:2px solid var(--primary-dark);outline-offset:-2px}
 #score-batch-splitter:has(+ #batch-score[hidden]) {display:none}
@@ -467,7 +467,7 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   #bottom-row {--side-target:32px}
   #score-move-side {height:44px}
   #display-area {--class-region-min:194px}
-  .score-height-splitter {flex-basis:24px}
+  .score-height-splitter {flex-basis:14px}
 }
 #selected-team-count {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted-text);font-size:12px;text-align:right}
 #team-viewport {
