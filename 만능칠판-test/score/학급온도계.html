@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=score-pursuit-width-1">
+    <link rel="stylesheet" href="style.css?v=score-batch-ratio-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -104,18 +104,20 @@
 
         <div id="score-batch-splitter" class="score-height-splitter" role="separator" tabindex="0" aria-label="점수 조작 하단바 높이 조절" aria-orientation="horizontal" aria-controls="batch-score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
         <form id="batch-score" hidden>
-            <button type="button" id="select-all-teams">전체선택</button>
             <div id="quick-undo" hidden><span id="quick-undo-label" role="status"></span><button type="button">취소</button></div>
-            <button type="button" id="undo-score" disabled>되돌리기</button>
-            <div class="batch-amount">
-                <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
-                <button type="button" id="batch-reset" aria-label="입력한 점수 지우기" hidden>×</button>
-                <div class="batch-stepper">
-                    <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
-                    <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
+            <div class="batch-controls">
+                <button type="button" id="select-all-teams">전체선택</button>
+                <button type="button" id="undo-score" disabled>되돌리기</button>
+                <div class="batch-amount">
+                    <input id="batch-delta" aria-label="일괄 반영할 점수" type="number" step="1" value="0" required>
+                    <button type="button" id="batch-reset" aria-label="입력한 점수 지우기" hidden>×</button>
+                    <div class="batch-stepper">
+                        <button type="button" id="batch-up" aria-label="입력값 1 증가">+</button>
+                        <button type="button" id="batch-down" aria-label="입력값 1 감소">−</button>
+                    </div>
                 </div>
+                <button type="submit" id="apply-batch" disabled>반영</button>
             </div>
-            <button type="submit" id="apply-batch" disabled>반영</button>
         </form>
 
     </div>

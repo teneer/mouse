@@ -575,10 +575,6 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   --batch-default:63px;
   container:batch-score / size;
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);
-  grid-template-areas:"select undo amount apply";
-  grid-auto-rows:minmax(0,1fr);
-  gap:4px;
   flex:none;
   position:relative;
   z-index:5;
@@ -587,6 +583,16 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   padding:clamp(3px, .8dvh, 7px) clamp(3px, 2cqw, 12px);
   border-top:1px solid var(--panel-line);
   background:var(--card-bg);
+}
+.batch-controls {
+  --control-height:min(100cqh,12.8cqw,72px);
+  --button-width:calc(1.65 * var(--control-height));
+  --input-width:calc(2.4 * var(--control-height));
+  display:grid;place-content:center;justify-items:center;
+  grid-template-columns:var(--button-width) var(--button-width) var(--input-width) var(--button-width);
+  grid-template-areas:"select undo amount apply";
+  grid-auto-rows:var(--control-height);
+  gap:4px;
 }
 #select-all-teams {grid-area:select}
 #undo-score {grid-area:undo}
@@ -599,12 +605,13 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   border-radius:8px;
   background:var(--control-bg);
   color:var(--text-color);
-  font-size:clamp(9px,min(4.1cqw,24cqh),23px);
+  font-size:12px;
   font-weight:700;
   cursor:pointer;
 }
+#batch-score .batch-controls button {font-size:clamp(9px,calc(.29 * var(--control-height)),21px)}
 #batch-score #select-all-teams, #batch-score #undo-score, #batch-score #apply-batch {
-  width:100%;
+  width:var(--button-width);
   min-width:0;
   overflow:hidden;
   white-space:nowrap;
@@ -612,7 +619,7 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 }
 #batch-score #apply-batch {background:var(--primary-color);color:#fff}
 #batch-score button:disabled {opacity:.55;cursor:default}
-.batch-amount {display:flex;min-width:0;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
+.batch-amount {display:flex;width:var(--input-width);min-width:0;min-height:0;border:1px solid var(--panel-line);border-radius:8px;background:#fff}
 #batch-delta {
   flex:1;
   width:0;
@@ -622,11 +629,11 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   border-radius:8px;
   appearance:textfield;
   text-align:center;
-  font:inherit;font-size:clamp(11px,min(5cqw,35cqh),28px);
+  font:inherit;font-size:clamp(11px,calc(.38 * var(--control-height)),28px);
 }
 #batch-delta::-webkit-inner-spin-button, #batch-delta::-webkit-outer-spin-button {appearance:none;margin:0}
 .batch-stepper {display:grid;grid-template-rows:repeat(2,minmax(0,1fr));border-left:1px solid var(--panel-line)}
-#batch-score .batch-stepper button {width:clamp(12px,min(8cqw,45cqh),44px);padding:0;border-radius:0;font-size:clamp(9px,min(5cqw,20cqh),21px)}
+#batch-score .batch-stepper button {width:calc(.52 * var(--control-height));padding:0;border-radius:0}
 #batch-score .batch-stepper button + button {border-top:1px solid var(--panel-line)}
 #score-link-points, #score-fixed-columns {width:min(76px, 100%);font:inherit}
 .settings-panel {
@@ -760,16 +767,17 @@ button, .main-scoreboard, .team-card, #batch-score {
   cursor:pointer;
 }
 .team-remove:hover {background:#a933271f}
-#batch-score #batch-reset {width:clamp(12px,min(6cqw,35cqh),26px);padding:0;background:#fff}
+#batch-score #batch-reset {width:calc(.42 * var(--control-height));padding:0;background:#fff}
 @container score-surface (max-width:304px) {
   #batch-score {
     --batch-min:76px;
     --batch-default:100px;
-    grid-template-columns:minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+  .batch-controls {
+    --control-height:min(46cqh,22cqw,64px);
+    grid-template-columns:var(--input-width) var(--button-width);
     grid-template-areas:"select undo" "amount apply";
   }
-  #batch-score button {font-size:clamp(9px,min(6cqw,17cqh),23px)}
-  #batch-delta {font-size:clamp(11px,min(7cqw,23cqh),28px)}
 }
 #score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
 
