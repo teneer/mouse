@@ -862,7 +862,7 @@ dialog.settings-panel {--dialog-padding:clamp(5px, 4vw, 12px);--dialog-header:#e
   border-radius:.35rem;font-size:clamp(.65rem,8cqw,1rem);white-space:nowrap;
 }
 #class-goal-gifts button {background:#fff0c3;border-color:#d8af56}
-#goal-settings {display:flex;flex-direction:column;flex:1;min-height:0;gap:.55rem;padding:.65rem 0}
+#goal-settings {display:flex;flex-direction:column;flex:1;min-height:0;padding:.65rem 0}
 #goal-edit-error {grid-column:1/-1;margin:0;color:#9d3027}
 #goal-edit-error:empty {display:none}
 .goal-manager-footer {
@@ -890,12 +890,14 @@ body.score-modal-open #score-surface {
   height:min(690px,calc(100dvh - 24px));max-height:94dvh;overflow:hidden;
 }
 #goal-management-view .dialog-header {flex:none;margin-bottom:0}
-.goal-table-toolbar,#goal-bulk,.goal-switch {
+.goal-table-toolbar,#goal-bulk {
   display:flex;align-items:center;flex-wrap:wrap;gap:.35rem;
 }
-.goal-table-toolbar {justify-content:space-between}
-#goal-settings .goal-switch [aria-pressed=true] {
-  color:#fff;background:var(--primary-color);border-color:var(--primary-color);
+.goal-table-toolbar {justify-content:space-between;align-items:flex-end}
+#goal-add-selected {margin-bottom:.25rem}
+#goal-scope-panel {
+  display:flex;flex-direction:column;flex:1;min-height:0;gap:.5rem;padding:.45rem;
+  border:1px solid var(--dialog-border);border-radius:0 8px 8px 8px;background:var(--card-bg);
 }
 #goal-bulk {gap:.25rem;padding:.3rem .45rem;background:var(--summary-bg);border:1px solid var(--panel-line);border-radius:8px}
 #goal-bulk-count {min-width:4em;margin-inline-end:.2rem;font-size:.82rem;white-space:nowrap}
@@ -1103,15 +1105,15 @@ body.score-modal-open #score-surface {
 #pursuit-editor label {display:flex;align-items:center;justify-content:space-between;gap:8px}
 #pursuit-editor label:has(input[type=checkbox]) {justify-content:flex-start}
 #pursuit-editor input:not([type=checkbox]),#pursuit-editor select {width:58%;min-width:0}
-.pursuit-picker {display:flex;gap:4px}
-#pursuit-editor .pursuit-picker .dialog-action {
+.score-index-tabs {display:flex;gap:4px}
+:is(#pursuit-editor,#goal-settings) .score-index-tabs .dialog-action {
   position:relative;min-width:76px;margin-bottom:-1px;
   border:1px solid var(--dialog-border);border-top:3px solid transparent;border-radius:8px 8px 0 0;
   background:var(--dialog-header);color:var(--muted-text);
 }
-#pursuit-editor .pursuit-picker .dialog-action[aria-selected=true] {
+:is(#pursuit-editor,#goal-settings) .score-index-tabs .dialog-action[aria-selected=true] {
   z-index:1;border-top-color:var(--dialog-accent);border-bottom-color:var(--card-bg);
   background:var(--card-bg);color:var(--dialog-text);font-weight:700;
 }
-#pursuit-editor .pursuit-picker .dialog-action:focus-visible {z-index:2}
+:is(#pursuit-editor,#goal-settings) .score-index-tabs .dialog-action:focus-visible {z-index:2}
 #pursuit-editor output {margin-right:auto;align-self:center;font-size:.85rem}

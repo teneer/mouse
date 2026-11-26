@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-repeat-cards-1">
+    <link rel="stylesheet" href="style.css?v=goal-index-tabs-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -127,7 +127,7 @@
     <dialog id="pursuit-editor" class="settings-panel dialog-sheet" aria-labelledby="pursuit-title">
       <header class="dialog-header"><h3 id="pursuit-title">추격자 설정</h3><button type="button" id="pursuit-close" class="dialog-close" aria-label="닫기">×</button></header>
       <div class="pursuit-settings">
-        <div class="pursuit-picker" role="tablist" aria-label="추격자 설정 대상">
+        <div class="score-index-tabs" role="tablist" aria-label="추격자 설정 대상">
           <button class="dialog-action" type="button" role="tab" id="pick-class" aria-selected="true" aria-controls="class-pursuit-settings">학급</button>
           <button class="dialog-action" type="button" role="tab" id="pick-team" aria-selected="false" aria-controls="team-pursuit-settings" tabindex="-1">모둠</button>
         </div>
@@ -260,37 +260,39 @@
         <header class="dialog-header"><h2 id="goal-manage-title">목표 관리</h2><button id="cancel-goal-view" class="dialog-close" aria-label="닫기">×</button></header>
         <div id="goal-settings">
           <div class="goal-table-toolbar">
-            <div class="goal-switch" role="group" aria-label="목표 대상">
-              <button type="button" class="dialog-action" data-goal-scope="class" aria-pressed="true">학급</button>
-              <button type="button" class="dialog-action" data-goal-scope="team" aria-pressed="false">모둠</button>
+            <div class="score-index-tabs" role="tablist" aria-label="목표 대상">
+              <button type="button" class="dialog-action" role="tab" id="goal-scope-class" data-goal-scope="class" aria-controls="goal-scope-panel" aria-selected="true">학급</button>
+              <button type="button" class="dialog-action" role="tab" id="goal-scope-team" data-goal-scope="team" aria-controls="goal-scope-panel" aria-selected="false" tabindex="-1">모둠</button>
             </div>
             <button type="button" class="dialog-action" id="goal-add-selected">＋ 목표 추가</button>
           </div>
-          <div id="goal-bulk" role="group" aria-label="선택한 목표 일괄 작업">
-            <strong id="goal-bulk-count" aria-live="polite">0개 선택</strong>
-            <button type="button" class="dialog-action" data-goal-bulk="message" disabled>메시지 변경</button>
-            <button type="button" class="dialog-action" data-goal-bulk="teams" disabled>적용 모둠 변경</button>
-            <button type="button" class="dialog-action" data-goal-bulk="auto-on" disabled>자동완료 켜기</button>
-            <button type="button" class="dialog-action" data-goal-bulk="auto-off" disabled>자동완료 끄기</button>
-            <button type="button" class="dialog-action dialog-danger" data-goal-bulk="delete" disabled>삭제</button>
-          </div>
-          <div class="goal-table-scroll">
-            <table class="goal-table">
-              <thead>
-                <tr>
-                  <th scope="col"><label><input type="checkbox" id="goal-select-all"> 선택</label></th>
-                  <th scope="col">목표 점수</th>
-                  <th scope="col">메시지</th>
-                  <th scope="col" class="goal-team-column">적용 모둠</th>
-                  <th scope="col">달성 상태</th>
-                  <th scope="col">자동완료</th>
-                  <th scope="col">반복</th>
-                  <th scope="col">삭제</th>
-                </tr>
-              </thead>
-              <tbody id="goal-table-body"></tbody>
-            </table>
-            <p id="goal-empty">등록된 목표가 없습니다.</p>
+          <div id="goal-scope-panel" role="tabpanel" aria-labelledby="goal-scope-class">
+            <div id="goal-bulk" role="group" aria-label="선택한 목표 일괄 작업">
+              <strong id="goal-bulk-count" aria-live="polite">0개 선택</strong>
+              <button type="button" class="dialog-action" data-goal-bulk="message" disabled>메시지 변경</button>
+              <button type="button" class="dialog-action" data-goal-bulk="teams" disabled>적용 모둠 변경</button>
+              <button type="button" class="dialog-action" data-goal-bulk="auto-on" disabled>자동완료 켜기</button>
+              <button type="button" class="dialog-action" data-goal-bulk="auto-off" disabled>자동완료 끄기</button>
+              <button type="button" class="dialog-action dialog-danger" data-goal-bulk="delete" disabled>삭제</button>
+            </div>
+            <div class="goal-table-scroll">
+              <table class="goal-table">
+                <thead>
+                  <tr>
+                    <th scope="col"><label><input type="checkbox" id="goal-select-all"> 선택</label></th>
+                    <th scope="col">목표 점수</th>
+                    <th scope="col">메시지</th>
+                    <th scope="col" class="goal-team-column">적용 모둠</th>
+                    <th scope="col">달성 상태</th>
+                    <th scope="col">자동완료</th>
+                    <th scope="col">반복</th>
+                    <th scope="col">삭제</th>
+                  </tr>
+                </thead>
+                <tbody id="goal-table-body"></tbody>
+              </table>
+              <p id="goal-empty">등록된 목표가 없습니다.</p>
+            </div>
           </div>
         </div>
         <div class="goal-manager-footer">
@@ -325,6 +327,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=goal-repeat-cards-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
+    <script type="module" src="script.js?v=goal-index-tabs-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
 </body>
 </html>

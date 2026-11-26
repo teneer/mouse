@@ -68,7 +68,12 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
   }
   function refreshScope() {
     view.dataset.goalScope=scope;
-    for(const tab of tabs)tab.setAttribute('aria-pressed',String(tab.dataset.goalScope===scope));
+    for(const tab of tabs) {
+      const active=tab.dataset.goalScope===scope;
+      tab.setAttribute('aria-selected',String(active));
+      tab.tabIndex=active?0:-1;
+      if(active)$('goal-scope-panel').setAttribute('aria-labelledby',tab.id);
+    }
     for(const cell of view.querySelectorAll('th.goal-team-column'))cell.hidden=scope==='class';
     rows.clear();
     for(const goal of scoped())rows.set(goal.id,createRow(goal));
@@ -480,7 +485,22 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     }
     syncBulk();
   };
-  for(const tab of tabs)tab.onclick=()=>{scope=tab.dataset.goalScope;refreshScope();};
+  function selectScope(tab) {
+    if(scope===tab.dataset.goalScope)return;
+    scope=tab.dataset.goalScope;
+    refreshScope();
+  }
+  for(const [index,tab] of tabs.entries()) {
+    tab.onclick=()=>selectScope(tab);
+    tab.onkeydown=event=>{
+      const opposite=tabs[1-index];
+      const next={ArrowLeft:opposite,ArrowRight:opposite,Home:tabs[0],End:tabs[1]}[event.key];
+      if(!next)return;
+      event.preventDefault();
+      selectScope(next);
+      next.focus();
+    };
+  }
   for(const control of view.querySelectorAll('[data-goal-bulk]'))control.onclick=()=>{
     const goals=chosen(), kind=control.dataset.goalBulk;
     if(!goals.length)return;
