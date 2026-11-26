@@ -196,15 +196,33 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     fieldset.append(create('legend','적용 모둠'));
     const all=create('input');all.type='checkbox';all.checked=!Array.isArray(teamIds);
     fieldset.append(label('전체 모둠',all));
-    const list=create('div');list.className='goal-team-options';fieldset.append(list);
-    const teams=teamList().map(team=>{
-      const input=create('input');input.type='checkbox';input.value=team.id;
-      input.checked=all.checked||teamIds?.includes(team.id)===true;
-      list.append(label(team.name,input));return input;
+    const list=create('div');list.className='goal-target-list goal-team-options';fieldset.append(list);
+    const teams=teamList();
+    const included=new Set(teamIds??teams.map(team=>team.id));
+    const cards=teams.map(team=>{
+      const card=teamCard(team,()=>{
+        all.checked=false;
+        if(included.has(team.id))included.delete(team.id);else included.add(team.id);
+        sync();
+      });
+      list.append(card);
+      return {id:team.id,card};
     });
-    function sync(){for(const input of teams)input.disabled=all.checked;}
-    all.onchange=sync;sync();
-    const value=()=>all.checked?undefined:teams.filter(input=>input.checked).map(input=>input.value);
+    function sync() {
+      for(const {id,card} of cards) {
+        const applies=included.has(id);
+        card.setAttribute('aria-pressed',String(applies));
+        card.dataset.state=applies?'applied':'excluded';
+        card.querySelector('.goal-target-label').textContent=applies?'적용':'미적용';
+      }
+    }
+    all.onchange=()=>{
+      if(all.checked)for(const team of teams)included.add(team.id);
+      sync();
+    };
+    if(!teams.length)list.append(create('p','등록된 모둠이 없습니다.'));
+    sync();
+    const value=()=>all.checked?undefined:teams.filter(team=>included.has(team.id)).map(team=>team.id);
     return {fieldset,value};
   }
   function setTeams(goals,ids) {
@@ -247,11 +265,16 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
       const input=create('input');input.type='text';input.inputMode='numeric';input.required=true;input.value=value;
       block.append(label(name,input));return input;
     });
+    const message=create('input');message.maxLength=240;message.value=goal.message;
+    const automatic=create('input');automatic.type='checkbox';automatic.checked=!!goal.automatic;
+    block.append(label('메시지',message),label('자동완료',automatic));
+    const picker=goal.type==='team'?teamPicker(goal.teamIds):null;
+    if(picker)block.append(picker.fieldset);
     const preview=create('p');preview.className='goal-repeat-preview';block.append(preview);
     const settings=()=>{
       const [start,interval,count]=[parseGoalScore(inputs[0].value),parseGoalInterval(inputs[1].value),parseGoalInterval(inputs[2].value)];
       if(start===null || interval===null || count===null || start+interval*(count-1)>10000)return null;
-      return {start,interval,count,message:goal.message.trim(),automatic:goal.automatic,teamIds:goal.teamIds};
+      return {start,interval,count,message:message.value.trim(),automatic:automatic.checked,teamIds:picker?.value()};
     };
     function updatePreview() {
       const config=settings();
@@ -313,6 +336,15 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     const message=create('strong',goal.message.trim());
     title.replaceChildren(score,message);
   }
+  function teamCard(team,onClick) {
+    const card=button('',onClick);
+    card.classList.add('goal-target-card');
+    const status=create('span');status.className='goal-target-label';
+    const facts=create('span');facts.className='goal-target-facts';
+    facts.append(create('strong',team.name),create('span',Number.isFinite(team.score)?team.score+'점':'—'));
+    card.append(status,facts);
+    return card;
+  }
   function paintStatus(content) {
     const {goal,selection}=statusView;
     const history=recordsFor(goal);
@@ -340,17 +372,14 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     const list=create('div');list.className='goal-target-list';content.append(list);
     const cases=targets.map(target=>{
       const {team,applies,state}=target, key=String(team.id);
-      const card=button('',()=>{
+      const card=teamCard(team,()=>{
         if(selection.has(key))selection.delete(key);else selection.add(key);
         updateActions();
       });
-      card.classList.add('goal-target-card');
       card.dataset.state=applies?state:'excluded';card.dataset.statusFocus='card:'+key;
       card.disabled=!!goal.archived;
-      const status=create('span',applies?labels[state]:'미적용');status.className='goal-target-label';
-      const facts=create('span');facts.className='goal-target-facts';
-      facts.append(create('strong',team.name),create('span',Number.isFinite(team.score)?team.score+'점':'—'));
-      card.append(status,facts);list.append(card);
+      card.querySelector('.goal-target-label').textContent=applies?labels[state]:'미적용';
+      list.append(card);
       return {target,key,card};
     });
     const footer=create('div');footer.className='goal-target-actions';
