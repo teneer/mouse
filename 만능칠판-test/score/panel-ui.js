@@ -6,11 +6,17 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   const ratioKey = 'whiteboard.test.score-card-ratio.v1';
   const modeKey = 'whiteboard.test.score-layout-mode.v1';
   const columnsKey = 'whiteboard.test.score-fixed-columns.v1';
+  const regionShareKey = 'whiteboard.test.score-region-share.v1';
   const root = document.body;
+  const displayArea = document.getElementById('display-area');
+  const splitter = document.getElementById('score-region-splitter');
+  const bottomRow = document.getElementById('bottom-row');
   const viewport = document.getElementById('team-viewport');
   const scoreboard = document.getElementById('scoreboard');
   const classScore = document.getElementById('number');
   const classControls = classScore.parentElement;
+  const classContent = classControls.parentElement;
+  const classBanners = [...classContent.querySelectorAll('.class-goal-slot, .score-progress-group')];
   const classButtons = [...classControls.querySelectorAll('button')];
   const measure = document.createElement('canvas').getContext('2d');
   const modeButton = document.getElementById('score-layout-mode');
@@ -21,6 +27,7 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   const scaleOutput = document.getElementById('scoreSizeValue');
   const sideRow = document.getElementById('score-panel-side-row');
   const sideButton = document.getElementById('score-panel-side');
+  const sideShortcut = document.getElementById('score-move-side');
 
   function readSetting(key) {
     try { return localStorage.getItem(key); } catch { return null; }
@@ -30,6 +37,81 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
     try { localStorage.setItem(key, String(value)); } catch {}
   }
 
+  const savedRegionShare = Number(readSetting(regionShareKey));
+  let regionShare = savedRegionShare > 0 && savedRegionShare < 1 ? savedRegionShare : null;
+  let regionBounds, drag;
+  const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
+  function updateRegionLayout(ratio) {
+    const available=displayArea.clientHeight-splitter.offsetHeight;
+    if(available<=0)return;
+    const bottomStyle=getComputedStyle(bottomRow);
+    const blockHeight=parseFloat(bottomStyle.paddingTop)+parseFloat(bottomStyle.paddingBottom);
+    const visible=[...bottomRow.children].filter(child=>getComputedStyle(child).display!=='none');
+    const labelsHeight=visible.reduce((height,child)=>height+(child===viewport?0:child.offsetHeight),blockHeight)
+      +Math.max(0,visible.length-1)*parseFloat(bottomStyle.rowGap);
+    const {cardWidth}=viewport.hidden ? {cardWidth:0} : measureTeamLayout({
+      width:viewport.clientWidth,height:0,count:scoreboard.childElementCount,ratio,gap:Math.min(10,Math.floor(viewport.clientWidth/18)),
+      fixedColumns:mode==='fixed'?fixedColumns:null,scale:scale/100,minimumWidth:132
+    });
+    const min=parseFloat(getComputedStyle(displayArea).getPropertyValue('--class-region-min'));
+    const teamMin=Math.ceil(labelsHeight+cardWidth/ratio+viewport.offsetHeight-viewport.clientHeight);
+    const total=Math.max(available,min+teamMin);
+    const max=total-teamMin;
+    displayArea.toggleAttribute('data-regions-overflow',total>available);
+    const teamPixels=teamMin+'px';
+    if(bottomRow.style.getPropertyValue('--team-area-min')!==teamPixels)bottomRow.style.setProperty('--team-area-min',teamPixels);
+    const automatic=clamp(total*.3,166,215);
+    const height=Math.round(clamp(regionShare===null?automatic:total*regionShare,min,max));
+    regionBounds={total,min,max,height};
+    const pixels=height+'px';
+    if(displayArea.style.getPropertyValue('--class-area-height')!==pixels)displayArea.style.setProperty('--class-area-height',pixels);
+    for(const [name,value] of [['min',min],['max',max],['now',height]]) {
+      splitter.setAttribute('aria-value'+name,String(Math.round(value/total*100)));
+    }
+  }
+  function adjustRegionHeight(height) {
+    if(!regionBounds)return;
+    const {min,max,total}=regionBounds;
+    regionShare=clamp(height,min,max)/total;
+    scheduleLayout();
+  }
+  splitter.addEventListener('pointerdown',event=>{
+    if(drag || event.button!==0 || !regionBounds || regionBounds.min===regionBounds.max)return;
+    const offset=event.clientY-splitter.getBoundingClientRect().top;
+    drag={id:event.pointerId,offset};
+    splitter.setPointerCapture(event.pointerId);
+    splitter.classList.add('dragging');
+    event.preventDefault();
+  });
+  splitter.addEventListener('pointermove',event=>{
+    if(drag?.id!==event.pointerId)return;
+    adjustRegionHeight(event.clientY-displayArea.getBoundingClientRect().top-drag.offset);
+  });
+  function finishRegionDrag(event) {
+    if(drag?.id!==event.pointerId)return;
+    drag=null;
+    splitter.classList.remove('dragging');
+    if(regionShare!==null)writeSetting(regionShareKey,regionShare);
+  }
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])splitter.addEventListener(type,finishRegionDrag);
+  splitter.addEventListener('keydown',event=>{
+    if(!regionBounds)return;
+    const {height,min,max}=regionBounds;
+    const step=event.shiftKey?32:12;
+    const targets={ArrowUp:height-step,ArrowDown:height+step,Home:min,End:max};
+    if(!Object.hasOwn(targets,event.key))return;
+    event.preventDefault();
+    event.stopPropagation();
+    if(min===max)return;
+    adjustRegionHeight(targets[event.key]);
+    writeSetting(regionShareKey,regionShare);
+  });
+  document.getElementById('score-reset-regions').onclick=()=>{
+    regionShare=null;
+    try {localStorage.removeItem(regionShareKey);} catch {}
+    scheduleLayout();
+  };
+
   const savedScale = Number(readSetting(scaleKey));
   let scale = savedScale >= 60 && savedScale <= 150 ? savedScale : 100;
 
@@ -38,10 +120,11 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   function updateLayout() {
     layoutFrame = null;
     root.style.setProperty('--toolbar-clearance', `${Number(frame?.dataset.toolbarHeight ?? 0)}px`);
+    const ratio = cardRatio === '16:9' ? 16 / 9 : 4 / 3;
+    updateRegionLayout(ratio);
     const width = viewport.clientWidth;
     const height = viewport.clientHeight;
     if (width > 0 && height > 0) {
-      const ratio = cardRatio === '16:9' ? 16 / 9 : 4 / 3;
       const gap = Math.min(10, Math.floor(width / 18));
       const { columns, cardWidth } = measureTeamLayout({
         width, height, count: scoreboard.childElementCount, ratio, gap, previousColumns,
@@ -58,7 +141,10 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
     }
 
     const style = getComputedStyle(classControls);
-    const preferred = 76 * scale / 100;
+    const contentStyle = getComputedStyle(classContent);
+    const occupied = classBanners.reduce((height,banner)=>height+(banner.offsetHeight?banner.offsetHeight+parseFloat(contentStyle.rowGap):0),0);
+    const availableHeight = classContent.clientHeight-occupied-parseFloat(contentStyle.paddingTop)-parseFloat(contentStyle.paddingBottom);
+    const preferred = Math.max(1,Math.min(76*scale/100,availableHeight));
     const font = getComputedStyle(classScore);
     const space = classControls.clientWidth-classButtons.reduce((width,button)=>width+button.offsetWidth,0)-2*(parseFloat(style.columnGap)||0);
     if (measure && classControls.clientWidth > 0) {
@@ -147,24 +233,34 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
     const applySide = () => {
       const side = frame.dataset.scoreSide;
       sideRow.hidden = side !== 'left' && side !== 'right';
+      sideShortcut.hidden = sideRow.hidden || frame.dataset.scoreFull === 'true';
       if (!sideRow.hidden) sideButton.textContent = side === 'left' ? '왼쪽' : '오른쪽';
+      const label=side==='left'?'점수판을 오른쪽으로 이동':'점수판을 왼쪽으로 이동';
+      sideShortcut.textContent=side==='left'?'→':'←';
+      sideShortcut.title=label;
+      sideShortcut.setAttribute('aria-label',label);
     };
     applySide();
-    sideButton.addEventListener('click', () => {
+    function toggleSide() {
       const side = frame.dataset.scoreSide === 'left' ? 'right' : 'left';
       frame.dispatchEvent(new CustomEvent('score-panel-side', { detail: side }));
       applySide();
-    });
+    }
+    sideButton.addEventListener('click',toggleSide);
+    sideShortcut.addEventListener('click',toggleSide);
     new MutationObserver(() => {
       applySide();
       const incoming = Number(frame.dataset.syncedScoreScale);
       if (incoming>=60 && incoming<=150 && incoming!==scale) setScale(incoming);
       scheduleLayout();
     }).observe(frame, {
-      attributeFilter: ['data-panel-percent', 'data-toolbar-height', 'data-synced-score-scale', 'data-score-side'],
+      attributeFilter: ['data-panel-percent', 'data-toolbar-height', 'data-synced-score-scale', 'data-score-side', 'data-score-full'],
     });
   }
   const resizeObserver = new ResizeObserver(scheduleLayout);
+  resizeObserver.observe(displayArea);
+  resizeObserver.observe(classContent);
+  for(const banner of classBanners)resizeObserver.observe(banner);
   resizeObserver.observe(viewport);
   resizeObserver.observe(classControls);
   new MutationObserver(scheduleLayout).observe(classScore,{childList:true});

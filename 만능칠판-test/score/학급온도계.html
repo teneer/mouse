@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=score-dialogs-1">
+    <link rel="stylesheet" href="style.css?v=score-regions-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -30,32 +30,35 @@
                             </div>
                             <div class="score-header-actions">
                                 <button type="button" id="score-maximize" aria-label="전체 화면" title="전체 화면" aria-pressed="false"><span class="score-screen-icon" aria-hidden="true"></span></button>
+                                <button type="button" id="score-move-side" aria-label="점수판을 왼쪽으로 이동" title="점수판을 왼쪽으로 이동" hidden>←</button>
                                 <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                             </div>
                         </header>
-                        <div class="class-goal-slot">
-                            <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
-                                <strong id="next-class-goal-score" class="score-goal-value"></strong>
-                                <div id="next-class-goal-message" class="score-goal-message" hidden>
-                                    <div class="goal-message-viewport">
-                                        <div class="goal-message-track">
-                                            <span id="goal-message-text" class="goal-message-text" role="status"></span>
-                                            <span class="goal-message-repeat" aria-hidden="true"></span>
+                        <div class="class-score-content">
+                            <div class="class-goal-slot">
+                                <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
+                                    <strong id="next-class-goal-score" class="score-goal-value"></strong>
+                                    <div id="next-class-goal-message" class="score-goal-message" hidden>
+                                        <div class="goal-message-viewport">
+                                            <div class="goal-message-track">
+                                                <span id="goal-message-text" class="goal-message-text" role="status"></span>
+                                                <span class="goal-message-repeat" aria-hidden="true"></span>
+                                            </div>
                                         </div>
                                     </div>
+                                    <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
                                 </div>
-                                <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
                             </div>
-                        </div>
-                        <div class="main-controls">
-                            <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
-                            <span id="number">0</span>
-                            <button id="main-increase-btn" class="main-btn" aria-label="학급 점수 1점 추가">+</button>
-                        </div>
-                        <div id="change"></div>
-                        <div class="score-progress-group">
-                            <div id="score-progress" tabindex="0" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
-                                <div class="score-progress-fill"></div>
+                            <div class="main-controls">
+                                <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
+                                <span id="number">0</span>
+                                <button id="main-increase-btn" class="main-btn" aria-label="학급 점수 1점 추가">+</button>
+                            </div>
+                            <div id="change"></div>
+                            <div class="score-progress-group">
+                                <div id="score-progress" tabindex="0" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+                                    <div class="score-progress-fill"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -63,6 +66,8 @@
                 </section>
 
             </div>
+
+            <div id="score-region-splitter" role="separator" tabindex="0" aria-label="학급·모둠 영역 높이 조절" aria-orientation="horizontal" aria-controls="class-area bottom-row" aria-valuemin="0" aria-valuemax="100" aria-valuenow="30"></div>
 
             <section id="bottom-row" aria-labelledby="scoreboard-title">
                 <header class="team-heading">
@@ -150,6 +155,10 @@
             <div class="score-setting-row" id="score-panel-side-row" hidden>
                 <span id="score-panel-side-label">점수판 위치</span>
                 <button id="score-panel-side" type="button" aria-labelledby="score-panel-side-label score-panel-side">오른쪽</button>
+            </div>
+            <div class="score-setting-row">
+                <span>학급·모둠 영역</span>
+                <button type="button" id="score-reset-regions">레이아웃 초기화</button>
             </div>
             <div class="score-setting-row">
                 <span id="score-layout-mode-label">모둠 카드 배치</span>
@@ -275,6 +284,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=pursuit-alert-1"></script><script type="module" src="panel-ui.js?v=score-slots-1"></script>
+    <script type="module" src="script.js?v=pursuit-alert-1"></script><script type="module" src="panel-ui.js?v=score-regions-1"></script>
 </body>
 </html>
