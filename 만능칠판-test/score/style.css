@@ -287,7 +287,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   max-width:none;
   padding:0 0 var(--toolbar-clearance, 0px);
 }
-#display-area {--class-region-min:164px;flex:1;min-height:0;gap:0;max-width:none;padding-bottom:0}
+#display-area {--class-region-min:169px;flex:1;min-height:0;gap:0;max-width:none;padding-bottom:0}
 #display-area[data-regions-overflow] {overflow:auto;scrollbar-width:thin}
 #display-area[data-regions-overflow] #bottom-row {min-height:var(--team-area-min)}
 #top-row, #bottom-row, #class-area {min-width:0;max-width:100%}
@@ -469,7 +469,7 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 @media (pointer:coarse) {
   #bottom-row {--side-target:32px}
   #score-move-side {height:44px}
-  #display-area {--class-region-min:194px}
+  #display-area {--class-region-min:199px}
   .score-height-splitter {flex-basis:14px}
 }
 #selected-team-count {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted-text);font-size:12px;text-align:right}
@@ -977,6 +977,7 @@ body.score-modal-open #score-surface {
 
 .pursuit-slot {display:grid;align-items:center;flex:0 0 24px;min-height:24px;overflow:hidden}
 #class-area > .pursuit-slot:has(> [hidden]) {display:none}
+#class-area:has(#score-progress:not([hidden])) > .pursuit-slot {margin-block-start:5px}
 #bottom-row > .pursuit-slot {margin-inline:calc(-1 * var(--team-gutter-start)) calc(-1 * var(--team-gutter-end))}
 .pursuit-bar {display:flex;height:24px;box-sizing:border-box;flex:none;align-items:stretch;width:100%;min-width:0;padding:0 12px;border:1px solid #28251c;border-radius:5px;cursor:pointer;color:#221c0f;background:repeating-linear-gradient(125deg,#25241c 0 5px,#f5c439 5px 10px)}
 .pursuit-window {container-type:inline-size;display:block;overflow:hidden;flex:1;background:#ffda59;padding-block:2px}
