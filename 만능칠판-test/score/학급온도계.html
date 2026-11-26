@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=pursuit-sign-1">
+    <link rel="stylesheet" href="style.css?v=score-slots-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
 </head>
@@ -31,17 +31,19 @@
                                 <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                             </div>
                         </header>
-                        <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
-                            <strong id="next-class-goal-score" class="score-goal-value"></strong>
-                            <div id="next-class-goal-message" class="score-goal-message" hidden>
-                                <div class="goal-message-viewport">
-                                    <div class="goal-message-track">
-                                        <span id="goal-message-text" class="goal-message-text" role="status"></span>
-                                        <span class="goal-message-repeat" aria-hidden="true"></span>
+                        <div class="class-goal-slot">
+                            <div id="next-class-goal" class="score-goal" role="group" aria-label="학급 목표" hidden>
+                                <strong id="next-class-goal-score" class="score-goal-value"></strong>
+                                <div id="next-class-goal-message" class="score-goal-message" hidden>
+                                    <div class="goal-message-viewport">
+                                        <div class="goal-message-track">
+                                            <span id="goal-message-text" class="goal-message-text" role="status"></span>
+                                            <span class="goal-message-repeat" aria-hidden="true"></span>
+                                        </div>
                                     </div>
                                 </div>
+                                <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
                             </div>
-                            <button id="goal-message-toggle" class="goal-motion-toggle" type="button" aria-label="학급 목표 메시지 일시 정지" hidden>Ⅱ</button>
                         </div>
                         <div class="main-controls">
                             <button id="main-decrease-btn" class="main-btn" aria-label="학급 점수 1점 차감">−</button>
@@ -50,16 +52,12 @@
                         </div>
                         <div id="change"></div>
                         <div class="score-progress-group">
-                            <div id="score-progress" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+                            <div id="score-progress" tabindex="0" role="progressbar" aria-label="학급 점수 환산 진행" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
                                 <div class="score-progress-fill"></div>
-                            </div>
-                            <div class="conversion-line">
-                                <span id="conversion-rule">모둠 3점 = 학급 1점</span>
-                                <span id="conversion-progress" aria-hidden="true"></span>
                             </div>
                         </div>
                     </div>
-                    <button type="button" id="class-pursuit" class="pursuit-bar" aria-label="학급 추격자 편집" hidden><span class="pursuit-window"><span class="pursuit-track"><span></span><span aria-hidden="true"></span></span></span></button>
+                    <div class="pursuit-slot"><button type="button" id="class-pursuit" class="pursuit-bar" aria-label="학급 추격자 편집" hidden><span class="pursuit-window"><span class="pursuit-track"><span></span><span aria-hidden="true"></span></span></span></button></div>
                 </section>
 
             </div>
@@ -79,6 +77,7 @@
                 <div id="create-teams-btn-wrap">
                     <button id="create-teams-btn" type="button" class="score-secondary">＋ 모둠 추가</button>
                 </div>
+                <div class="pursuit-slot"><button type="button" id="team-pursuit" class="pursuit-bar" aria-label="모둠 추격자 편집" hidden><span class="pursuit-window"><span class="pursuit-track"><span></span><span aria-hidden="true"></span></span></span></button></div>
             </section>
         </div>
 
@@ -96,7 +95,6 @@
             </span>
         </template>
 
-        <button type="button" id="team-pursuit" class="pursuit-bar" aria-label="모둠 추격자 편집" hidden><span class="pursuit-window"><span class="pursuit-track"><span></span><span aria-hidden="true"></span></span></span></button>
         <form id="batch-score" hidden>
             <button type="button" id="select-all-teams">전체선택</button>
             <div id="quick-undo" hidden><span id="quick-undo-label" role="status"></span><button type="button">취소</button></div>
@@ -264,6 +262,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=pursuit-inclusive-1"></script><script type="module" src="panel-ui.js?v=goal-cells-1"></script>
+    <script type="module" src="script.js?v=score-slots-1"></script><script type="module" src="panel-ui.js?v=score-slots-1"></script>
 </body>
 </html>

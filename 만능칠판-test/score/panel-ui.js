@@ -34,8 +34,6 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   let scale = savedScale >= 60 && savedScale <= 150 ? savedScale : 100;
 
   let previousColumns;
-  const hasVisibleGoals = () => !!scoreboard.querySelector('.team-goal-target:not([hidden])');
-  let teamGoals = hasVisibleGoals();
   let layoutFrame = null;
   function updateLayout() {
     layoutFrame = null;
@@ -50,7 +48,7 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
         fixedColumns: mode === 'fixed' ? fixedColumns : null,
         maxAutoColumns: Number(frame?.dataset.panelPercent) <= 10 ? 1 : 6,
         scale: scale / 100,
-        minimumWidth: teamGoals ? 132 : undefined,
+        minimumWidth: 132,
       });
       previousColumns = columns;
       const widthPx = Math.floor(cardWidth * 16) / 16;
@@ -173,13 +171,11 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   document.fonts?.ready.then(scheduleLayout);
   let teamCount = scoreboard.childElementCount;
   new MutationObserver(() => {
-    const showTeamGoals = hasVisibleGoals();
-    if (teamCount === scoreboard.childElementCount && teamGoals === showTeamGoals) return;
+    if (teamCount === scoreboard.childElementCount) return;
     teamCount = scoreboard.childElementCount;
-    teamGoals = showTeamGoals;
     previousColumns = undefined;
     scheduleLayout();
-  }).observe(scoreboard, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  }).observe(scoreboard, { childList: true });
   applyLayoutSetting();
   const initialScale = Number(frame?.dataset.syncedScoreScale);
   setScale(initialScale>=60 && initialScale<=150 ? initialScale : scale);

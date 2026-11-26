@@ -113,7 +113,7 @@ export function wireTooltips() {
       button.setAttribute('aria-describedby',[previousDescription,tooltip.id].filter(Boolean).join(' '));
     },delay);
   }
-  const match=target=>target instanceof Element && target.closest('button,[role="button"],#answerCoverSync');
+  const match=target=>target instanceof Element && target.closest('button,[role="button"],#answerCoverSync,#score-progress');
   document.addEventListener('pointerover',event=>{
     const button=match(event.target);
     if (button && button!==match(event.relatedTarget) && event.pointerType!=='touch') show(button,350);

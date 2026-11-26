@@ -1,4 +1,4 @@
-import {wireTooltips} from '../js/tooltips.js?v=help-1';
+import {wireTooltips} from '../js/tooltips.js?v=score-slots-1';
 import {schoolDay,pursuitScore} from './class-activities.js?v=pursuit-manager-1';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=pursuit-manager-1';
@@ -49,8 +49,6 @@ const teamGoalMotionToggle = document.getElementById('team-goal-motion-toggle');
 const teamGoalTemplate = document.getElementById('team-goal-template');
 const goalScoreFormat = new Intl.NumberFormat('ko-KR');
 const progress = document.getElementById('score-progress');
-const conversionRule = document.getElementById('conversion-rule');
-const conversionProgress = document.getElementById('conversion-progress');
 const linkMode = document.getElementById('score-link-mode');
 const linkRule = document.getElementById('score-link-rule');
 const linkInput = document.getElementById('score-link-points');
@@ -861,7 +859,6 @@ function renderProgress(value,rate) {
   progress.style.setProperty('--filled',String(value/rate));
   progress.setAttribute('aria-valuenow',value);
   progress.setAttribute('aria-valuetext',`${value}점 / ${rate}점`);
-  conversionProgress.textContent=`${value} / ${rate}`;
 }
 
 async function moveProgress(from,to,rate,signal) {
@@ -1100,8 +1097,7 @@ function updateScoreProgress() {
   progress.toggleAttribute('data-continuous', linkPoints === 1 || linkPoints > 20);
   progress.setAttribute('aria-valuemax', linkPoints);
   if(linkEnabled)renderProgress(remainder,linkPoints);
-  else conversionProgress.textContent='';
-  conversionRule.textContent = linkEnabled ? `모둠 ${linkPoints}점 = 학급 1점` : '점수 연동 안 함';
+  progress.title = `모둠 ${linkPoints}점 = 학급 1점`;
 }
 function setScoreLink(enabled, points) {
   syncFromStorage();
