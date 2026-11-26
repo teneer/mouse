@@ -7,9 +7,12 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   const modeKey = 'whiteboard.test.score-layout-mode.v1';
   const columnsKey = 'whiteboard.test.score-fixed-columns.v1';
   const regionShareKey = 'whiteboard.test.score-region-share.v1';
+  const batchHeightKey = 'whiteboard.test.score-batch-height.v1';
   const root = document.body;
   const displayArea = document.getElementById('display-area');
   const splitter = document.getElementById('score-region-splitter');
+  const batchSplitter = document.getElementById('score-batch-splitter');
+  const batch = document.getElementById('batch-score');
   const bottomRow = document.getElementById('bottom-row');
   const viewport = document.getElementById('team-viewport');
   const scoreboard = document.getElementById('scoreboard');
@@ -37,13 +40,13 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
     try { localStorage.setItem(key, String(value)); } catch {}
   }
 
-  const savedRegionShare = Number(readSetting(regionShareKey));
+const savedRegionShare = Number(readSetting(regionShareKey));
   let regionShare = savedRegionShare > 0 && savedRegionShare < 1 ? savedRegionShare : null;
-  let regionBounds, drag;
+  let batchHeight = Number(readSetting(batchHeightKey)) || null;
+  let regionBounds, batchBounds;
   const clamp = (value,min,max)=>Math.min(max,Math.max(min,value));
-  function updateRegionLayout(ratio) {
-    const available=displayArea.clientHeight-splitter.offsetHeight;
-    if(available<=0)return;
+
+  function minimumTeamHeight(ratio) {
     const bottomStyle=getComputedStyle(bottomRow);
     const blockHeight=parseFloat(bottomStyle.paddingTop)+parseFloat(bottomStyle.paddingBottom);
     const visible=[...bottomRow.children].filter(child=>child!==sideShortcut && getComputedStyle(child).display!=='none');
@@ -53,62 +56,98 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
       width:viewport.clientWidth,height:0,count:scoreboard.childElementCount,ratio,gap:Math.min(10,Math.floor(viewport.clientWidth/18)),
       fixedColumns:mode==='fixed'?fixedColumns:null,scale:scale/100,minimumWidth:132
     });
+    return Math.ceil(labelsHeight+cardWidth/ratio+viewport.offsetHeight-viewport.clientHeight);
+  }
+  function setSplitterSize(handle,{min,max,height,total}) {
+    for(const [name,value] of [['min',min],['max',max],['now',height]]) {
+      handle.setAttribute('aria-value'+name,String(Math.round(value/total*100)));
+    }
+  }
+  function setPixelSize(element,property,height) {
+    const pixels=height+'px';
+    if(element.style.getPropertyValue(property)!==pixels)element.style.setProperty(property,pixels);
+  }
+  function updateRegionLayout(ratio) {
+    const container=displayArea.parentElement;
+    const panelHeight=container.clientHeight-parseFloat(getComputedStyle(container).paddingBottom)
+      -splitter.offsetHeight-batchSplitter.offsetHeight;
+    if(panelHeight<=0)return;
+    const teamMin=minimumTeamHeight(ratio);
     const min=parseFloat(getComputedStyle(displayArea).getPropertyValue('--class-region-min'));
-    const teamMin=Math.ceil(labelsHeight+cardWidth/ratio+viewport.offsetHeight-viewport.clientHeight);
+    const batchStyle=getComputedStyle(batch);
+    const batchDefault=batch.hidden?0:parseFloat(batchStyle.getPropertyValue('--batch-default'));
+    // The class share uses the default footer height so moving the lower handle only takes space from the team area.
+    const reference=Math.max(panelHeight-batchDefault,min+teamMin);
+    const desiredClass=regionShare===null?clamp(reference*.3,166,215):reference*regionShare;
+    let available=panelHeight;
+    if(!batch.hidden) {
+      const minBatch=parseFloat(batchStyle.getPropertyValue('--batch-min'));
+      const maxBatch=Math.max(minBatch,Math.min(180,Math.floor(panelHeight-teamMin-Math.max(min,desiredClass))));
+      const height=Math.round(clamp(batchHeight??batchDefault,minBatch,maxBatch));
+      batchBounds={min:minBatch,max:maxBatch,height,total:Math.max(panelHeight,height)};
+      setSplitterSize(batchSplitter,batchBounds);
+      setPixelSize(batch,'--batch-height',height);
+      available-=height;
+    }
     const total=Math.max(available,min+teamMin);
     const max=total-teamMin;
     displayArea.toggleAttribute('data-regions-overflow',total>available);
-    const teamPixels=teamMin+'px';
-    if(bottomRow.style.getPropertyValue('--team-area-min')!==teamPixels)bottomRow.style.setProperty('--team-area-min',teamPixels);
-    const automatic=clamp(total*.3,166,215);
-    const height=Math.round(clamp(regionShare===null?automatic:total*regionShare,min,max));
-    regionBounds={total,min,max,height};
-    const pixels=height+'px';
-    if(displayArea.style.getPropertyValue('--class-area-height')!==pixels)displayArea.style.setProperty('--class-area-height',pixels);
-    for(const [name,value] of [['min',min],['max',max],['now',height]]) {
-      splitter.setAttribute('aria-value'+name,String(Math.round(value/total*100)));
+    setPixelSize(bottomRow,'--team-area-min',teamMin);
+    const height=Math.round(clamp(desiredClass,min,max));
+    regionBounds={total,min,max,height,reference};
+    setPixelSize(displayArea,'--class-area-height',height);
+    setSplitterSize(splitter,regionBounds);
+  }
+
+  function wireHeightSplitter(handle,direction,getBounds,setHeight,save) {
+    let drag;
+    function adjust(height) {
+      const {min,max}=getBounds();
+      setHeight(clamp(height,min,max));
+      scheduleLayout();
     }
+    handle.addEventListener('pointerdown',event=>{
+      const bounds=getBounds();
+      if(drag || event.button!==0 || !bounds || bounds.min===bounds.max)return;
+      drag={id:event.pointerId,y:event.clientY,height:bounds.height};
+      handle.setPointerCapture(event.pointerId);
+      handle.classList.add('dragging');
+      event.preventDefault();
+    });
+    handle.addEventListener('pointermove',event=>{
+      if(drag?.id===event.pointerId)adjust(drag.height+direction*(event.clientY-drag.y));
+    });
+    function finishDrag(event) {
+      if(drag?.id!==event.pointerId)return;
+      drag=null;
+      handle.classList.remove('dragging');
+      save();
+    }
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,finishDrag);
+    handle.addEventListener('keydown',event=>{
+      const bounds=getBounds();
+      if(!bounds)return;
+      const {height,min,max}=bounds;
+      const step=(event.shiftKey?32:12)*direction;
+      const targets={ArrowUp:height-step,ArrowDown:height+step,Home:min,End:max};
+      if(!Object.hasOwn(targets,event.key))return;
+      event.preventDefault();
+      event.stopPropagation();
+      if(min===max)return;
+      adjust(targets[event.key]);
+      save();
+    });
   }
-  function adjustRegionHeight(height) {
-    if(!regionBounds)return;
-    const {min,max,total}=regionBounds;
-    regionShare=clamp(height,min,max)/total;
-    scheduleLayout();
-  }
-  splitter.addEventListener('pointerdown',event=>{
-    if(drag || event.button!==0 || !regionBounds || regionBounds.min===regionBounds.max)return;
-    const offset=event.clientY-splitter.getBoundingClientRect().top;
-    drag={id:event.pointerId,offset};
-    splitter.setPointerCapture(event.pointerId);
-    splitter.classList.add('dragging');
-    event.preventDefault();
-  });
-  splitter.addEventListener('pointermove',event=>{
-    if(drag?.id!==event.pointerId)return;
-    adjustRegionHeight(event.clientY-displayArea.getBoundingClientRect().top-drag.offset);
-  });
-  function finishRegionDrag(event) {
-    if(drag?.id!==event.pointerId)return;
-    drag=null;
-    splitter.classList.remove('dragging');
-    if(regionShare!==null)writeSetting(regionShareKey,regionShare);
-  }
-  for(const type of ['pointerup','pointercancel','lostpointercapture'])splitter.addEventListener(type,finishRegionDrag);
-  splitter.addEventListener('keydown',event=>{
-    if(!regionBounds)return;
-    const {height,min,max}=regionBounds;
-    const step=event.shiftKey?32:12;
-    const targets={ArrowUp:height-step,ArrowDown:height+step,Home:min,End:max};
-    if(!Object.hasOwn(targets,event.key))return;
-    event.preventDefault();
-    event.stopPropagation();
-    if(min===max)return;
-    adjustRegionHeight(targets[event.key]);
-    writeSetting(regionShareKey,regionShare);
-  });
+  wireHeightSplitter(splitter,1,()=>regionBounds,height=>{regionShare=height/regionBounds.reference;},
+    ()=>{if(regionShare!==null)writeSetting(regionShareKey,regionShare);});
+  wireHeightSplitter(batchSplitter,-1,()=>batchBounds,height=>{batchHeight=height;},
+    ()=>{if(batchHeight!==null)writeSetting(batchHeightKey,batchHeight);});
   document.getElementById('score-reset-regions').onclick=()=>{
-    regionShare=null;
-    try {localStorage.removeItem(regionShareKey);} catch {}
+    regionShare=batchHeight=null;
+    try {
+      localStorage.removeItem(regionShareKey);
+      localStorage.removeItem(batchHeightKey);
+    } catch {}
     scheduleLayout();
   };
 
@@ -260,6 +299,7 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   }
   const resizeObserver = new ResizeObserver(scheduleLayout);
   resizeObserver.observe(displayArea);
+  resizeObserver.observe(batch);
   resizeObserver.observe(classContent);
   for(const banner of classBanners)resizeObserver.observe(banner);
   resizeObserver.observe(viewport);

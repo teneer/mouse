@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=score-side-edge-1">
+    <link rel="stylesheet" href="style.css?v=score-batch-resize-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -66,7 +66,7 @@
 
             </div>
 
-            <div id="score-region-splitter" role="separator" tabindex="0" aria-label="학급·모둠 영역 높이 조절" aria-orientation="horizontal" aria-controls="class-area bottom-row" aria-valuemin="0" aria-valuemax="100" aria-valuenow="30"></div>
+            <div id="score-region-splitter" class="score-height-splitter" role="separator" tabindex="0" aria-label="학급·모둠 영역 높이 조절" aria-orientation="horizontal" aria-controls="class-area bottom-row" aria-valuemin="0" aria-valuemax="100" aria-valuenow="30"></div>
 
             <section id="bottom-row" aria-labelledby="scoreboard-title">
                 <button type="button" id="score-move-side" aria-label="점수판을 왼쪽으로 이동" title="점수판을 왼쪽으로 이동" hidden>&lt;</button>
@@ -102,6 +102,7 @@
             </span>
         </template>
 
+        <div id="score-batch-splitter" class="score-height-splitter" role="separator" tabindex="0" aria-label="점수 조작 하단바 높이 조절" aria-orientation="horizontal" aria-controls="batch-score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
         <form id="batch-score" hidden>
             <button type="button" id="select-all-teams">전체선택</button>
             <div id="quick-undo" hidden><span id="quick-undo-label" role="status"></span><button type="button">취소</button></div>
@@ -284,6 +285,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=pursuit-alert-1"></script><script type="module" src="panel-ui.js?v=score-side-edge-1"></script>
+    <script type="module" src="script.js?v=pursuit-alert-1"></script><script type="module" src="panel-ui.js?v=score-batch-resize-1"></script>
 </body>
 </html>

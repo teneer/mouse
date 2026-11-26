@@ -455,18 +455,19 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 #score-move-side:is(:hover,:focus-visible) {
   border-color:#7895a8;background:#e6f1f4d9;color:#174866;
 }
-#score-region-splitter {
+.score-height-splitter {
   display:grid;flex:0 0 14px;place-items:center;z-index:11;
   background:var(--control-bg);cursor:row-resize;touch-action:none;user-select:none;
 }
-#score-region-splitter::before {content:"";width:36px;height:3px;border-radius:3px;background:#7393a3}
-#score-region-splitter:is(:hover,:focus-visible,.dragging) {background:#cde3eb}
-#score-region-splitter:focus-visible {outline:2px solid var(--primary-dark);outline-offset:-2px}
+.score-height-splitter::before {content:"";width:36px;height:3px;border-radius:3px;background:#7393a3}
+.score-height-splitter:is(:hover,:focus-visible,.dragging) {background:#cde3eb}
+.score-height-splitter:focus-visible {outline:2px solid var(--primary-dark);outline-offset:-2px}
+#score-batch-splitter:has(+ #batch-score[hidden]) {display:none}
 @media (pointer:coarse) {
   #bottom-row {--side-target:32px}
   #score-move-side {height:44px}
   #display-area {--class-region-min:194px}
-  #score-region-splitter {flex-basis:24px}
+  .score-height-splitter {flex-basis:24px}
 }
 #selected-team-count {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted-text);font-size:12px;text-align:right}
 #team-viewport {
@@ -567,16 +568,20 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 .team-steps button:hover {background:color-mix(in srgb, var(--card-bg) 52%, transparent)}
 [hidden] {display:none !important}
 #batch-score {
+  --batch-min:46px;
+  --batch-default:63px;
+  container:batch-score / size;
   display:grid;
-  grid-template-columns:60px minmax(0, 1fr) 60px 89px 60px;
-  grid-template-areas:"select . undo amount apply";
-  align-items:center;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);
+  grid-template-areas:"select undo amount apply";
+  grid-auto-rows:minmax(0,1fr);
   gap:4px;
   flex:none;
   position:relative;
   z-index:5;
   margin:0;
-  padding:10px clamp(4px, 3cqw, 18px);
+  height:var(--batch-height,var(--batch-default));
+  padding:clamp(3px, .8dvh, 7px) clamp(3px, 2cqw, 12px);
   border-top:1px solid var(--panel-line);
   background:var(--card-bg);
 }
@@ -585,13 +590,13 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 .batch-amount {grid-area:amount}
 #apply-batch {grid-area:apply}
 #batch-score button {
-  min-height:42px;
-  padding:0 6px;
+  min-height:0;
+  padding:0 2px;
   border:0;
   border-radius:8px;
   background:var(--control-bg);
   color:var(--text-color);
-  font-size:12px;
+  font-size:clamp(9px,min(4.1cqw,24cqh),23px);
   font-weight:700;
   cursor:pointer;
 }
@@ -614,11 +619,11 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
   border-radius:8px;
   appearance:textfield;
   text-align:center;
-  font:inherit;
+  font:inherit;font-size:clamp(11px,min(5cqw,35cqh),28px);
 }
 #batch-delta::-webkit-inner-spin-button, #batch-delta::-webkit-outer-spin-button {appearance:none;margin:0}
-.batch-stepper {display:grid;border-left:1px solid var(--panel-line)}
-#batch-score .batch-stepper button {min-height:21px;width:26px;padding:0;border-radius:0}
+.batch-stepper {display:grid;grid-template-rows:repeat(2,minmax(0,1fr));border-left:1px solid var(--panel-line)}
+#batch-score .batch-stepper button {width:clamp(12px,min(8cqw,45cqh),44px);padding:0;border-radius:0;font-size:clamp(9px,min(5cqw,20cqh),21px)}
 #batch-score .batch-stepper button + button {border-top:1px solid var(--panel-line)}
 #score-link-points, #score-fixed-columns {width:min(76px, 100%);font:inherit}
 .settings-panel {
@@ -689,8 +694,8 @@ body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inl
 .goal-row input {min-width:0;font-size:12px;padding:5px}
 .add-row-btn {margin-top:8px;background:var(--control-bg);color:var(--text-color)}
 @media (pointer:coarse) {
-  #settings-toggle-btn, #score-maximize, .main-btn, #batch-score button {min-height:44px}
-  #batch-score .batch-stepper button {min-height:22px}
+  #settings-toggle-btn, #score-maximize, .main-btn {min-height:44px}
+  #batch-score {--batch-min:54px}
 }
 .modal-box {width:min(500px, calc(100vw - 16px));max-width:100%;max-height:calc(100dvh - var(--toolbar-clearance, 0px) - 8px)}
 .modal-content, .modal-box h3, .modal-buttons {padding:12px}
@@ -752,20 +757,16 @@ button, .main-scoreboard, .team-card, #batch-score {
   cursor:pointer;
 }
 .team-remove:hover {background:#a933271f}
-#batch-score #batch-reset {width:18px;min-height:0;padding:0;background:#fff;font-size:15px}
+#batch-score #batch-reset {width:clamp(12px,min(6cqw,35cqh),26px);padding:0;background:#fff}
 @container score-surface (max-width:304px) {
   #batch-score {
-    grid-template-columns:minmax(0, 3fr) minmax(0, 2fr);
+    --batch-min:76px;
+    --batch-default:100px;
+    grid-template-columns:minmax(0, 1.25fr) minmax(0, 1fr);
     grid-template-areas:"select undo" "amount apply";
   }
-  #batch-score #select-all-teams, #batch-score #undo-score {width:min(84px,100%)}
-  #undo-score {justify-self:end}
-}
-@container score-surface (max-width:150px) {
-  #batch-score {padding-inline:3px;gap:3px}
-  #batch-score button {font-size:clamp(9px, 10cqw, 12px);padding-inline:0}
-  #batch-score #batch-reset {width:min(14px, 15cqw)}
-  #batch-score .batch-stepper button {width:min(20px, 17cqw)}
+  #batch-score button {font-size:clamp(9px,min(6cqw,17cqh),23px)}
+  #batch-delta {font-size:clamp(11px,min(7cqw,23cqh),28px)}
 }
 #score-progress[data-converting] .score-progress-fill {box-shadow:inset 0 0 0 2px #dd9a20}
 
