@@ -152,7 +152,7 @@ export function wireAnswerCover(canvas,{allowed,changed,uid,mode,notify,isOpen,s
   document.addEventListener('pointercancel',e=>{
     if (gesture?.id===e.pointerId) cancelGesture();
   },true);
-  return {get dragging(){return !!gesture;},activate:()=>setArmed(true),toggle:()=>setArmed(!armed),deactivate:()=>{if (armed) setArmed(false);}};
+  return {get dragging(){return !!gesture;},cancelGesture,activate:()=>setArmed(true),toggle:()=>setArmed(!armed),deactivate:()=>{if (armed) setArmed(false);}};
 }
 
 export function keepCoversAboveAnchors(canvas) {

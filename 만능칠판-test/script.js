@@ -1,5 +1,6 @@
+import {wireBoardTouch} from './js/board-touch.js?v=board-touch-1';
 import {wireTooltips} from './js/tooltips.js?v=help-1';
-import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=cover-transform-1';
+import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=board-touch-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
@@ -9,7 +10,7 @@ import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES}
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=page-selection-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js?v=import-sets-1';
-import {CanvasTools} from './js/canvas-tools.js?v=file-placeholders-1';
+import {CanvasTools} from './js/canvas-tools.js?v=board-touch-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
@@ -994,8 +995,8 @@ function saveTextProps(event){
 }
 function layerToEdge(front){if(!allowed()||isTextEditing())return;const selection=c.getActiveObjects();if(!selection.length)return;const all=c.getObjects(),pinned=all.filter(o=>o.wbPinned),next=[...pinned,...orderedToEdge(all.filter(o=>!o.wbPinned),selection,front)];if(next.every((o,i)=>o===all[i]))return;next.forEach((o,i)=>c.moveTo(o,i));c.requestRenderAll();changed();}
 function closeContext(){const menu=$('objectContextMenu');if(menu)menu.hidden=true;}
-function openContext(x,y,target=null,hit=target){
-  if(!allowed()||isTextEditing()||(target && !target.wbAnswerCover && !target.wbImportSet && tools.mode!=='select'))return;
+function openContext(x,y,target=null,hit=target,fromTouch=false){
+  if(!allowed()||isTextEditing()||(target && !fromTouch && !target.wbAnswerCover && !target.wbImportSet && tools.mode!=='select'))return;
   closePopups();
   contextImportSet=hit?.wbImportSet||target?.wbImportSet;
   const set=importSetMembers(contextImportSet);
@@ -1393,6 +1394,17 @@ function clearPageJumpError() {
 }
 function wireUI() {
   wireTooltips();
+  const refreshViewAfterTouch=()=>{
+    if(cloudActive())requestCloudRefresh();else applyLocalView().catch(fail);
+  };
+  wireBoardTouch(c,{
+    canStart:allowed,
+    canHold:()=>!busy && !modalOpen() && !answerCoverTool?.dragging && ['select','move'].includes(tools.mode),
+    cancelSingle:event=>{answerCoverTool?.cancelGesture();tools.cancelTouch(event);},
+    onPinch:active=>{tools.gesture=active;if(!active) rememberView(true);},
+    onContext:event=>openContextAt(event,true),
+    onEnd:refreshViewAfterTouch
+  });
   const pageNumber=$('pageJumpNumber');
   pageNumber.oninput=clearPageJumpError;
   $('pageJumpForm').onsubmit=event=>{
@@ -1497,33 +1509,33 @@ function wireUI() {
   $('contextGroup').onclick=()=>{closeContext();groupObjects();};$('contextUngroup').onclick=()=>{closeContext();groupObjects(true);};
   $('contextFront').onclick=()=>{closeContext();layerToEdge(true);};$('contextBack').onclick=()=>{closeContext();layerToEdge(false);};
   $('contextTextProps').onclick=()=>{if(contextTextTarget)openTextProps(contextTextTarget);};
-  // A stationary 600ms touch press opens the object menu; movement cancels it.
-  let pressTimer=null,pressStart=null,suppressNextClick=false;
   const surface=c.upperCanvasEl;
-  surface.addEventListener('contextmenu',e=>{
-    e.preventDefault();
+  function openContextAt(event,fromTouch=false) {
     if(!allowed())return;
     if(isTextEditing())finishText();
     const skip=c.skipTargetFind;
     c.skipTargetFind=false;
-    let target;
-        let hit;
+    let target,hit;
     try{
-      target=answerCoverAt(c,e)||c.findTarget(e);
-      hit=target?.type==='activeSelection'?c.findTarget(e,true):target;
+      target=answerCoverAt(c,event)||c.findTarget(event);
+      hit=target?.type==='activeSelection'?c.findTarget(event,true):target;
       if (!target) {
-        const point=c.getPointer(e);
+        const point=c.getPointer(event);
         target=c.getObjects().slice().reverse().find(object=>object.wbPinned && object.wbImportSet &&
           object.containsPoint(point,undefined,true,true));
         hit=target;
       }
     }finally{c.skipTargetFind=skip;}
-    if(tools.mode==='select' || !target || target.wbAnswerCover || target.wbImportSet)openContext(e.clientX,e.clientY,target,hit);
+    if(fromTouch || tools.mode==='select' || !target || target.wbAnswerCover || target.wbImportSet) {
+      openContext(event.clientX,event.clientY,target,hit,fromTouch);
+    }
+  }
+  surface.addEventListener('contextmenu',event=>{
+    event.preventDefault();
+    if (event.pointerType==='touch' || event.sourceCapabilities?.firesTouchEvents) return;
+    openContextAt(event);
   });
-  surface.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||tools.mode!=='select')return;const target=c.findTarget(e);if(!target)return;pressStart={x:e.clientX,y:e.clientY};pressTimer=setTimeout(()=>{pressTimer=null;suppressNextClick=true;tools.up();openContext(e.clientX,e.clientY,target);},600);});
-  surface.addEventListener('pointermove',e=>{if(pressStart&&Math.hypot(e.clientX-pressStart.x,e.clientY-pressStart.y)>9){clearTimeout(pressTimer);pressTimer=null;pressStart=null;}});
-  for(const type of ['pointerup','pointercancel'])surface.addEventListener(type,()=>{clearTimeout(pressTimer);pressTimer=null;pressStart=null;if(cloudActive())requestCloudRefresh();else applyLocalView().catch(fail);});
-  surface.addEventListener('click',e=>{if(suppressNextClick){e.stopImmediatePropagation();suppressNextClick=false;}},true);
+  for (const type of ['pointerup','pointercancel']) surface.addEventListener(type,refreshViewAfterTouch);
   // Outside-click dismissal is handled above; menu buttons must stay visible through click.
   let blankClick=null;
   c.on('mouse:down:before',opt=>{

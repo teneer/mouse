@@ -141,6 +141,19 @@ export class CanvasTools {
     if(this.pan){this.pan=null;this.canvas.setViewportTransform(this.canvas.viewportTransform.slice());this.canvas.selection=this.mode==='select';this.canvas.skipTargetFind=this.mode==='move';this.canvas.setCursor(this.mode==='move'?'grab':'default');this.onViewport();}
     this.gesture=false;
   }
+  cancelTouch(event) {
+    const c=this.canvas;
+    if (!this.gesture && !c._currentTransform) return;
+    // Fabric 5 keeps drawing and document listeners until its pointer-up handler.
+    // Clear the draft stroke first so starting a two-finger gesture commits no ink.
+    if (c._isCurrentlyDrawing) {
+      c._isCurrentlyDrawing=false;
+      c.clearContext(c.contextTop);
+    }
+    c._groupSelector=null;
+    c._onMouseUp(event);
+    this.up();
+  }
   zoom(value) {
     const c=this.canvas,z=Math.min(MAX_ZOOM,Math.max(MIN_ZOOM,value));
     const el=c.upperCanvasEl||c.lowerCanvasEl,rect=el?.getBoundingClientRect?.();

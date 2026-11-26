@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {fitScoreFont, conversionFrame, conversionStarFlight, conversionStarPosition, mergeTeamEffects, scoreRemainder} from '../score/score-display.js';
 import {measureTeamLayout} from '../score/team-layout.js';
 import {applyOperation, boardPages, newBoard, pagePatch, validView, validViewState} from '../js/cloud-model.js';
+import {boardTouchTransform} from '../js/board-touch.js';
 import {movePageId,movePageSelection} from '../js/board-navigation.js';
 import {normalizeFavoriteSize, scaleFavoriteSize} from '../js/board-options.js';
 import {validateContent} from '../js/validation.js';
@@ -135,4 +136,13 @@ test('shared page batches rename and delete together and protect the last page',
   applyOperation(board,{kind:'delete-pages',entries:[['b',1],['c',1]]},4);
   applyOperation(board,{kind:'delete-pages',entries:[['a',1]]},5);
   assert.deepEqual(boardPages(board).map(page=>page.id),['a']);
+});
+
+
+test('board pinch follows the midpoint and keeps the original world anchor',()=>{
+  const gesture={zoom:1,worldX:80,worldY:60,distance:100};
+  assert.deepEqual(boardTouchTransform(gesture,105,90,100),[1,0,0,1,25,30]);
+  assert.deepEqual(boardTouchTransform(gesture,105,90,200),[2,0,0,2,-55,-30]);
+  assert.equal(boardTouchTransform(gesture,105,90,1)[0],.1);
+  assert.equal(boardTouchTransform(gesture,105,90,1500)[0],10);
 });
