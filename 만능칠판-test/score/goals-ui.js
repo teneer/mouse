@@ -12,6 +12,10 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
   const view = $('goal-management-view'), popup = $('goal-celebration');
   const localPopup=mountGoalCelebration(popup);
   const saveButton=$('close-goal-view-btn');
+  const navigation=$('goal-nav-list'), detail=view.querySelector('.goal-detail');
+  const scopeButtons=[...view.querySelectorAll('[data-goal-scope]')];
+  const detailButtons=[...view.querySelectorAll('[data-goal-mode]')];
+  let scope='class', selectedRow, opener;
   const celebrations = createGoalCelebrationQueue(celebrate);
   let records = new Map();
   let system, active, timer, editingRevision, previous;
@@ -138,9 +142,9 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       parent.append(control);
     };
     if (teamId===null && records.length<=2) {
-      for (const record of records) add(1,record.message,()=>show(record));
-    } else if (records.length===1) add(1,records[0].message,()=>show(records[0]));
-    else add(records.length,`달성 기록 ${records.length}개`,()=>openRecords(teamId));
+      for (const record of records) add(1,record.message||'학급 선물',()=>openSettings(record));
+    } else if (records.length===1) add(1,records[0].message||'선물 지급 관리',()=>openSettings(records[0]));
+    else add(records.length,`지급 대기 선물 ${records.length}개`,()=>openSettings(records[0]));
   }
   function addRow(type,goal={}) {
     const row=document.createElement('div');row.className='goal-row goal-edit-row';
@@ -155,11 +159,11 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
         </div>
         <label class="goal-field goal-message-field"><span>축하 메시지</span><input class="goal-message" maxlength="240" aria-label="축하 메시지"></label>
         <label class="goal-auto"><input class="goal-completion" type="checkbox" aria-label="자동 완료"><span>자동 완료</span></label>
-        <button type="button" class="dialog-action goal-status" aria-expanded="false"><span class="goal-status-text">새 목표</span></button>
       </div>
-      <div class="goal-progress" hidden>
+      <section class="goal-progress" aria-label="선물 지급 현황">
+        <h3 tabindex="-1">선물 지급 현황</h3>
         <div class="goal-progress-body"></div>
-      </div>`;
+      </section>`;
     const frequency = row.querySelector('.goal-frequency');
     const intervalField = row.querySelector('.goal-interval-field');
     const scoreInput = row.querySelector('.goal-score');
@@ -177,22 +181,50 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     frequency.onchange();
     row.querySelector('.goal-message').value=goal.message??'';
     row.querySelector('.goal-completion').checked=!!goal.automatic;
-    const remove=button('×',()=>row.remove(),'dialog-action dialog-danger goal-remove');
+    const remove=button('목표 삭제',()=>{
+      row.remove();
+      selectGoal($(type+'-goals-list').firstElementChild, type);
+    },'dialog-action dialog-danger goal-remove');
     remove.title='목표 삭제';
     remove.setAttribute('aria-label','목표 삭제');
     row.querySelector('.goal-fields').append(remove);
-    const progress=row.querySelector('.goal-progress'), status=row.querySelector('.goal-status');
-    progress.id='goal-details-'+row.dataset.goal;
-    status.setAttribute('aria-controls',progress.id);
-    status.onclick=()=>{if(type==='team')setExpanded(row,progress.hidden);};
+    row.addEventListener('input',()=>{
+      const item=navigation.querySelector('[aria-current=true]');
+      if(row===selectedRow && item)item.textContent=goalLabel(row);
+    });
     $(type+'-goals-list').append(row);
+    return row;
   }
-  function setExpanded(row,expanded) {
-    row.querySelector('.goal-progress').hidden=!expanded;
-    row.querySelector('.goal-status').setAttribute('aria-expanded',String(expanded));
+  function goalLabel(row) {
+    const score=row.querySelector('.goal-score').value.trim();
+    const message=row.querySelector('.goal-message').value.trim();
+    return [score && score+'점',message].filter(Boolean).join(' · ') || '새 목표';
   }
-  function openSettings() {
+  function setDetailMode(mode) {
+    detail.dataset.mode=mode;
+    for (const control of detailButtons)control.setAttribute('aria-pressed',String(control.dataset.goalMode===mode));
+  }
+  function selectGoal(row,type) {
+    scope=type;
+    selectedRow=row;
+    for (const control of scopeButtons)control.setAttribute('aria-pressed',String(control.dataset.goalScope===type));
+    for (const item of view.querySelectorAll('.goal-edit-row'))item.hidden=item!==row;
+    $('goal-empty').hidden=!!row;
+    for (const control of detailButtons)control.disabled=!row;
+    const items=[...$(type+'-goals-list').children].map(item=>{
+      const control=button(goalLabel(item),()=>{
+        selectGoal(item,type);
+        navigation.querySelector('[aria-current=true]').focus();
+      });
+      if (item===row)control.setAttribute('aria-current','true');
+      return control;
+    });
+    navigation.replaceChildren(...items);
+    refreshRows();
+  }
+  function openSettings(record) {
     if (!system) return;
+    opener=document.activeElement;
     editingRevision=system.revision;
     for (const type of ['class','team']) {
       $(type+'-goals-list').replaceChildren();
@@ -200,25 +232,25 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     }
     view.style.display='flex';
     modalState(true);
-    refreshRows();
-    $('cancel-goal-view').focus();
-  }
-  function openRecords(teamId) {
-    openSettings();
-    const record=system.records.find(row=>row.teamId===teamId && row.status==='pending');
-    if (!record) return;
-    const row=[...view.querySelectorAll('.goal-edit-row')].find(item=>item.dataset.goal===record.goalId);
-    if (row) {
-      row.scrollIntoView({block:'nearest'});
-      if (row.dataset.type==='team' && record.milestone===undefined) setExpanded(row,true);
-      else row.querySelector('.goal-status').click();
-    } else show(record);
+    const requested=system.goals.find(goal=>goal.id===record?.goalId);
+    const type=requested?.type ?? (system.goals.some(goal=>goal.type==='class') || !system.goals.length?'class':'team');
+    const list=$(type+'-goals-list');
+    const row=[...list.children].find(item=>item.dataset.goal===requested?.id) || list.firstElementChild;
+    if (row && record?.milestone!==undefined)row.dataset.round=String(record.milestone);
+    setDetailMode(record?'rewards':'settings');
+    $('goal-include-existing').checked=false;
+    $('goal-edit-error').textContent='';
+    selectGoal(row,type);
+    (record && row ? row.querySelector('.goal-progress h3') : $('cancel-goal-view')).focus();
   }
   function closeView() {
+    if (view.style.display!=='flex') return;
     closeDropdown();
     view.style.display='none';
     editingRevision=undefined;
     modalState(false);
+    opener?.focus();
+    opener=null;
   }
   async function saveGoals() {
     if (saveButton.disabled) return;
@@ -231,6 +263,9 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
       if (!input.value.trim() && !message && (!repeating || !intervalValue.trim())) continue;
       const interval = repeating ? parseGoalInterval(intervalValue) : null;
       if (score===null || repeating && interval===null) {
+        setDetailMode('settings');
+        selectGoal(row,type);
+        (score===null ? input : row.querySelector('.goal-interval')).focus();
         $('goal-edit-error').textContent = score===null
           ? '목표 점수를 -10000~10000 사이의 정수로 입력해 주세요.'
           : '반복 간격을 1~10000 사이의 정수로 입력해 주세요.';
@@ -284,116 +319,115 @@ export function wireGoals({submit,teamList,classScore,teamAccent,celebrate,confi
     return {team,state,target};
   }
 
-  function renderRecurringRows(row,goal,status) {
-    const records = system.records.filter(record => record.goalId === goal.id);
-    const waiting = records.filter(record => record.status === 'pending').length;
-    const finished = records.filter(record => record.status === 'done').length;
-    const progress = row.querySelector('.goal-progress');
-    status.removeAttribute('data-status');
-    status.removeAttribute('data-confirm-cancel');
-    status.removeAttribute('aria-label');
-    status.classList.remove('goal-dropdown-trigger');
-    status.querySelector('.goal-status-text').textContent = waiting ? `대기 ${waiting}건`
-      : finished ? `✓ 완료 ${finished}건` : '미도달';
-    status.setAttribute('aria-controls',progress.id);
-    status.onclick = () => {
-      const expand = progress.hidden;
-      setExpanded(row,expand);
-      if (expand) renderRecurringRows(row,goal,status);
-    };
-    if (progress.hidden) return;
+  function renderTargets(body,groups,selected) {
+    const list=document.createElement('div');
+    list.className='goal-team-list';
+    body.append(list);
+    const checks=[];
+    for (const {team,state,target} of groups) {
+      const item=document.createElement('div');
+      item.className='goal-team-progress';
+      if (state==='done')item.dataset.done='true';
+      const check=document.createElement('input');
+      check.type='checkbox';check.disabled=state==='unreached';check.value=target.id;
+      check.checked=!check.disabled&&selected.has(target.id);check.setAttribute('aria-label',team.name+' 선택');
+      if (!check.disabled)checks.push({check,target,state});
+      const name=document.createElement('strong');name.textContent=team.name;
+      const control=button('',null,'dialog-action goal-status');
+      setStatus(control,state,target);
+      item.append(check,name,control);list.append(item);
+    }
+    if (!checks.length)return;
+    const actions=document.createElement('div');actions.className='goal-tabs';
+    if (checks.some(({state})=>state==='reached'))actions.append(button('도달 대상 전체선택',()=>{
+      for (const {check,state} of checks)check.checked=state==='reached';
+    }));
+    for (const complete of [true,false]) {
+      const state=complete?'reached':'done';
+      if (checks.some(item=>item.state===state))actions.append(button(complete?'선택 완료':'선택 완료 취소',()=>{
+        change(checks.filter(item=>item.check.checked && item.state===state).map(({target})=>target),complete);
+      },complete?'dialog-action dialog-primary':'dialog-action'));
+    }
+    body.append(actions);
+  }
 
-    const body = row.querySelector('.goal-progress-body');
-    const sorted = records.sort((a,b) => {
-      const order = {pending:0,done:1,withdrawn:2};
-      return order[a.status]-order[b.status] || b.score-a.score ||
-        (a.teamName||'').localeCompare(b.teamName||'','ko');
-    });
-    body.replaceChildren();
-    if (!sorted.length) {
+  function renderRecurringRows(row,body,history,selected) {
+    if (!history.length) {
       body.append('아직 달성한 회차가 없습니다.');
       return;
     }
-    const list = document.createElement('div');
-    list.className = 'goal-round-list';
-    body.append(list);
-    let shown = 0;
-    const more = button('더 보기',showMore);
-    function showMore() {
-      for (const record of sorted.slice(shown,shown+30)) {
-        const item = document.createElement('div');
-        item.className = 'goal-round';
-        const heading = document.createElement('strong');
-        heading.textContent = (record.teamName ? record.teamName+' · ' : '')+record.score+'점';
-        const pending = record.status === 'pending';
-        const done = record.status === 'done';
-        const state = document.createElement('span');
-        state.textContent = pending ? '완료 대기' : done ? '✓ 완료' : '미도달';
-        state.dataset.status = record.status;
-        item.append(heading,state);
-        if (pending || done) item.append(button(pending ? '완료 처리' : '완료 취소',()=>change([record],pending)));
-        list.append(item);
-      }
-      shown = list.childElementCount;
-      if (shown < sorted.length) list.after(more);
-      else more.remove();
+    const rounds=new Map();
+    for (const record of history) {
+      const round=record.milestone===undefined?'once':String(record.milestone);
+      if (!rounds.has(round))rounds.set(round,[]);
+      rounds.get(round).push(record);
     }
-    showMore();
+    const keys=[...rounds.keys()].sort((a,b)=>a==='once'?1:b==='once'?-1:Number(b)-Number(a));
+    const current=keys.includes(row.dataset.round)?row.dataset.round:
+      keys.find(key=>rounds.get(key).some(record=>record.status==='pending'))??keys[0];
+    row.dataset.round=current;
+    const picker=document.createElement('select');
+    picker.setAttribute('aria-label','달성 회차');
+    for (const key of keys) {
+      const pending=rounds.get(key).filter(record=>record.status==='pending').length;
+      const label=key==='once'?'한 번 달성':key+'점 회차';
+      picker.add(new Option(label+(pending?' · 지급 대기 '+pending:''),key,key===current,key===current));
+    }
+    picker.onchange=()=>{
+      row.dataset.round=picker.value;
+      refreshRows();
+      body.querySelector('select').focus();
+    };
+    const label=document.createElement('label');
+    label.className='goal-round-picker';
+    label.append('달성 회차',picker);
+    body.append(label);
+    const names=new Map(teamList().map(team=>[team.id,team.name]));
+    renderTargets(body,rounds.get(current).map(record=>({
+      team:{name:record.teamId===null?'학급':names.get(record.teamId)??record.teamName??'모둠'},
+      state:record.status==='pending'?'reached':record.status==='done'?'done':'unreached',
+      target:record
+    })),selected);
   }
 
   function refreshRows() {
     closeDropdown();
-    for (const row of view.querySelectorAll('.goal-edit-row')) {
-      const goal=system.goals.find(item=>item.id===row.dataset.goal);
-      if (!goal) continue;
-      const found=new Map(system.records.filter(rec=>rec.goalId===goal.id).map(rec=>[rec.teamId,rec]));
-      const status=row.querySelector('.goal-status');
-      if (goal.interval || system.records.some(record=>record.goalId===goal.id && record.milestone!==undefined)) {
-        renderRecurringRows(row,goal,status);
-        continue;
-      }
-      if (goal.type==='class') {
-        const info=describeTarget(goal,{id:null,name:'학급',score:classScore()},found.get(null));
-        row.querySelector('.goal-progress').hidden=true;
-        status.removeAttribute('aria-controls');
-        setStatus(status,info.state,info.target);
-        continue;
-      }
-      const body=row.querySelector('.goal-progress-body');
-      const groups=teamList().map(team=>describeTarget(goal,team,found.get(team.id)));
-      const finished=groups.filter(info=>info.state==='done').length;
-      status.querySelector('.goal-status-text').textContent=
-        (finished && finished===groups.length?'✓ ':'')+finished+'/'+groups.length+' 완료';
-      const selected=new Set([...body.querySelectorAll('input:checked')].map(input=>input.value));
-      body.replaceChildren();
-      const list=document.createElement('div');
-      list.className='goal-team-list';
-      body.append(list);
-      const checks=[];
-      for (const {team,state,target} of groups) {
-        const item=document.createElement('div');
-        item.className='goal-team-progress';
-        if (state==='done') item.dataset.done='true';
-        const check=document.createElement('input');
-        check.type='checkbox';check.disabled=state==='unreached';check.value=target.id;
-        check.checked=!check.disabled&&selected.has(target.id);check.setAttribute('aria-label',team.name+' 선택');
-        if (!check.disabled) checks.push({check,target,state});
-        const name=document.createElement('strong');name.textContent=team.name;
-        const control=button('',null,'dialog-action goal-status');
-        setStatus(control,state,target);
-        item.append(check,name,control);list.append(item);
-      }
-      if (checks.length) {
-        const actions=document.createElement('div');actions.className='goal-tabs';
-        actions.append(button('도달 모둠 전체선택',()=>checks.forEach(({check,state})=>{check.checked=state==='reached';})));
-        for (const complete of [true,false]) actions.append(button(complete?'선택 완료':'선택 완료 취소',()=>{
-          change(checks.filter(({check,state})=>check.checked && state===(complete?'reached':'done')).map(({target})=>target),complete);
-        },complete?'dialog-action dialog-primary':'dialog-action'));
-        body.append(actions);
-      }
+    const row=selectedRow;
+    if (!row) return;
+    const body=row.querySelector('.goal-progress-body');
+    const selected=new Set([...body.querySelectorAll('input:checked')].map(input=>input.value));
+    body.replaceChildren();
+    const goal=system.goals.find(item=>item.id===row.dataset.goal);
+    if (!goal) {
+      body.append('목표를 저장하면 지급 현황을 확인할 수 있습니다.');
+      return;
     }
+    const history=system.records.filter(record=>record.goalId===goal.id);
+    if (goal.interval || history.some(record=>record.milestone!==undefined)) {
+      renderRecurringRows(row,body,history,selected);
+      return;
+    }
+    const found=new Map(history.map(record=>[record.teamId,record]));
+    const targets=goal.type==='class'?[{id:null,name:'학급',score:classScore()}]:teamList();
+    if (!targets.length)body.append('등록된 모둠이 없습니다.');
+    else renderTargets(body,targets.map(team=>describeTarget(goal,team,found.get(team.id))),selected);
   }
-  $('goal-management-view').querySelectorAll('.add-row-btn').forEach(control=>{control.onclick=()=>addRow(control.dataset.type);});
+
+  for (const control of scopeButtons)control.onclick=()=>{
+    const type=control.dataset.goalScope;
+    if (type!==scope) selectGoal($(type+'-goals-list').firstElementChild,type);
+  };
+  for (const control of detailButtons)control.onclick=()=>setDetailMode(control.dataset.goalMode);
+  $('goal-add-selected').onclick=()=>{
+    const row=addRow(scope);
+    setDetailMode('settings');
+    selectGoal(row,scope);
+    row.querySelector('.goal-score').focus();
+  };
+
+  view.addEventListener('keydown',event=>{
+    if (event.key==='Escape' && !dropdown.matches(':popover-open'))closeView();
+  });
   saveButton.onclick=saveGoals;
   $('cancel-goal-view').onclick=$('cancel-goal-edit').onclick=closeView;
   return {openSettings,update,giftGroup,reset(){celebrations.reset();close();previous=null;closeView();}};
