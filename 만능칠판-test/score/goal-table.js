@@ -62,8 +62,8 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
     selectAll.checked=!!eligible && count===eligible;
     selectAll.indeterminate=count>0 && count<eligible;
     selectAll.disabled=!eligible;
-    $('goal-bulk').hidden=count===0;
     $('goal-bulk-count').textContent=count+'개 선택';
+    for(const control of view.querySelectorAll('[data-goal-bulk]'))control.disabled=count===0;
     view.querySelector('[data-goal-bulk=teams]').hidden=scope==='class';
   }
   function refreshScope() {
@@ -247,17 +247,11 @@ export function mountGoalTable({submit,teamList,classScore,modalState,confirmSav
       const input=create('input');input.type='text';input.inputMode='numeric';input.required=true;input.value=value;
       block.append(label(name,input));return input;
     });
-    const message=create('input');message.maxLength=240;message.value=goal.message;
-    const automatic=create('input');automatic.type='checkbox';automatic.checked=!!goal.automatic;
-    const messageLabel=label('메시지',message);messageLabel.className='goal-repeat-message';
-    block.append(messageLabel,label('자동완료',automatic));
-    const picker=goal.type==='team'?teamPicker(goal.teamIds):null;
-    if(picker)block.append(picker.fieldset);
     const preview=create('p');preview.className='goal-repeat-preview';block.append(preview);
     const settings=()=>{
       const [start,interval,count]=[parseGoalScore(inputs[0].value),parseGoalInterval(inputs[1].value),parseGoalInterval(inputs[2].value)];
       if(start===null || interval===null || count===null || start+interval*(count-1)>10000)return null;
-      return {start,interval,count,message:message.value.trim(),automatic:automatic.checked,teamIds:picker?.value()};
+      return {start,interval,count,message:goal.message.trim(),automatic:goal.automatic,teamIds:goal.teamIds};
     };
     function updatePreview() {
       const config=settings();

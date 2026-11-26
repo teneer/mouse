@@ -2,7 +2,7 @@ import {wireTooltips} from '../js/tooltips.js?v=score-slots-1';
 import {createPursuitMonitor,schoolDay,pursuitScore} from './class-activities.js?v=pursuit-alert-1';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=goal-table-1';
-import {wireGoals} from './goals-ui.js?v=goal-cards-1';
+import {wireGoals} from './goals-ui.js?v=goal-bulk-controls-1';
 import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
 import {mountPursuitAlert} from './pursuit-alert.js?v=pursuit-alert-1';
 import {conversionFrame,conversionStarFlight,conversionStarPosition,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-2';

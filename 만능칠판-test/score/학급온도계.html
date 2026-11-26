@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=goal-cards-1">
+    <link rel="stylesheet" href="style.css?v=goal-bulk-controls-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -266,13 +266,13 @@
             </div>
             <button type="button" class="dialog-action" id="goal-add-selected">＋ 목표 추가</button>
           </div>
-          <div id="goal-bulk" role="group" aria-label="선택한 목표 일괄 작업" hidden>
-            <strong id="goal-bulk-count"></strong>
-            <button type="button" class="dialog-action" data-goal-bulk="message">메시지 변경</button>
-            <button type="button" class="dialog-action" data-goal-bulk="teams">적용 모둠 변경</button>
-            <button type="button" class="dialog-action" data-goal-bulk="auto-on">자동완료 켜기</button>
-            <button type="button" class="dialog-action" data-goal-bulk="auto-off">자동완료 끄기</button>
-            <button type="button" class="dialog-action dialog-danger" data-goal-bulk="delete">삭제</button>
+          <div id="goal-bulk" role="group" aria-label="선택한 목표 일괄 작업">
+            <strong id="goal-bulk-count" aria-live="polite">0개 선택</strong>
+            <button type="button" class="dialog-action" data-goal-bulk="message" disabled>메시지 변경</button>
+            <button type="button" class="dialog-action" data-goal-bulk="teams" disabled>적용 모둠 변경</button>
+            <button type="button" class="dialog-action" data-goal-bulk="auto-on" disabled>자동완료 켜기</button>
+            <button type="button" class="dialog-action" data-goal-bulk="auto-off" disabled>자동완료 끄기</button>
+            <button type="button" class="dialog-action dialog-danger" data-goal-bulk="delete" disabled>삭제</button>
           </div>
           <div class="goal-table-scroll">
             <table class="goal-table">
@@ -325,6 +325,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=goal-cards-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
+    <script type="module" src="script.js?v=goal-bulk-controls-1"></script><script type="module" src="panel-ui.js?v=score-batch-rows-1"></script>
 </body>
 </html>
