@@ -170,9 +170,6 @@ function applySharedScore(model,live) {
       goalSystem = readGoals(nextGoals);
       completeReachedAutomaticGoals({count,teams,goalSystem});
       renderGoalFeedback(announce);
-    } else {
-      renderClassGoalTarget();
-      teams.forEach((team,index)=>renderTeamGoal(scoreboard.children[index]?.querySelector('.team-goal-target'),team));
     }
     renderBatchControls();
     return;
@@ -378,15 +375,16 @@ goalMessageResize.observe(scoreboard);
 goalMessageResize.observe(document.getElementById('team-viewport'));
 document.fonts?.ready.then(scheduleGoalMessageFit);
 
-function renderNextGoal(target,next) {
-  target.hidden = next === null;
+function renderNextGoal(target,next,pursuit=null) {
+  target.toggleAttribute('data-pursuit-warning',!!pursuit);
+  target.hidden = !next && !pursuit;
   scheduleGoalMessageFit();
-  if (!next) return;
+  if (!next && !pursuit) return;
   const score = target.querySelector('.score-goal-value');
   const messageCell = target.querySelector('.score-goal-message');
   const text = messageCell.querySelector('.goal-message-text');
-  const label = `${goalScoreFormat.format(next.score)}점`;
-  const message = next.additional
+  const label = pursuit ? '추격당함' : `${goalScoreFormat.format(next.score)}점`;
+  const message = pursuit ? pursuit.message ?? '' : next.additional
     ? next.message ? `${next.message} 외 ${next.additional}개` : `목표 ${next.additional+1}개`
     : next.message ?? '';
   if (score.textContent !== label) score.textContent = label;
@@ -412,8 +410,11 @@ function renderActivities() {
         track.style.animationDuration=Math.max(8,label.length*.38)+'s';
       }
     }
-    if (kind==='class') document.querySelector('.main-scoreboard').classList.toggle('pursuit-behind',!!rule?.enabled && count<limit);
-    else teams.forEach((team,i)=>{
+    if (kind==='class') {
+      const behind=!!rule?.enabled && count<limit;
+      document.querySelector('.main-scoreboard').classList.toggle('pursuit-behind',behind);
+      renderNextGoal(nextClassGoalBanner,behind?null:nextClassGoal(goalSystem,count),behind?rule:null);
+    } else teams.forEach((team,i)=>{
       const card=scoreboard.children[i];
       if (!card) return;
       const behind=!!rule?.enabled && team.score<limit;
@@ -421,6 +422,7 @@ function renderActivities() {
       const select=card.querySelector('.team-select-btn');
       card.classList.toggle('pursuit-behind',behind);
       warning.hidden=!behind;
+      renderNextGoal(card.querySelector('.team-goal-target'),behind?null:nextTeamGoal(goalSystem,team),behind?rule:null);
       if (behind) select.setAttribute('aria-describedby',warning.id);
       else select.removeAttribute('aria-describedby');
     });
@@ -484,16 +486,9 @@ function schedulePursuitDay() {
 }
 setTimeout(schedulePursuitDay,0);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden) renderActivities();});
-function renderClassGoalTarget() {
-  renderNextGoal(nextClassGoalBanner,nextClassGoal(goalSystem,count));
-}
 function renderClassGoalFeedback(announce) {
   goalUI.update(goalSystem,announce);
   goalUI.giftGroup(document.getElementById('class-goal-gifts'));
-  renderClassGoalTarget();
-}
-function renderTeamGoal(target,team) {
-  if (target) renderNextGoal(target,nextTeamGoal(goalSystem,team));
 }
 function renderGoalFeedback(announce) {
   renderActivities();
@@ -501,7 +496,6 @@ function renderGoalFeedback(announce) {
   for (const [index,team] of teams.entries()) {
     const card = scoreboard.children[index];
     if (!card) continue;
-    renderTeamGoal(card.querySelector('.team-goal-target'),team);
     goalUI.giftGroup(card.querySelector('[data-team-gifts]'),team.id);
   }
 }
@@ -682,7 +676,6 @@ function renderTeams() {
     nameSpan.textContent = team.name;
     nameSpan.title = team.name;
     const target = teamGoalTemplate.content.firstElementChild.cloneNode(true);
-    renderTeamGoal(target,team);
     const title = document.createElement('span');
     title.className = 'team-title-row';
     selectButton.appendChild(target);
