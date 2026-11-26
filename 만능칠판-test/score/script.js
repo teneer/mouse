@@ -1,9 +1,10 @@
 import {wireTooltips} from '../js/tooltips.js?v=score-slots-1';
-import {schoolDay,pursuitScore} from './class-activities.js?v=pursuit-manager-1';
+import {createPursuitMonitor,schoolDay,pursuitScore} from './class-activities.js?v=pursuit-alert-1';
 import {fieldConflictOptions,scoreDeltaBasis,scorePatch} from '../js/score-conflicts.js';
 import {freshGoals,readGoals,changeGoals,reconcileGoals,completeReachedAutomaticGoals,nextClassGoal,nextTeamGoal} from './goal-model.js?v=pursuit-manager-1';
 import {wireGoals} from './goals-ui.js?v=score-dialogs-1';
 import {wireScoreAudio} from './score-audio.js?v=class-tools-1';
+import {mountPursuitAlert} from './pursuit-alert.js?v=pursuit-alert-1';
 import {conversionFrame,conversionStarFlight,conversionStarPosition,mergeTeamEffects,scoreRemainder} from './score-display.js?v=star-flight-2';
 
 // 학급온도계: 동일 출처의 탭 간 양방향 동기화
@@ -14,9 +15,20 @@ const sounds = {
   teamIncrease: new Audio('Sound/Plus.MP3'),
   teamDecrease: new Audio('Sound/Minus.MP3'),
   confirm: new Audio('Sound/Confirm.MP3'),
-  success: new Audio('Sound/Success small.MP3')
+  success: new Audio('Sound/Success small.MP3'),
+  pursuit: new Audio('Sound/pursuit-lock-on.wav') // SamsterBirdies, “lock on” (CC0), Freesound #467881.
 };
 const playSound = wireScoreAudio(sounds);
+const monitorPursuit = createPursuitMonitor();
+const showLocalPursuitAlert = window.frameElement ? null : mountPursuitAlert();
+
+function updatePursuitAlert(state,key,day) {
+  const warnings=monitorPursuit(state,day);
+  if(!key || !warnings.length)return;
+  const detail={warnings,play:()=>playSound(sounds.pursuit,1,'pursuit:'+key)};
+  if(window.frameElement)window.frameElement.dispatchEvent(new CustomEvent('score-pursuit-alert',{detail}));
+  else showLocalPursuitAlert(detail);
+}
 
 let count = 0;
 let displayedClassScore = 0;
@@ -141,6 +153,7 @@ function applySharedScore(model,live) {
   if (conflictsDialog.open) drawConflicts(conflicts);
   if (!model) {
     applyStateFields({});
+    updatePursuitAlert({count,teams,goalSystem});
     renderCurrentState();
     return;
   }
@@ -161,6 +174,7 @@ function applySharedScore(model,live) {
   const sameTeamOrder = teams.length === nextTeams.length && teams.every((team,index)=>team.id === nextTeams[index].id);
   if (!sameTeamOrder) selectedTeams.clear();
   const announce = live || ownScoreEvents.has(model.version);
+  updatePursuitAlert(model.state,previous && announce ? model.version : null);
   const sameScores = count === nextCount && linkEnabled === scoreLink.enabled && linkPoints === scoreLink.points &&
     sameTeamOrder && teams.every((team,index)=>team.score === nextTeams[index].score && team.name === nextTeams[index].name);
   if (sameScores) {
@@ -208,6 +222,7 @@ window.whiteboardScore = {
       lastScoreChange = null;
       selectedTeams.clear();
       loadFromStorage();
+      updatePursuitAlert({count,teams,goalSystem});
       renderCurrentState();
     }
   },
@@ -491,12 +506,21 @@ for (const form of pursuitForms) {
 document.getElementById('manage-pursuit').onclick=()=>editPursuit('class');
 document.getElementById('pursuit-close').onclick=()=>pursuitEditor.close();
 pursuitEditor.onclose=()=>scoreModalState(false);
-function schedulePursuitDay() {
+function refreshPursuitDay() {
   renderActivities();
+  const state=sharedMode ? sharedScore?.state : {count,teams,goalSystem};
+  const day=schoolDay();
+  if(initialized && state) {
+    const version=sharedMode ? sharedScore.version : lastAppliedVersion;
+    updatePursuitAlert(state,`day:${day}:${version??''}`,day);
+  }
+}
+function schedulePursuitDay() {
+  refreshPursuitDay();
   setTimeout(schedulePursuitDay,86400000-(Date.now()+9*3600000)%86400000+100);
 }
 setTimeout(schedulePursuitDay,0);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden) renderActivities();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPursuitDay();});
 function renderClassGoalFeedback(announce) {
   goalUI.update(goalSystem,announce);
   goalUI.giftGroup(document.getElementById('class-goal-gifts'));
@@ -530,13 +554,14 @@ function saveToStorage(effect = null, base = sharedScore?.state,key) {
   const state = {...snapshot(version),effect};
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    lastAppliedVersion = version;
-    return true;
   } catch (error) {
     console.error('상태 저장 실패:', error);
     // 저장에 실패했다면 다른 탭에 성공한 것처럼 알리지 않습니다.
     return;
   }
+  lastAppliedVersion = version;
+  updatePursuitAlert(state,version);
+  return true;
 }
 function syncFromStorage(state = readStoredState()) {
   if (sharedMode || !state || !state.version || state.version === lastAppliedVersion) return;
@@ -548,6 +573,7 @@ function syncFromStorage(state = readStoredState()) {
   applyStateFields(state);
   lastAppliedVersion = state.version;
   renderCurrentState(state.effect, true);
+  updatePursuitAlert({count,teams,goalSystem},state.version);
   speakEffect(state.effect,state.version);
 }
 window.addEventListener('storage', event => {
@@ -1244,6 +1270,7 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('load', () => {
   loadFromStorage();
+  updatePursuitAlert({count,teams,goalSystem});
   localBaseline={count,teams:structuredClone(teams)};
   renderCurrentState();
   initialized = true;

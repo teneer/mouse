@@ -2,6 +2,7 @@ import {wireBoardTouch} from './js/board-touch.js?v=board-touch-1';
 import {wireTooltips} from './js/tooltips.js?v=help-1';
 import {answerCoverAt,coverName,installAnswerCoverDrawing,keepCoversAboveAnchors,wireAnswerCover,wireCoverAnchors} from './js/lesson-tools.js?v=board-touch-1';
 import {mountGoalCelebration} from './score/goal-celebration.js?v=celebration-4';
+import {mountPursuitAlert} from './score/pursuit-alert.js?v=pursuit-alert-1';
 import {acquireTabIdentity} from './js/tab-identity.js';
 import {activeView,wireViewTabs} from './js/view-tabs.js?v=answer-cover-1';
 import {setBoardIcon} from './js/board-icons.js?v=answer-cover-1';
@@ -1754,6 +1755,8 @@ function setupIntegratedScorePanel(){
   const celebrationPopup=mountGoalCelebration(celebration);
   frame.addEventListener('score-celebration',event=>celebrationPopup.show(event.detail));
   frame.addEventListener('score-celebration-skip',event=>celebrationPopup.setSkip(event.detail));
+  const showPursuitAlert=mountPursuitAlert();
+  frame.addEventListener('score-pursuit-alert',event=>showPursuitAlert(event.detail));
   frame.addEventListener('score-frame-pointer',()=>{closePopups();closeContext();});
   let dragOffset=0;
   const changeShare=clientX=>{

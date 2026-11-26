@@ -11,3 +11,20 @@ export function pursuitScore(rule,day=schoolDay()) {
   }
   return Math.min(10000,rule.score+periods*rule.step);
 }
+
+export function createPursuitMonitor() {
+  let classCaught=false, teamsCaught=new Set();
+  return ({count,teams,goalSystem},day=schoolDay())=>{
+    const classRule=goalSystem?.classPursuit,teamRule=goalSystem?.teamPursuit;
+    const nextClass=!!classRule?.enabled && count<=pursuitScore(classRule,day);
+    const teamLimit=pursuitScore(teamRule,day);
+    const nextTeams=teamRule?.enabled?teams.filter(team=>team.score<=teamLimit):[];
+    const caughtTeams=nextTeams.filter(team=>!teamsCaught.has(team.id));
+    const warnings=[];
+    if(nextClass && !classCaught)warnings.push({target:'학급',message:classRule.message});
+    if(caughtTeams.length)warnings.push({target:caughtTeams.map(team=>team.name).join(' · '),message:teamRule.message});
+    classCaught=nextClass;
+    teamsCaught=new Set(nextTeams.map(team=>team.id));
+    return warnings;
+  };
+}

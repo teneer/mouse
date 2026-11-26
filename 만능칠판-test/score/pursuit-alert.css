@@ -1,0 +1,38 @@
+.pursuit-alert[hidden] {display:none}
+.pursuit-alert {
+  position:fixed;inset:0;z-index:3000;
+  display:grid;place-items:center;padding:16px;
+  pointer-events:none;
+}
+.pursuit-alert-flash {
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at center,#8709164d 15%,#990c22 100%);
+  animation:pursuit-alert-flash .73333s ease-out 3;
+}
+.pursuit-alert-box {
+  position:relative;width:min(100%,34rem);box-sizing:border-box;
+  max-height:calc(100dvh - 32px);overflow:hidden;
+  padding:clamp(.75rem,3vmin,1.5rem);
+  border:2px solid #28251c;border-radius:12px;
+  background:linear-gradient(#ffda59,#ffda59) padding-box,
+    repeating-linear-gradient(130deg,#242019 0 8px,#fbc738 8px 16px) border-box;
+  border-block-width:12px;border-block-color:transparent;
+  color:#231b0e;text-align:center;overflow-wrap:anywhere;
+  box-shadow:0 12px 40px #28030680;
+}
+.pursuit-alert-box section + section {
+  margin-top:.65rem;padding-top:.65rem;border-top:1px solid #805e24aa;
+}
+.pursuit-alert-target {
+  margin:0;font-size:clamp(.85rem,2.6vmin,1.2rem);font-weight:750;
+}
+.pursuit-alert-heading {
+  display:block;color:#86151e;font-size:clamp(1.65rem,6vmin,3.25rem);line-height:1.1;
+}
+.pursuit-alert-message {
+  margin:.4rem 0 0;font-size:clamp(.9rem,3vmin,1.35rem);font-weight:650;white-space:pre-wrap;
+}
+@keyframes pursuit-alert-flash {
+  0%,100% {opacity:.12}
+  15% {opacity:.55}
+}

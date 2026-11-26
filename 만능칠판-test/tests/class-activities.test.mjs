@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {schoolDay,pursuitScore} from '../score/class-activities.js';
+import {createPursuitMonitor,schoolDay,pursuitScore} from '../score/class-activities.js';
 import {changeGoals,freshGoals} from '../score/goal-model.js';
 
 test('daily pursuit crosses Korean midnight once and catches up after reopening',()=>{
@@ -31,4 +31,21 @@ test('team and class rules have separate revisions and stale edits are rejected'
   assert.equal(changeGoals(state,{...edit,key:'stale'}),false);
   assert.equal(changeGoals(state,{...edit,slot:'teamPursuit',key:'b'}),true);
   assert.equal(state.goalSystem.classPursuit.message,'오늘 청소');
+});
+
+test('pursuit alerts include newly caught targets at equality and reset on escape',()=>{
+  const monitor=createPursuitMonitor();
+  const rules={enabled:true,day:1,score:4,step:1,mode:'daily'};
+  const state={count:5,teams:[{id:'a',name:'1모둠',score:5},{id:'b',name:'2모둠',score:4}],goalSystem:{
+    classPursuit:{...rules,message:'학급 메시지'},teamPursuit:{...rules,message:'모둠 메시지'}
+  }};
+  monitor(state,1);
+  assert.deepEqual(monitor(state,1),[]);
+  assert.deepEqual(monitor(state,2),[
+    {target:'학급',message:'학급 메시지'},{target:'1모둠',message:'모둠 메시지'}
+  ]);
+  state.count=6;
+  assert.deepEqual(monitor(state,2),[]);
+  state.count=4;
+  assert.deepEqual(monitor(state,2),[{target:'학급',message:'학급 메시지'}]);
 });
