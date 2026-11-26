@@ -49,7 +49,7 @@ export class CanvasTools {
     this.setMode('select');
   }
   pointer(e) {const p=e.touches?.[0] || e.changedTouches?.[0] || e;return {x:p.clientX,y:p.clientY};}
-  setMode(mode) {
+  setMode(mode,{reapply=false}={}) {
     this.ink=null;this.inkStart=null;
     this.mode=mode;const c=this.canvas;
     c.discardActiveObject();c.isDrawingMode=mode==='pen'||mode==='marker';c.selection=mode==='select';c.skipTargetFind=mode==='move';
@@ -68,7 +68,7 @@ export class CanvasTools {
       c.freeDrawingBrush=new fabric.PencilBrush(c);c.freeDrawingBrush.width=settings.width;
       c.freeDrawingBrush.color=mode==='marker'?new fabric.Color(settings.color).setAlpha(0.32).toRgba():settings.color;
     }
-    c.requestRenderAll();this.onMode(mode);
+    c.requestRenderAll();this.onMode(mode,{reapply});
   }
   updateBrush() {
     const mode=this.mode;if(mode==='pen'||mode==='marker') {

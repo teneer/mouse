@@ -11,7 +11,7 @@ import {VERSION,DEFAULT_BG,uid,clone,emptyContent,SERIAL_PROPS,MAX_BACKUP_BYTES}
 import {BoardStore,TabSync,SESSION_KEY,readLegacy} from './data.js?v=page-selection-1';
 import {PageHistory} from './history.js';
 import {SystemClipboard} from './clipboard.js?v=import-sets-1';
-import {CanvasTools} from './js/canvas-tools.js?v=board-touch-1';
+import {CanvasTools} from './js/canvas-tools.js?v=cover-continuous-1';
 import {QUICK_DEFAULTS,SIZE_DEFAULTS,TEXT_TYPES,targets,applyAppearance,orderedToEdge,parseQuickColors,SIZE_LABELS,SIZE_LIMITS,defaultFavoriteSize,normalizeFavoriteSize,scaleFavoriteSize} from './js/board-options.js';
 import {loadCanvas,makeThumbnail} from './js/previews.js';
 import {assetReferences, prepareFiles, BoardFiles, readDataURL} from './js/files.js';
@@ -252,13 +252,15 @@ async function run(fn,label='처리 중입니다.',{keepPageList=false}={}) {
   try {await fn();}catch(e){if(e?.name==='AbortError')notify('가져오기를 취소했습니다.');else fail(e);}
   finally {busy=false;importAbort=null;restoreInteraction();updateHistory();}
 }
-async function setPage(page,reset=false,keepView=true) {
+async function setPage(page,reset=false,keepView=true,{restoreTool=false}={}) {
+  const mode=restoreTool?tools.mode:'select';
+  const reapply=restoreTool && current?.id===page.id;
   rememberView();c.discardActiveObject();const previous=current?clone(current):null;
   current=clone(page);cloudBase=cloudActive()?clone(page.content):null;dirty=false;
   try {await loadCanvas(c,current.content.canvas);await checkFiles(current.content);}catch(error){
     current=previous;cloudBase=cloudActive()?previous?.content:null;if(previous)await loadCanvas(c,previous.content.canvas);throw error;
   }
-  tools.setMode('select');
+  tools.setMode(mode,{reapply});
   keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);receiveCoverSync();
   const view=keepView?session.views[current.id]:null;
   if(Array.isArray(view)&&view.length===6&&view.every(Number.isFinite)&&view[0]>=0.1&&view[0]<=10) {
@@ -1284,7 +1286,8 @@ async function refreshCloud() {
     cloudHistory=board.history;
     if(!remote || remote.deleted || !cloudBase){
       cloudBase=null;dirty=false;
-      await run(()=>setPage(remote && !remote.deleted?remote:pages[0],true));
+      const samePage=!!remote && !remote.deleted;
+      await run(()=>setPage(samePage?remote:pages[0],true,true,{restoreTool:samePage}));
     }else if(remote.version!==current.version || pagePatch(cloudBase,remote.content) || pagePatch(current.content,cloudBase)){
       if(isTextEditing()){
         const edit=c.getActiveObject();
@@ -1314,8 +1317,7 @@ async function refreshCloud() {
         const mode=tools.mode;
         const selected=c.getActiveObjects().map(object=>object.id);
         await run(async()=>{
-          await setPage(remote,true);
-          tools.setMode(mode);
+          await setPage(remote,true,true,{restoreTool:true});
           const objects=c.getObjects().filter(object=>selected.includes(object.id) && !object.wbPinned);
           if(mode==='select' && objects.length)c.setActiveObject(objects.length===1?objects[0]:new fabric.ActiveSelection(objects,{canvas:c}));
           keepCoversAboveAnchors(c);applyCoverView(session.coverViews?.[current.id]);receiveCoverSync();
@@ -1380,8 +1382,7 @@ async function refreshRemote() {
       await run(async()=>{
         const next=remote || all[0] || await store.ensurePage(emptyContent(c.width,c.height));
         if(!all.length)pages=await store.listPages();
-        const mode=tools.mode;
-        await setPage(next,true);tools.setMode(mode);status('다른 탭의 변경을 반영했습니다.');
+        await setPage(next,true,true,{restoreTool:true});status('다른 탭의 변경을 반영했습니다.');
       },'다른 탭의 변경을 반영하는 중입니다.');
     } else {current.order=remote.order;renderPages();}
   } catch(e){console.error('탭 동기화 오류',e);status('동기화 확인 실패','error');}
@@ -1800,8 +1801,8 @@ async function boot() {
   c=new fabric.Canvas('whiteboardCanvas',{width:boardViewportWidth(),height:boardViewportHeight(),preserveObjectStacking:true,selection:true,fireMiddleClick:true,stopContextMenu:true,enablePointerEvents:true});
   fabric.Object.prototype.cornerStyle='circle';fabric.Object.prototype.cornerSize=10;fabric.Object.prototype.transparentCorners=false;fabric.Object.prototype.setControlsVisibility({mtr:false});
   wireCoverAnchors(c);
-  tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&canEditBoard()&&!busy&&!modalOpen(),onChange:changed,onViewport:()=>rememberView(true),onText:p=>addText('텍스트',p,true),onMode:mode=>{
-    answerCoverTool?.deactivate();
+  tools=new CanvasTools({canvas:c,canEdit:()=>!!current&&canEditBoard()&&!busy&&!modalOpen(),onChange:changed,onViewport:()=>rememberView(true),onText:p=>addText('텍스트',p,true),onMode:(mode,{reapply})=>{
+    if(!reapply)answerCoverTool?.deactivate();
     const map={selectMoveToggleBtn:'select',penModeBtn:'pen',markerModeBtn:'marker',freeTextModeBtn:'text',eraserModeBtn:'eraser'};
     for(const [id,m] of Object.entries(map))$(id).classList.toggle('active-select',mode===m);
     $('selectMoveLabel').textContent=mode==='move'?'이동':'선택';setBoardIcon($('selectMoveToggleBtn'),mode==='move'?'hand':'select');$('selectMoveToggleBtn').classList.toggle('active-move',mode==='move');
