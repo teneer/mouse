@@ -46,7 +46,7 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
     if(available<=0)return;
     const bottomStyle=getComputedStyle(bottomRow);
     const blockHeight=parseFloat(bottomStyle.paddingTop)+parseFloat(bottomStyle.paddingBottom);
-    const visible=[...bottomRow.children].filter(child=>getComputedStyle(child).display!=='none');
+    const visible=[...bottomRow.children].filter(child=>child!==sideShortcut && getComputedStyle(child).display!=='none');
     const labelsHeight=visible.reduce((height,child)=>height+(child===viewport?0:child.offsetHeight),blockHeight)
       +Math.max(0,visible.length-1)*parseFloat(bottomStyle.rowGap);
     const {cardWidth}=viewport.hidden ? {cardWidth:0} : measureTeamLayout({
@@ -232,11 +232,12 @@ import { measureTeamLayout } from './team-layout.js?v=goal-cells-1';
   if (frame) {
     const applySide = () => {
       const side = frame.dataset.scoreSide;
+      root.dataset.scoreSide=side??'';
       sideRow.hidden = side !== 'left' && side !== 'right';
       sideShortcut.hidden = sideRow.hidden || frame.dataset.scoreFull === 'true';
       if (!sideRow.hidden) sideButton.textContent = side === 'left' ? '왼쪽' : '오른쪽';
       const label=side==='left'?'점수판을 오른쪽으로 이동':'점수판을 왼쪽으로 이동';
-      sideShortcut.textContent=side==='left'?'→':'←';
+      sideShortcut.textContent=side==='left'?'>':'<';
       sideShortcut.title=label;
       sideShortcut.setAttribute('aria-label',label);
     };

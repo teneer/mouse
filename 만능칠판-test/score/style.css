@@ -327,7 +327,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   text-shadow:none;
   overflow-wrap:anywhere;
 }
-#settings-toggle-btn, #score-maximize, #score-move-side, .main-btn {
+#settings-toggle-btn, #score-maximize, .main-btn {
   min-width:0;
   width:min(44px, 24cqw);
   min-height:36px;
@@ -338,7 +338,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   border-radius:10px;
   cursor:pointer;
 }
-#settings-toggle-btn, #score-maximize, #score-move-side {flex:none;width:min(44px, 18cqw);min-height:36px;font-size:clamp(12px, 12cqw, 21px);line-height:1}
+#settings-toggle-btn, #score-maximize {flex:none;width:min(44px, 18cqw);min-height:36px;font-size:clamp(12px, 12cqw, 21px);line-height:1}
 .class-score-content {
   display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;min-height:0;
   gap:clamp(3px,3cqh,8px);padding-block:clamp(3px,2cqh,8px);
@@ -432,12 +432,28 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
   mask-image:repeating-linear-gradient(to right, transparent 0 max(0%, calc(var(--division, 33.333%) - 1px)), #000 max(0%, calc(var(--division, 33.333%) - 1px)) var(--division, 33.333%));
 }
 #bottom-row {
+  --team-gutter:clamp(4px, 3cqw, 18px);
+  --side-target:24px;
+  position:relative;
   flex:1;
   min-height:0;
   width:100%;
   align-items:stretch;
   gap:10px;
-  padding:10px clamp(4px, 3cqw, 18px) 6px;
+  padding:10px var(--team-gutter) 6px;
+}
+body[data-score-side="right"] #bottom-row:has(> #score-move-side:not([hidden])) {padding-inline-start:calc(var(--side-target) + 4px)}
+body[data-score-side="left"] #bottom-row:has(> #score-move-side:not([hidden])) {padding-inline-end:calc(var(--side-target) + 4px)}
+#score-move-side {
+  position:absolute;z-index:2;inset-block-start:50%;inset-inline-start:2px;
+  transform:translateY(-50%);display:grid;place-items:center;
+  width:var(--side-target);height:40px;padding:0;
+  border:1px solid transparent;border-radius:7px;background:transparent;
+  color:#174866aa;font-size:21px;font-weight:750;line-height:1;cursor:pointer;
+}
+body[data-score-side="left"] #score-move-side {inset-inline-start:auto;inset-inline-end:2px}
+#score-move-side:is(:hover,:focus-visible) {
+  border-color:#7895a8;background:#e6f1f4d9;color:#174866;
 }
 #score-region-splitter {
   display:grid;flex:0 0 14px;place-items:center;z-index:11;
@@ -447,6 +463,8 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 #score-region-splitter:is(:hover,:focus-visible,.dragging) {background:#cde3eb}
 #score-region-splitter:focus-visible {outline:2px solid var(--primary-dark);outline-offset:-2px}
 @media (pointer:coarse) {
+  #bottom-row {--side-target:32px}
+  #score-move-side {height:44px}
   #display-area {--class-region-min:194px}
   #score-region-splitter {flex-basis:24px}
 }
@@ -671,7 +689,7 @@ body {display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidde
 .goal-row input {min-width:0;font-size:12px;padding:5px}
 .add-row-btn {margin-top:8px;background:var(--control-bg);color:var(--text-color)}
 @media (pointer:coarse) {
-  #settings-toggle-btn, #score-maximize, #score-move-side, .main-btn, #batch-score button {min-height:44px}
+  #settings-toggle-btn, #score-maximize, .main-btn, #batch-score button {min-height:44px}
   #batch-score .batch-stepper button {min-height:22px}
 }
 .modal-box {width:min(500px, calc(100vw - 16px));max-width:100%;max-height:calc(100dvh - var(--toolbar-clearance, 0px) - 8px)}

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학급 점수판 v.7 · 통합 패널</title>
-    <link rel="stylesheet" href="style.css?v=score-regions-1">
+    <link rel="stylesheet" href="style.css?v=score-side-edge-1">
     <link rel="stylesheet" href="../dialog.css?v=help-1">
     <link rel="stylesheet" href="celebration.css?v=motion-1">
     <link rel="stylesheet" href="pursuit-alert.css?v=pursuit-alert-1">
@@ -30,7 +30,6 @@
                             </div>
                             <div class="score-header-actions">
                                 <button type="button" id="score-maximize" aria-label="전체 화면" title="전체 화면" aria-pressed="false"><span class="score-screen-icon" aria-hidden="true"></span></button>
-                                <button type="button" id="score-move-side" aria-label="점수판을 왼쪽으로 이동" title="점수판을 왼쪽으로 이동" hidden>←</button>
                                 <button id="settings-toggle-btn" type="button" aria-label="점수판 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
                             </div>
                         </header>
@@ -70,6 +69,7 @@
             <div id="score-region-splitter" role="separator" tabindex="0" aria-label="학급·모둠 영역 높이 조절" aria-orientation="horizontal" aria-controls="class-area bottom-row" aria-valuemin="0" aria-valuemax="100" aria-valuenow="30"></div>
 
             <section id="bottom-row" aria-labelledby="scoreboard-title">
+                <button type="button" id="score-move-side" aria-label="점수판을 왼쪽으로 이동" title="점수판을 왼쪽으로 이동" hidden>&lt;</button>
                 <header class="team-heading">
                     <h2 id="scoreboard-title">모둠 점수</h2>
                     <div class="team-heading-actions">
@@ -284,6 +284,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="script.js?v=pursuit-alert-1"></script><script type="module" src="panel-ui.js?v=score-regions-1"></script>
+    <script type="module" src="script.js?v=pursuit-alert-1"></script><script type="module" src="panel-ui.js?v=score-side-edge-1"></script>
 </body>
 </html>
